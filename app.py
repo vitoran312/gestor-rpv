@@ -11,23 +11,67 @@ class Aplicativo:
     def __init__(self, janela):
         self.janela = janela
         self.banco = Banco()
-        janela.title('Gestor de RPVs')
-        janela.geometry('1100x650')
-        janela.minsize(850, 500)
+        janela.title('Gestor de RPV')
+        janela.geometry('440x340')
+        janela.resizable(False, False)
+        janela.configure(bg='#181a1f')
+        self.historico = None
+        self.configurar_tema()
+
+        menu = ttk.Frame(janela, padding=40)
+        menu.pack(fill='both', expand=True)
+        ttk.Button(menu, text='Nova entrada', style='Menu.TButton',
+                   command=self.formulario).pack(fill='x', pady=(12, 16))
+        ttk.Button(menu, text='Ver histórico total', style='Menu.TButton',
+                   command=self.mostrar_historico).pack(fill='x', pady=(0, 16))
+        ttk.Button(menu, text='Sair', style='Menu.TButton',
+                   command=janela.destroy).pack(fill='x')
+
+    def configurar_tema(self):
         estilo = ttk.Style()
         estilo.theme_use('clam')
-        estilo.configure('.', font=('Verdana', 10))
-        estilo.configure('Titulo.TLabel', font=('Verdana', 20, 'bold'))
-        estilo.configure('Treeview', rowheight=32)
-        estilo.configure('Treeview.Heading', font=('Verdana', 10, 'bold'))
+        fundo, campo, texto = '#181a1f', '#262a33', '#f2f4f8'
+        estilo.configure('.', font=('Verdana', 10), background=fundo,
+                         foreground=texto, bordercolor='#414754',
+                         lightcolor=campo, darkcolor=fundo, troughcolor=fundo)
+        estilo.configure('TButton', background='#303745', padding=(12, 10))
+        estilo.map('TButton', background=[('pressed', '#234f78'), ('active', '#3c526b')],
+                   foreground=[('disabled', '#8b929e'), ('!disabled', texto)])
+        estilo.configure('Menu.TButton', font=('Verdana', 16, 'bold'), padding=(20, 15))
+        for tipo in ('TEntry', 'TCombobox'):
+            estilo.configure(tipo, fieldbackground=campo, foreground=texto,
+                             insertcolor=texto, padding=6)
+            estilo.map(tipo, fieldbackground=[('readonly', campo)],
+                       foreground=[('readonly', texto)],
+                       selectbackground=[('!disabled', '#345777')],
+                       selectforeground=[('!disabled', texto)])
+        estilo.configure('Treeview', background=campo, fieldbackground=campo,
+                         foreground=texto, rowheight=34)
+        estilo.map('Treeview', background=[('selected', '#345777')],
+                   foreground=[('selected', texto)])
+        estilo.configure('Treeview.Heading', background='#303745',
+                         font=('Verdana', 10, 'bold'), padding=8)
+        estilo.map('Treeview.Heading', background=[('active', '#3c526b')])
+        self.janela.option_add('*TCombobox*Listbox.background', campo)
+        self.janela.option_add('*TCombobox*Listbox.foreground', texto)
+        self.janela.option_add('*TCombobox*Listbox.selectBackground', '#345777')
+        self.janela.option_add('*TCombobox*Listbox.selectForeground', texto)
 
-        corpo = ttk.Frame(janela, padding=20)
+    def mostrar_historico(self):
+        if self.historico is not None and self.historico.winfo_exists():
+            self.historico.lift()
+            self.historico.focus_set()
+            return
+        self.historico = tk.Toplevel(self.janela)
+        self.historico.title('Histórico total — Gestor de RPV')
+        self.historico.geometry('1100x650')
+        self.historico.minsize(850, 500)
+        self.historico.configure(bg='#181a1f')
+        corpo = ttk.Frame(self.historico, padding=20)
         corpo.pack(fill='both', expand=True)
-        ttk.Label(corpo, text='Gestor de RPVs', style='Titulo.TLabel').pack(anchor='w')
-        ttk.Label(corpo, text='Suas aquisições organizadas em um só lugar.').pack(anchor='w', pady=(4, 18))
         barra = ttk.Frame(corpo)
         barra.pack(fill='x', pady=(0, 12))
-        ttk.Button(barra, text='Nova RPV', command=self.formulario).pack(side='left')
+        ttk.Button(barra, text='Nova entrada', command=self.formulario).pack(side='left')
         ttk.Button(barra, text='Abrir registro', command=self.abrir).pack(side='left', padx=8)
         ttk.Label(barra, text='Buscar nome ou data:').pack(side='left', padx=(20, 6))
         self.busca = tk.StringVar()
@@ -58,6 +102,8 @@ class Aplicativo:
         self.atualizar()
 
     def atualizar(self):
+        if self.historico is None or not self.historico.winfo_exists():
+            return
         registros = self.banco.listar(self.busca.get().strip())
         self.tabela.delete(*self.tabela.get_children())
         for r in registros:
@@ -79,9 +125,10 @@ class Aplicativo:
     def formulario(self, identificador=None):
         registro = self.banco.obter(identificador) if identificador else None
         tela = tk.Toplevel(self.janela)
-        tela.title('Editar RPV' if registro else 'Nova RPV')
+        tela.title('Editar registro' if registro else 'Nova entrada')
+        tela.configure(bg='#181a1f')
         tela.resizable(False, False)
-        tela.transient(self.janela)
+        tela.transient(self.historico if self.historico is not None and self.historico.winfo_exists() else self.janela)
         tela.grab_set()
         quadro = ttk.Frame(tela, padding=20)
         quadro.pack(fill='both', expand=True)
@@ -143,7 +190,10 @@ class Aplicativo:
         tem_comissao.trace_add('write', exibir_comissao)
         exibir_comissao()
         ttk.Label(quadro, text='Observações').grid(row=9, column=0, sticky='nw', pady=10)
-        observacoes = tk.Text(quadro, height=4, width=32, wrap='word', font=('Verdana', 10))
+        observacoes = tk.Text(quadro, height=4, width=32, wrap='word', font=('Verdana', 10),
+                              bg='#262a33', fg='#f2f4f8', insertbackground='#f2f4f8',
+                              selectbackground='#345777', selectforeground='white',
+                              relief='flat', padx=6, pady=6)
         observacoes.grid(row=9, column=1, pady=10)
         if registro:
             observacoes.insert('1.0', registro['observacoes'])

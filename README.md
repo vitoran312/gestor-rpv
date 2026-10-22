@@ -1,9 +1,13 @@
-# Gestor de RPVs
+# Gestor de RPV
 
 Aplicativo pessoal para Windows, escrito em Python com Tkinter e SQLite.
 Cada computador mantém seus próprios dados, sem servidor ou sincronização.
 
 ## Primeira versão
+
+A abertura é um menu escuro de tamanho fixo, sem campos de entrada, com os botões
+**Nova entrada**, **Ver histórico total** e **Sair**. O cadastro abre em uma janela
+separada. O histórico reúne todos os registros e permite buscar e editar.
 
 - Cadastro e edição de compras de RPVs, com nome do titular e data de aquisição.
 - Valores de aquisição e recebimento previsto; lucro previsto calculado automaticamente.
@@ -45,7 +49,7 @@ Após validar a interface:
 
 ```bat
 python -m pip install pyinstaller
-python -m PyInstaller --onefile --windowed --name "Gestor de RPVs" app.py
+python -m PyInstaller --onefile --windowed --name "Gestor de RPV" app.py
 ```
 
 O executável será criado em `dist`. Atualizar o executável não substitui o banco
@@ -57,7 +61,6 @@ salvo na pasta de dados do usuário.
 - Cópia dos dados de destino usados em cada operação.
 - Prorrogações em histórico próprio, sem criar colunas para cada nova data.
 - PDFs anexados, recebimento integral e valor recebido destacado em verde.
-- Botão “Ver histórico total” para consultar todos os registros pela interface.
 - Backup e restauração incluindo documentos.
 
 Essas etapas ainda não estão implementadas nesta versão.
