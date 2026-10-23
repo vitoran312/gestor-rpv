@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.4.0
+# Gestor de RPV — 0.5.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -12,7 +12,7 @@ Se precisar ver uma mensagem de erro, abra o Prompt de Comando nessa pasta:
 python app.py
 ```
 
-Mantenha `app.py`, `dados.py`, `componentes.py`, `contas.py` e `versao.py` juntos.
+Mantenha `app.py`, `dados.py`, `componentes.py`, `contas.py`, `interacao.py` e `versao.py` juntos.
 A tela inicial tem os botões **Nova entrada**, **Ver histórico total**,
 **Contas de recebimento** e **Sair**. A versão aparece no canto inferior direito.
 As janelas abrem centralizadas; o histórico abre maximizado no Windows.
@@ -22,8 +22,9 @@ As janelas abrem centralizadas; o histórico abre maximizado no Windows.
 - Vitor e Lilian aparecem inicialmente sem dados bancários inventados. Use
   **Ver / Editar** para completar os cadastros.
 - **Cadastrar nova conta** permite informar identificação, nome completo, endereço,
-  banco, agência (se houver), conta e chave Pix. CPF é opcional; quando informado,
-  precisa ser válido e exclusivo entre as contas.
+  banco, agência, conta e chave Pix. CPF é obrigatório, válido e exclusivo entre
+  as contas. Cadastros antigos sem CPF aparecem como **⚠ Completar cadastro**,
+  em vermelho, e precisam ser completados ao editar.
 - Identificação, CPF, chave Pix e combinação banco/agência/conta não podem se repetir,
   inclusive entre contas desativadas. Endereços podem ser iguais.
   Use o mesmo nome de banco nos cadastros para uma comparação consistente.
@@ -31,16 +32,20 @@ As janelas abrem centralizadas; o histórico abre maximizado no Windows.
   aparecem em novas entradas; continuam disponíveis na edição da RPV que já as usa.
 - Cada nova operação guarda uma cópia dos dados de recebimento. Alterar uma conta
   não reescreve essa cópia nas operações antigas. O botão **Dados de recebimento**
-  do registro permite consultar e copiar os dados preservados.
+  do registro permite consultar os dados preservados. Para copiá-los, clique
+  com o botão direito sobre os dados e escolha **Copiar**.
 - A migração só conhece os dados existentes na versão antiga (Vitor ou Lilian).
   Não preenche retroativamente os dados bancários desconhecidos dos registros antigos.
 
 ## Cadastro e histórico
 
-- Nomes completos são salvos com iniciais maiúsculas.
-- Digite valores normalmente: `10560,50` ou `10560`. Ao sair do campo,
-  eles serão formatados como `R$ 10.560,50` ou `R$ 10.560,00`.
-  O prefixo R$ é fixo, sem mover o cursor durante a digitação.
+- Nomes completos ganham iniciais maiúsculas enquanto você digita, inclusive
+  após espaços. Identificação, endereço, banco, busca e observações começam
+  com maiúscula. Chaves Pix e identificadores bancários mantêm sua escrita original.
+- Os dois últimos dígitos dos valores são sempre centavos: `5200000` mostra
+  `R$ 52.000,00`; `1523659` mostra `R$ 15.236,59`. A máscara é aplicada a cada tecla,
+  sem salto do cursor. Também é possível colar um valor já formatado, como
+  `R$ 15.236,59`. O prefixo R$ permanece fixo.
 - A aquisição deve ser maior que zero e não pode superar o recebimento previsto.
 - Comissão é opcional e apenas informativa: não altera o lucro.
 - Os valores são guardados em centavos, sem ponto flutuante.
@@ -52,6 +57,17 @@ As janelas abrem centralizadas; o histórico abre maximizado no Windows.
 - Cada prorrogação é um registro separado, sem criar colunas adicionais por data.
   A tabela mostra a previsão atual e a quantidade de prorrogações.
 - Cabeçalhos e valores da tabela são centralizados.
+
+## Clique direito
+
+- Campos de texto: **Recortar**, **Copiar**, **Colar** e **Selecionar tudo**.
+  Os atalhos de teclado continuam funcionando. Campos somente de leitura
+  permitem copiar, mas não alterar o conteúdo.
+- Histórico: clique direito em uma linha para **Editar**, **Excluir**,
+  adicionar **Prorrogação** ou **Copiar**.
+- Contas: clique direito em uma linha para **Editar**, **Desativar/Reativar**
+  ou **Copiar** os dados completos.
+- Não há mais botão “Copiar dados”; a ação está no menu de contexto.
 
 ## Dados e backup
 

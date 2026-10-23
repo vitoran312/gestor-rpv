@@ -9,6 +9,7 @@ from dados import Banco, centavos, moeda, data_iso, data_br, nome_formatado
 from componentes import CampoMoeda, CampoData, centralizar, maximizar
 from contas import JanelaContas, dados_para_copiar
 from versao import VERSAO
+from interacao import instalar_menu_texto, aplicar_formato, capitalizar_inicio, menu_copia, novo_menu, mostrar_menu, copiar_texto
 
 
 class Aplicativo:
@@ -22,6 +23,7 @@ class Aplicativo:
         self.historico = None
         self.janela_contas = None
         self.configurar_tema()
+        instalar_menu_texto(janela)
 
         menu = ttk.Frame(janela, padding=40)
         menu.place(relx=0.5, rely=0.5, anchor='center', width=440)
@@ -98,7 +100,9 @@ class Aplicativo:
         ttk.Button(barra, text='Excluir', command=self.excluir).pack(side='left')
         ttk.Label(barra, text='Buscar nome ou data:').pack(side='left', padx=(20, 6))
         self.busca = tk.StringVar()
-        ttk.Entry(barra, textvariable=self.busca).pack(side='left', fill='x', expand=True)
+        entrada_busca = ttk.Entry(barra, textvariable=self.busca)
+        entrada_busca.pack(side='left', fill='x', expand=True)
+        aplicar_formato(entrada_busca, self.busca, capitalizar_inicio)
         self.busca.trace_add('write', lambda *_: self.atualizar())
 
         quadro = ttk.Frame(corpo)
@@ -118,6 +122,7 @@ class Aplicativo:
         horizontal.grid(row=1, column=0, sticky='ew')
         quadro.rowconfigure(0, weight=1)
         quadro.columnconfigure(0, weight=1)
+        self.tabela.bind('<Button-3>', self.menu_historico)
         self.tabela.bind('<ButtonRelease-1>', self.clicar_historico)
         self.tabela.bind('<Double-1>', self.duplo_clique_historico)
         self.resumo = ttk.Label(corpo)
@@ -142,6 +147,19 @@ class Aplicativo:
         self.resumo.config(text=f'{len(registros)} registro(s) • '
             f"Investido: R$ {moeda(sum(r['custo'] for r in registros))} • "
             f"Lucro previsto: R$ {moeda(sum(r['previsto'] - r['custo'] for r in registros))}")
+
+    def menu_historico(self, evento):
+        linha = self.tabela.identify_row(evento.y)
+        menu = novo_menu(self.tabela)
+        if linha:
+            self.tabela.selection_set(linha)
+            menu.add_command(label='Editar', command=self.abrir)
+            menu.add_command(label='Excluir', command=self.excluir)
+            menu.add_command(label='Prorrogação', command=lambda: self.prorrogar(int(linha)))
+            menu.add_command(label='Copiar', command=lambda: copiar_texto(self.tabela, '\t'.join(self.tabela.item(linha, 'values'))))
+            menu.add_separator()
+        menu.add_command(label='Nova entrada', command=self.formulario)
+        return mostrar_menu(menu, evento)
 
     def clicar_historico(self, evento):
         if self.tabela.identify_region(evento.x, evento.y) != 'cell':
@@ -295,7 +313,7 @@ class Aplicativo:
             entrada.grid(row=linha, column=1, sticky='ew', pady=6)
             if chave == 'nome':
                 entrada.focus_set()
-                entrada.bind('<FocusOut>', lambda _: campos['nome'].set(nome_formatado(campos['nome'].get())))
+                aplicar_formato(entrada, campos['nome'], str.title)
 
         lucro = tk.StringVar()
         ttk.Label(quadro, text='Lucro previsto').grid(row=6, column=0, sticky='w', pady=6)
@@ -336,6 +354,17 @@ class Aplicativo:
                               selectbackground='#345777', selectforeground='white',
                               relief='flat', padx=6, pady=6)
         observacoes.grid(row=9, column=1, pady=10)
+
+        def capitalizar_observacoes(_evento=None):
+            texto = observacoes.get('1.0', 'end-1c')
+            novo = capitalizar_inicio(texto)
+            if texto != novo:
+                posicao = observacoes.index('insert')
+                observacoes.delete('1.0', tk.END)
+                observacoes.insert('1.0', novo)
+                observacoes.mark_set('insert', posicao)
+        observacoes.bind('<KeyRelease>', capitalizar_observacoes)
+        observacoes.bind('<<Paste>>', lambda _: observacoes.after_idle(capitalizar_observacoes))
         if registro:
             observacoes.insert('1.0', registro['observacoes'])
 
@@ -363,8 +392,10 @@ class Aplicativo:
             self.atualizar()
             tela.destroy()
 
+        ttk.Label(quadro, text='Os dois últimos dígitos são centavos: 1523659 → R$ 15.236,59.',
+                  wraplength=650).grid(row=10, column=0, columnspan=2, sticky='w', pady=(4, 8))
         botoes = ttk.Frame(quadro)
-        botoes.grid(row=10, column=0, columnspan=2, sticky='e', pady=(10, 0))
+        botoes.grid(row=11, column=0, columnspan=2, sticky='e', pady=(10, 0))
         ttk.Button(botoes, text='Dados de recebimento',
                    command=lambda: self.ver_dados_recebimento(tela, registro, mapa_contas.get(campos['conta'].get()))).pack(side='left', padx=8)
         ttk.Button(botoes, text='Cancelar', command=tela.destroy).pack(side='left', padx=8)
@@ -391,20 +422,17 @@ class Aplicativo:
         corpo = ttk.Frame(tela, padding=20)
         corpo.pack(fill='both', expand=True)
         texto = dados_para_copiar(conta)
-        ttk.Label(corpo, text=texto, wraplength=550).pack(anchor='w', pady=(0, 15))
+        rotulo_dados = ttk.Label(corpo, text=texto, wraplength=550)
+        rotulo_dados.pack(anchor='w', pady=(0, 15))
+        menu_copia(rotulo_dados, lambda: texto)
         if registro and registro['conta_id'] == conta_id:
             ttk.Label(corpo, text='Dados preservados do cadastro desta operação.', wraplength=550).pack(anchor='w', pady=(0, 15))
-
-        def copiar():
-            tela.clipboard_clear()
-            tela.clipboard_append(texto)
 
         def fechar():
             tela.destroy()
             if pai.winfo_exists():
                 pai.grab_set()
 
-        ttk.Button(corpo, text='Copiar dados', command=copiar).pack(side='left')
         ttk.Button(corpo, text='Fechar', command=fechar).pack(side='right')
         tela.protocol('WM_DELETE_WINDOW', fechar)
         tela.bind('<Escape>', lambda _: fechar())

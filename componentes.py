@@ -32,30 +32,107 @@ def maximizar(janela):
 
 
 def formatar_digitacao_moeda(texto):
-    """Formata valores em reais; a vírgula é digitada pelo usuário."""
-    return moeda(centavos(texto.strip() or '0'))
+    """Números sem separadores são centavos; valores formatados podem ser colados."""
+    texto = texto.strip()
+    if not texto:
+        return moeda(0)
+    if texto.isascii() and texto.isdigit():
+        valor = int(texto)
+        if valor > 99999999999999:
+            raise ValueError('Valor acima do limite permitido.')
+        return moeda(valor)
+    return moeda(centavos(texto))
 
 
 class CampoMoeda(ttk.Frame):
     def __init__(self, pai, variavel):
         super().__init__(pai, style='Dinheiro.TFrame', padding=(8, 1))
         self.variavel = variavel
-        variavel.set(formatar_digitacao_moeda(variavel.get()))
+        # A variável pública contém reais formatados, prontos para persistência.
+        variavel.set(moeda(centavos(variavel.get() or '0')))
         ttk.Label(self, text='R$', style='Dinheiro.TLabel').pack(side='left')
         self.entrada = ttk.Entry(self, textvariable=variavel, justify='right', width=26)
         self.entrada.pack(side='left', fill='x', expand=True)
+        self.entrada.bind('<KeyPress>', self.tecla)
+        self.entrada.bind('<<Paste>>', self.colar)
+        self.entrada.bind('<<Cut>>', self.recortar)
         self.entrada.bind('<FocusOut>', self.formatar)
         self.entrada.bind('<FocusIn>', self.selecionar)
 
     def selecionar(self, _evento=None):
-        # Facilita substituir o valor inicial, sem reescrever o texto a cada tecla.
         self.entrada.selection_range(0, tk.END)
+
+    def editar(self, acao, inserir=''):
+        texto = self.variavel.get()
+        if inserir and not any(c in '123456789' for c in texto):
+            self.entrada.selection_range(0, tk.END)
+        inicio = self.entrada.index('insert')
+        fim = inicio
+        selecionado = self.entrada.selection_present()
+        if selecionado:
+            inicio = self.entrada.index('sel.first')
+            fim = self.entrada.index('sel.last')
+        antes = sum(c.isdigit() for c in texto[:inicio])
+        depois = sum(c.isdigit() for c in texto[:fim])
+        digitos = ''.join(c for c in texto if c.isdigit())
+        if selecionado:
+            digitos = digitos[:antes] + digitos[depois:]
+        elif acao == 'BackSpace' and antes:
+            digitos = digitos[:antes-1] + digitos[antes:]
+            antes -= 1
+        elif acao == 'Delete':
+            digitos = digitos[:antes] + digitos[antes+1:]
+        digitos = digitos[:antes] + inserir + digitos[antes:]
+        posicao = antes + len(inserir)
+        direita = len(digitos) - posicao
+        try:
+            novo = formatar_digitacao_moeda(digitos)
+        except ValueError:
+            self.entrada.bell()
+            return 'break'
+        self.variavel.set(novo)
+        self.entrada.selection_clear()
+        cursor = len(novo)
+        if direita:
+            vistos = 0
+            for indice in range(len(novo)-1, -1, -1):
+                if novo[indice].isdigit():
+                    vistos += 1
+                if vistos == direita:
+                    cursor = indice
+                    break
+        self.entrada.icursor(cursor)
+        return 'break'
+
+    def tecla(self, evento):
+        if evento.keysym in ('BackSpace', 'Delete'):
+            return self.editar(evento.keysym)
+        if evento.char in '0123456789' and evento.char:
+            return self.editar('Inserir', evento.char)
+        if evento.char and evento.char.isprintable():
+            return 'break'
+
+    def colar(self, _evento=None):
+        try:
+            texto = self.entrada.clipboard_get().strip()
+            valor = formatar_digitacao_moeda(texto)
+        except (tk.TclError, ValueError):
+            self.entrada.bell()
+            return 'break'
+        return self.editar('Inserir', ''.join(c for c in valor if c.isdigit()).lstrip('0') or '0')
+
+    def recortar(self, _evento=None):
+        if self.entrada.selection_present():
+            texto = self.variavel.get()[self.entrada.index('sel.first'):self.entrada.index('sel.last')]
+            self.entrada.clipboard_clear()
+            self.entrada.clipboard_append(texto)
+            self.editar('Delete')
+        return 'break'
 
     def formatar(self, _evento=None):
         try:
-            self.variavel.set(formatar_digitacao_moeda(self.variavel.get()))
+            self.variavel.set(moeda(centavos(self.variavel.get())))
         except ValueError:
-            # O formulário mostrará a mensagem de validação ao salvar.
             pass
 
 

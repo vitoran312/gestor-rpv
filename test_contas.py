@@ -15,7 +15,7 @@ def dados_rpv(**valores):
 
 
 def dados_conta(**valores):
-    dados = dict(identificacao='Conta teste', nome='titular DE teste', cpf='', endereco='Endereço compartilhado',
+    dados = dict(identificacao='Conta teste', nome='titular DE teste', cpf='52998224725', endereco='Endereço compartilhado',
                  banco='Banco Teste', agencia='0001', numero='12345-6', pix='teste@example.com')
     dados.update(valores)
     return dados
@@ -30,20 +30,21 @@ class TestContas(unittest.TestCase):
 
     def test_duplicidades_endereco_compartilhado_e_edicao(self):
         primeiro = self.banco.salvar_conta(dados_conta())
-        outra = dados_conta(identificacao='Outra', numero='99999-1', pix='outra@example.com')
+        outra = dados_conta(identificacao='Outra', cpf='11144477735', numero='99999-1', pix='outra@example.com')
         segundo = self.banco.salvar_conta(outra)
         self.assertEqual(self.banco.obter_conta(segundo)['endereco'], self.banco.obter_conta(primeiro)['endereco'])
         self.banco.salvar_conta(dados_conta(), primeiro)
-        for dados in (dados_conta(identificacao=' CONTA TESTE ', numero='888'),
-                      dados_conta(identificacao='Duplicada', numero='123456', pix='nova@example.com'),
-                      dados_conta(identificacao='Duplicada', numero='888', pix='TESTE@example.com')):
+        for dados in (dados_conta(identificacao=' CONTA TESTE ', cpf='12345678909', numero='888'),
+                      dados_conta(identificacao='Duplicada', cpf='12345678909', numero='123456', pix='nova@example.com'),
+                      dados_conta(identificacao='Duplicada', cpf='12345678909', numero='888', pix='TESTE@example.com')):
             with self.subTest(dados=dados), self.assertRaises(ValueError):
                 self.banco.salvar_conta(dados)
         self.banco.salvar_conta(dados_conta(cpf='529.982.247-25'), primeiro)
         with self.assertRaises(ValueError):
             self.banco.salvar_conta(dados_conta(identificacao='CPF repetido', cpf='52998224725', numero='777', pix='cpf@example.com'))
-        with self.assertRaises(ValueError):
-            self.banco.salvar_conta(dados_conta(cpf='11111111111'))
+        for cpf in ('', '11111111111'):
+            with self.subTest(cpf=cpf), self.assertRaises(ValueError):
+                self.banco.salvar_conta(dados_conta(cpf=cpf))
 
     def test_snapshot_desativacao_reativacao_e_nome(self):
         identificador = self.banco.salvar_conta(dados_conta())

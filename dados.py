@@ -62,7 +62,7 @@ def normalizar(texto):
 
 def validar_cpf(texto):
     if not texto.strip():
-        return None
+        raise ValueError('Informe o CPF.')
     if re.search(r'[^0-9.\-\s]', texto):
         raise ValueError('CPF inválido.')
     cpf = re.sub(r'\D', '', texto)
@@ -169,10 +169,12 @@ class Banco:
     def salvar_conta(self, dados, identificador=None):
         dados = {k: dados.get(k, '').strip() for k in
                  ('identificacao', 'nome', 'cpf', 'endereco', 'banco', 'agencia', 'numero', 'pix')}
-        for campo in ('identificacao', 'nome', 'endereco', 'banco', 'numero', 'pix'):
+        for campo in ('identificacao', 'nome', 'cpf', 'endereco', 'banco', 'numero', 'pix'):
             if not dados[campo]:
-                raise ValueError('Preencha identificação, nome completo, endereço, banco, conta e chave Pix.')
+                raise ValueError('Preencha identificação, nome completo, CPF, endereço, banco, conta e chave Pix.')
         dados['nome'] = nome_formatado(dados['nome'])
+        for campo in ('identificacao', 'endereco', 'banco'):
+            dados[campo] = dados[campo][:1].upper() + dados[campo][1:]
         dados['cpf'] = validar_cpf(dados['cpf'])
         dados['identificacao_chave'] = normalizar(dados['identificacao'])
         dados['banco_chave'] = normalizar(dados['banco'])
@@ -207,6 +209,7 @@ class Banco:
     def salvar(self, dados, identificador=None):
         dados = dict(dados)
         dados['nome'] = nome_formatado(dados['nome'])
+        dados['observacoes'] = dados['observacoes'][:1].upper() + dados['observacoes'][1:]
         if not dados['nome']:
             raise ValueError('Informe o nome completo do titular original.')
         if dados['custo'] <= 0:

@@ -53,22 +53,17 @@ class TestInterface(unittest.TestCase):
         campo.entrada.focus_force()
         self.root.update()
         campo.entrada.selection_range(0, tk.END)
-        for tecla in '10560':
+        for tecla in '1056050':
             campo.entrada.event_generate('<KeyPress>', keysym=tecla)
         self.root.update()
-        self.assertEqual(campo.variavel.get(), '10560')
-        self.assertEqual(campo.entrada.index('insert'), 5)
-        campo.entrada.event_generate('<KeyPress>', keysym='comma')
-        campo.entrada.event_generate('<KeyPress>', keysym='5')
-        campo.entrada.event_generate('<KeyPress>', keysym='0')
-        self.root.update()
-        self.assertEqual(campo.variavel.get(), '10560,50')
+        self.assertEqual(campo.variavel.get(), '10.560,50')
+        self.assertEqual(campo.entrada.index('insert'), 9)
         campo.entrada.icursor(1)
         campo.entrada.event_generate('<KeyPress>', keysym='2')
         self.root.update()
         self.assertEqual(campo.entrada.index('insert'), 2)
-        self.assertEqual(campo.variavel.get(), '120560,50')
-        campo.variavel.set('10560,50')
+        self.assertEqual(campo.variavel.get(), '120.560,50')
+        campo.variavel.set('10.560,50')
         moedas[1].entrada.focus_force()
         self.root.update()
         self.assertEqual(campo.variavel.get(), '10.560,50')
@@ -106,7 +101,7 @@ class TestInterface(unittest.TestCase):
         self.root.update()
         form = next(w for w in janela.tela.winfo_children() if isinstance(w, tk.Toplevel))
         entradas = [w for w in filhos(form) if isinstance(w, app.ttk.Entry)]
-        valores = ('Conta teste', 'pessoa DE teste', '', 'Endereço teste', 'Banco teste', '0001', '12345-6', 'teste@example.com')
+        valores = ('Conta teste', 'pessoa DE teste', '52998224725', 'Endereço teste', 'Banco teste', '0001', '12345-6', 'teste@example.com')
         for entrada, valor in zip(entradas, valores):
             entrada.insert(0, valor)
         botao(form, 'Salvar conta').invoke()
@@ -173,11 +168,160 @@ class TestInterface(unittest.TestCase):
         botao(form, 'Dados de recebimento').invoke()
         self.root.update()
         tela = next(w for w in form.winfo_children() if isinstance(w, tk.Toplevel))
-        botao(tela, 'Copiar dados').invoke()
+        rotulo = next(w for w in filhos(tela) if isinstance(w, app.ttk.Label) and 'Nome completo:' in w.cget('text'))
+        rotulo.event_generate('<Button-3>', x=5, y=5)
+        self.root.update()
+        menu = next(w for w in rotulo.winfo_children() if isinstance(w, tk.Menu))
+        menu.invoke('Copiar')
+        menu.unpost()
+        self.root.update()
         self.assertIn('Nome completo:', tela.clipboard_get())
         botao(tela, 'Fechar').invoke()
         self.root.update()
         self.assertEqual(self.root.grab_current(), form)
+
+    def test_cpf_obrigatorio_mascara_e_nomes_durante_digitacao(self):
+        self.programa.mostrar_contas()
+        self.root.update()
+        janela = self.programa.janela_contas
+        for linha in janela.tabela.get_children():
+            self.assertIn('Completar cadastro', janela.tabela.item(linha, 'values')[-1])
+            self.assertIn('incompleta', janela.tabela.item(linha, 'tags'))
+        self.assertEqual(str(janela.tabela.tag_configure('incompleta', 'foreground')), '#ff6b6b')
+        janela.formulario()
+        self.root.update()
+        tela = next(w for w in janela.tela.winfo_children() if isinstance(w, tk.Toplevel))
+        entradas = [w for w in filhos(tela) if isinstance(w, app.ttk.Entry)]
+        cpf = entradas[2]
+        cpf.focus_force()
+        self.root.update()
+        for digito in '52998224725':
+            cpf.event_generate('<KeyPress>', keysym=digito)
+            cpf.event_generate('<KeyRelease>', keysym=digito)
+        self.root.update()
+        self.assertEqual(cpf.get(), '529.982.247-25')
+        self.assertEqual(cpf.index('insert'), 14)
+        cpf.event_generate('<KeyPress>', keysym='1')
+        self.root.update()
+        self.assertEqual(cpf.get(), '529.982.247-25')
+        nome = entradas[1]
+        nome.focus_force()
+        self.root.update()
+        for char in 'vitor silva':
+            tecla = 'space' if char == ' ' else char
+            nome.event_generate('<KeyPress>', keysym=tecla)
+            nome.event_generate('<KeyRelease>', keysym=tecla)
+        self.root.update()
+        self.assertEqual(nome.get(), 'Vitor Silva')
+        entradas[0].focus_force()
+        self.root.update()
+        entradas[0].insert(0, 'conta teste')
+        entradas[0].event_generate('<KeyRelease>', keysym='e')
+        self.assertEqual(entradas[0].get(), 'Conta teste')
+        for entrada, valor in zip(entradas[3:], ('rua teste', 'banco teste', '001', '123-4', 'ChaveCaseSensitive')):
+            entrada.insert(0, valor)
+        cpf.delete(0, tk.END)
+        with patch.object(app.messagebox, 'showerror') as erro:
+            botao(tela, 'Salvar conta').invoke()
+            self.root.update()
+            erro.assert_called_once()
+        self.assertEqual(len(self.banco.contas()), 2)
+        cpf.focus_force()
+        self.root.update()
+        cpf.insert(0, '52998224725')
+        cpf.event_generate('<KeyRelease>', keysym='5')
+        botao(tela, 'Salvar conta').invoke()
+        self.root.update()
+        conta = next(c for c in self.banco.contas() if c['identificacao'] == 'Conta teste')
+        self.assertEqual(conta['cpf'], '52998224725')
+        self.assertEqual(conta['pix'], 'ChaveCaseSensitive')
+
+    def test_menu_texto_recorta_copia_cola_e_preserva_modal(self):
+        form = self.formulario()
+        nome = next(w for w in filhos(form) if isinstance(w, app.ttk.Entry))
+        nome.insert(0, 'Vitor Silva')
+        nome.selection_range(0, 5)
+
+        def contexto(acao):
+            nome.event_generate('<Button-3>', x=5, y=5)
+            self.root.update()
+            menu = [w for w in nome.winfo_children() if isinstance(w, tk.Menu)][-1]
+            menu.invoke(acao)
+            menu.unpost()
+            self.root.update()
+            self.assertEqual(self.root.grab_current(), form)
+
+        contexto('Copiar')
+        self.assertEqual(nome.clipboard_get(), 'Vitor')
+        contexto('Recortar')
+        self.assertEqual(nome.get(), ' Silva')
+        nome.icursor(0)
+        contexto('Colar')
+        self.assertEqual(nome.get(), 'Vitor Silva')
+        contexto('Selecionar tudo')
+        self.assertEqual(nome.index('sel.first'), 0)
+        self.assertEqual(nome.index('sel.last'), len(nome.get()))
+
+    def test_menu_historico_seleciona_linha_certa(self):
+        dados = dict(nome='Primeiro', aquisicao='2026-10-22', previsto=2000000,
+                     custo=1200000, conta='Vitor', previsao='2026-12-20', comissao=None, observacoes='')
+        primeiro = self.banco.salvar(dados)
+        segundo = self.banco.salvar(dict(dados, nome='Segundo'))
+        self.programa.mostrar_historico()
+        self.root.update()
+        tabela = self.programa.tabela
+        tabela.selection_set(str(segundo))
+        x, y, largura, altura = tabela.bbox(str(primeiro), 'nome')
+        tabela.event_generate('<Button-3>', x=x+5, y=y+5)
+        self.root.update()
+        self.assertEqual(tabela.selection(), (str(primeiro),))
+        menu = next(w for w in tabela.winfo_children() if isinstance(w, tk.Menu))
+        menu.invoke('Copiar')
+        menu.unpost()
+        self.root.update()
+        self.assertIn('Primeiro', tabela.clipboard_get())
+        tabela.event_generate('<Button-3>', x=x+5, y=y+5)
+        self.root.update()
+        menu = [w for w in tabela.winfo_children() if isinstance(w, tk.Menu)][-1]
+        with patch.object(app.messagebox, 'askyesno', return_value=False):
+            menu.invoke('Excluir')
+        menu.unpost()
+        self.root.update()
+        self.assertEqual(len(self.banco.listar()), 2)
+
+    def test_valores_em_centavos_colagem_recorte_e_persistencia(self):
+        form = self.formulario()
+        moedas = [w for w in filhos(form) if isinstance(w, CampoMoeda)]
+        esperado = ('52.000,00', '15.236,59')
+        for campo, digitos, resultado in zip(moedas[:2], ('5200000', '1523659'), esperado):
+            campo.entrada.focus_force()
+            self.root.update()
+            campo.entrada.selection_clear()
+            campo.entrada.icursor(0)
+            for tecla in digitos:
+                campo.entrada.event_generate('<KeyPress>', keysym=tecla)
+            self.root.update()
+            self.assertEqual(campo.variavel.get(), resultado)
+        custo = moedas[1]
+        custo.entrada.selection_range(0, tk.END)
+        custo.entrada.event_generate('<<Cut>>')
+        self.root.update()
+        self.assertEqual(custo.variavel.get(), '0,00')
+        self.assertEqual(custo.entrada.clipboard_get(), '15.236,59')
+        custo.entrada.selection_range(0, tk.END)
+        custo.entrada.event_generate('<<Paste>>')
+        self.root.update()
+        self.assertEqual(custo.variavel.get(), '15.236,59')
+        nome = next(w for w in filhos(form) if isinstance(w, app.ttk.Entry))
+        nome.insert(0, 'Titular Teste')
+        datas = [w for w in filhos(form) if isinstance(w, CampoData)]
+        datas[0].variavel.set('01/01/2026')
+        datas[1].variavel.set('01/01/2027')
+        botao(form, 'Salvar registro').invoke()
+        self.root.update()
+        registro = self.banco.listar()[0]
+        self.assertEqual(registro['previsto'], 5200000)
+        self.assertEqual(registro['custo'], 1523659)
 
 
 if __name__ == '__main__':
