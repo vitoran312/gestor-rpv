@@ -91,6 +91,15 @@ def data_br(texto):
     return datetime.strptime(texto, '%Y-%m-%d').strftime('%d/%m/%Y')
 
 
+def situacao(registro, hoje=None):
+    """Recebida, atrasada (previsão atual vencida sem recebimento) ou pendente."""
+    if registro['recebimento']:
+        return 'recebida'
+    if registro['previsao_atual'] < (hoje or date.today()).isoformat():
+        return 'atrasada'
+    return 'pendente'
+
+
 def nome_formatado(texto):
     return ' '.join(texto.split()).title()
 
@@ -135,13 +144,13 @@ class Banco:
             versao_atual=con.execute('PRAGMA user_version').fetchone()[0]
         migrar = ('previsao_atual_definida' not in colunas or 'recebimento' not in colunas or
                   not {'numero_endereco', 'cidade', 'estado'}.issubset(colunas_contas) or
-                  'lixeira_em' not in colunas or cpf_unico or not tem_documentos or 'tipo' not in colunas_documentos or versao_atual<7)
+                  'lixeira_em' not in colunas or cpf_unico or not tem_documentos or 'tipo' not in colunas_documentos or versao_atual<8)
         if colunas and migrar:
             versao_backup = ('0.4.0' if 'conta_id' not in colunas else
                              '0.6.0' if 'recebimento' not in colunas else
                              '0.7.0' if 'previsao_atual_definida' not in colunas or
                              not {'numero_endereco', 'cidade', 'estado'}.issubset(colunas_contas) else
-                             '0.9.0' if 'lixeira_em' not in colunas or cpf_unico else '0.10.0' if not tem_documentos else '0.11.0' if 'tipo' not in colunas_documentos else '0.16.0')
+                             '0.9.0' if 'lixeira_em' not in colunas or cpf_unico else '0.10.0' if not tem_documentos else '0.11.0' if 'tipo' not in colunas_documentos else '0.16.0' if versao_atual<7 else '0.21.0')
             backup = self.caminho.with_name(f'backup-antes-{versao_backup}-' +
                 datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.sqlite3')
             with self.conectar() as origem:
@@ -208,9 +217,9 @@ class Banco:
                 con.execute('ALTER TABLE rpvs ADD COLUMN previsao_atual_definida TEXT')
             if 'lixeira_em' not in atuais:
                 con.execute('ALTER TABLE rpvs ADD COLUMN lixeira_em TEXT')
-            con.execute('''CREATE TABLE IF NOT EXISTS historico_alteracoes (
-                id INTEGER PRIMARY KEY, rpv_id INTEGER NOT NULL REFERENCES rpvs(id) ON DELETE CASCADE,
-                quando TEXT NOT NULL, acao TEXT NOT NULL, alteracoes TEXT NOT NULL)''')
+            # O histórico geral de alterações foi descontinuado na 0.10.0 e removido na 0.21.0;
+            # a cópia backup-antes-0.21.0 preserva registros antigos, se houver.
+            con.execute('DROP TABLE IF EXISTS historico_alteracoes')
             if con.execute('PRAGMA foreign_key_check').fetchall():
                 raise ValueError('Não foi possível migrar o banco: vínculos inconsistentes.')
             con.execute('''CREATE TABLE IF NOT EXISTS documentos (
@@ -230,7 +239,7 @@ class Banco:
             con.execute('CREATE TABLE IF NOT EXISTS configuracoes (chave TEXT PRIMARY KEY,valor TEXT NOT NULL)')
             if con.execute('PRAGMA foreign_key_check').fetchall():
                 raise ValueError('Não foi possível migrar o banco: vínculos inconsistentes.')
-            con.execute('PRAGMA user_version=7')
+            con.execute('PRAGMA user_version=8')
 
     @staticmethod
     def cpf_unico(con):
@@ -426,10 +435,6 @@ class Banco:
                     raise ValueError('Uma entrada não está mais na lixeira. Reabra a lista e tente novamente.')
             con.executemany('UPDATE rpvs SET lixeira_em=NULL WHERE id=?',[(i,) for i in ids])
 
-    def historico(self, identificador):
-        with self.conectar() as con:
-            return con.execute('SELECT * FROM historico_alteracoes WHERE rpv_id=? ORDER BY id DESC', (identificador,)).fetchall()
-
     def prorrogacoes(self, identificador):
         with self.conectar() as con:
             return con.execute('SELECT * FROM prorrogacoes WHERE rpv_id=? ORDER BY data, id', (identificador,)).fetchall()
@@ -440,8 +445,8 @@ class Banco:
         with self.conectar() as con:
             con.execute('BEGIN IMMEDIATE')
             rpv = con.execute('SELECT * FROM rpvs WHERE id=?', (identificador,)).fetchone()
-            if rpv is None:
-                raise ValueError('Registro não encontrado.')
+            if rpv is None or rpv['lixeira_em']:
+                raise ValueError('Registro não encontrado na lista ativa.')
             ultima = con.execute('SELECT MAX(data) FROM prorrogacoes WHERE rpv_id=?', (identificador,)).fetchone()[0]
             if nova_data <= max(ultima or rpv['previsao'], rpv['aquisicao'], rpv['previsao']):
                 raise ValueError('A nova previsão deve ser posterior à previsão atual e à aquisição.')
@@ -532,6 +537,10 @@ class Banco:
     def salvar_configuracao(self, chave, valor):
         with self.conectar() as con:
             con.execute('INSERT OR REPLACE INTO configuracoes (chave,valor) VALUES (?,?)', (chave, valor))
+
+    def remover_configuracao(self, chave):
+        with self.conectar() as con:
+            con.execute('DELETE FROM configuracoes WHERE chave=?', (chave,))
 
     def ultimo_backup(self):
         return self.configuracao('ultimo_backup')

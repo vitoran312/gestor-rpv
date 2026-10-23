@@ -79,7 +79,6 @@ class TestOperacoes016(unittest.TestCase):
         eventos=Banco(self.banco.caminho).historico_previsoes(rpv)
         self.assertEqual([(e['anterior'],e['nova']) for e in eventos],
                          [('2027-01-20','2026-11-20'),('2026-12-20','2027-01-20')])
-        self.assertEqual(self.banco.historico(rpv),[])
         with self.assertRaises(ValueError):self.banco.atualizar_previsao(rpv,'2026-01-01')
         self.assertEqual(len(self.banco.historico_previsoes(rpv)),2)
 

@@ -16,6 +16,8 @@ from dados import Banco, limitar_backups
 
 
 FORMATO = 'gestor-rpv-backup'
+PASTA_AUTOMATICA = 'backup_auto_pasta'
+PREFIXO_AUTOMATICO = 'GestorRPV-auto-'
 
 
 def aviso_backup(quando, hoje=None):
@@ -53,14 +55,13 @@ def validar_banco(caminho):
             if con.execute('PRAGMA integrity_check').fetchall() != [('ok',)]:
                 raise ValueError('O banco do backup está danificado.')
             versao_banco = con.execute('PRAGMA user_version').fetchone()[0]
-            if versao_banco not in (4,5,6,7):
+            if versao_banco not in (4,5,6,7,8):
                 raise ValueError('Este backup exige outra versão do Gestor de RPV.')
             requisitos = {
                 'rpvs': {'id','nome','aquisicao','previsto','custo','conta','previsao','comissao',
                          'observacoes','conta_id','conta_snapshot','recebimento','previsao_atual_definida','lixeira_em'},
                 'contas': {'id','identificacao','identificacao_chave','nome','cpf','endereco','numero_endereco',
                            'cidade','estado','banco','agencia','numero','pix','ativa','banco_chave','agencia_chave','numero_chave'},
-                'historico_alteracoes': {'id','rpv_id','quando','acao','alteracoes'},
                 'prorrogacoes': {'id','rpv_id','data','criada_em'},
             }
             if versao_banco >= 5:
@@ -85,11 +86,11 @@ def validar_banco(caminho):
         raise ValueError('Não foi possível validar o banco do backup.') from erro
 
 
-def criar_backup(banco, pasta):
+def criar_backup(banco, pasta, prefixo='GestorRPV-'):
     pasta = Path(pasta)
     pasta.mkdir(parents=True, exist_ok=True)
     quando=datetime.now().astimezone().isoformat(timespec='seconds')
-    nome = 'GestorRPV-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.rpvbackup'
+    nome = prefixo + datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.rpvbackup'
     destino = pasta / nome
     with tempfile.TemporaryDirectory(prefix='.backup-rpv-', dir=pasta) as temporaria:
         trabalho = Path(temporaria)
@@ -134,6 +135,22 @@ def criar_backup(banco, pasta):
         os.replace(zip_temporario, destino)
     banco.registrar_backup(quando)
     return destino
+
+
+def executar_backup_automatico(banco, forcar=False, hoje=None):
+    """Grava um backup na pasta escolhida quando o último tiver sete dias ou mais.
+
+    Só as cópias automáticas entram no limite de 10; backups manuais na mesma pasta são preservados.
+    A pasta não é criada: se um disco externo ou pasta sincronizada sumir, o erro é informado.
+    """
+    pasta = banco.configuracao(PASTA_AUTOMATICA)
+    if not pasta or not (forcar or aviso_backup(banco.ultimo_backup(), hoje)):
+        return None
+    if not Path(pasta).is_dir():
+        raise OSError('A pasta do backup automático não está disponível neste computador.')
+    arquivo = criar_backup(banco, pasta, prefixo=PREFIXO_AUTOMATICO)
+    limitar_backups(pasta, PREFIXO_AUTOMATICO + '*.rpvbackup')
+    return arquivo
 
 
 def copiar_banco(origem, destino):

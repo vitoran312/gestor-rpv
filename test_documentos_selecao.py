@@ -62,9 +62,12 @@ class TestDocumentos(unittest.TestCase):
         self.banco.restaurar_varios([primeiro,segundo])
         self.assertEqual(len(self.banco.listar()),2)
 
-    def test_importa_backup_090_e_preserva_registros_antigos_sem_gerar_novos(self):
+    def test_importa_backup_090_e_remove_historico_geral_descontinuado(self):
         identificador = self.banco.salvar(dados_rpv())
         with self.banco.conectar() as con:
+            con.execute('''CREATE TABLE historico_alteracoes (
+                id INTEGER PRIMARY KEY, rpv_id INTEGER NOT NULL REFERENCES rpvs(id) ON DELETE CASCADE,
+                quando TEXT NOT NULL, acao TEXT NOT NULL, alteracoes TEXT NOT NULL)''')
             con.execute("INSERT INTO historico_alteracoes (rpv_id,quando,acao,alteracoes) VALUES (?, '2026-10-22T12:00:00+00:00','Legado','{}')",(identificador,))
             con.execute('DROP TABLE documentos')
             con.execute('PRAGMA user_version=4')
@@ -73,10 +76,10 @@ class TestDocumentos(unittest.TestCase):
         with BackupPreparado(pacote) as preparado:
             preparado.restaurar(destino)
         destino.salvar(dados_rpv(observacoes='Editado'),identificador)
-        self.assertEqual(len(destino.historico(identificador)),1)
         self.assertEqual(destino.documentos(identificador),[])
         with destino.conectar() as con:
-            self.assertEqual(con.execute('PRAGMA user_version').fetchone()[0],7)
+            self.assertEqual(con.execute('PRAGMA user_version').fetchone()[0],8)
+            self.assertIsNone(con.execute("SELECT 1 FROM sqlite_master WHERE name='historico_alteracoes'").fetchone())
 
     def test_recebimento_separado_com_backup_e_rollback(self):
         identificador = self.banco.salvar(dados_rpv(),anexos=[self.pdf])

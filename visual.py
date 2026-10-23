@@ -132,6 +132,9 @@ def aplicar_superficies(raiz):
                                   ('primario_pressionado',c['primario_pressionado'],None),
                                   ('inativo',c['fundo'],c['borda_suave'])):
             imagens[nome] = tk.PhotoImage(master=raiz,data=_png_arredondado(cor,contorno))
+        imagens['filtro'] = tk.PhotoImage(master=raiz,data=_png_arredondado(c['fundo'],c['borda_suave'],16,40,32))
+        imagens['filtro_ativo'] = tk.PhotoImage(master=raiz,data=_png_arredondado(c['ativo'],c['borda'],16,40,32))
+        imagens['filtro_selecionado'] = tk.PhotoImage(master=raiz,data=_png_arredondado(c['realce'],c['floresta'],16,40,32))
         imagens['cartao'] = tk.PhotoImage(master=raiz,data=_png_arredondado(c['superficie'],c['borda_suave'],12,48,48))
         prefixo = 'Pro'+chave[1:]
         for nome,normal,hover,pressionado in (('secundario','botao','ativo','pressionado'),
@@ -139,6 +142,8 @@ def aplicar_superficies(raiz):
             estilo.element_create(prefixo+nome,'image',imagens[normal],
                                   ('disabled',imagens['inativo']),('pressed',imagens[pressionado]),
                                   ('active',imagens[hover]),border=(10,10,10,10),padding=0,width=40,height=36,sticky='nsew')
+        estilo.element_create(prefixo+'filtro','image',imagens['filtro'],('selected',imagens['filtro_selecionado']),
+                              ('active',imagens['filtro_ativo']),border=(16,14,16,14),padding=0,width=40,height=32,sticky='nsew')
         estilo.element_create(prefixo+'cartao','image',imagens['cartao'],border=(14,14,14,14),padding=0,width=48,height=48,sticky='nsew')
         for selecionado in (False,True):
             imagens['recebido'+str(selecionado)]=tk.PhotoImage(master=raiz,data=_png_recebido(c,selecionado))
@@ -168,6 +173,9 @@ def aplicar_superficies(raiz):
         estilo.layout(nome,[('Checkbutton.padding',{'sticky':'nswe','children':[
             (prefixo+'recebido',{'side':'left','sticky':''}),
             ('Checkbutton.label',{'side':'left','sticky':'nswe'})]})])
+    for nome in ('Filtro.TRadiobutton','FiltroAlerta.TRadiobutton'):
+        estilo.layout(nome,[(prefixo+'filtro',{'sticky':'nsew','children':[
+            ('Radiobutton.padding',{'sticky':'nsew','children':[('Radiobutton.label',{'sticky':'nsew'})]})]})])
     for nome in ('Cartao.TFrame','Resumo.TFrame'):
         estilo.layout(nome,[(prefixo+'cartao',{'sticky':'nsew','children':[('Frame.padding',{'sticky':'nsew'})]})])
         estilo.configure(nome,background=c['fundo'],borderwidth=0)

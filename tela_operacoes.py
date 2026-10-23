@@ -4,7 +4,8 @@ import tkinter as tk
 from datetime import datetime
 from tkinter import messagebox, ttk, font as tkfont
 
-from dados import moeda, data_iso, data_br
+from dados import moeda, data_iso, data_br, situacao
+from grafico import JanelaGrafico
 from componentes import centralizar, maximizar
 from tema import cores
 from ordenacao import ordenar
@@ -20,6 +21,7 @@ class OperacoesMixin:
         arquivo.add_command(label='Contas de recebimento', command=self.mostrar_contas)
         arquivo.add_separator()
         arquivo.add_command(label='Fazer backup', command=self.exportar_backup)
+        arquivo.add_command(label='Backup automático…', command=self.configurar_backup_automatico)
         arquivo.add_command(label='Importar dados', command=self.importar_dados)
         arquivo.add_command(label='Exportar para Excel', command=self.exportar_excel)
         arquivo.add_command(label='Abrir pasta dos documentos', command=self.abrir_pasta_documentos)
@@ -29,6 +31,8 @@ class OperacoesMixin:
         editar.add_command(label='Editar registro', command=self.abrir)
         editar.add_command(label='Excluir registro', command=self.excluir)
         exibir = novo_menu(barra)
+        exibir.add_command(label='Gráfico mensal', command=self.mostrar_grafico)
+        exibir.add_separator()
         exibir.add_radiobutton(label='Tema claro', variable=self.modo_tema, value='claro', command=self.configurar_tema)
         exibir.add_radiobutton(label='Tema escuro', variable=self.modo_tema, value='escuro', command=self.configurar_tema)
         ajuda = novo_menu(barra)
@@ -40,6 +44,11 @@ class OperacoesMixin:
         barra.add_cascade(label='Ajuda',menu=ajuda)
         self.menus = {'Arquivo': arquivo, 'Editar': editar, 'Exibir': exibir, 'Ajuda': ajuda, 'barra': barra}
         self.historico.configure(menu=barra)
+
+    def mostrar_grafico(self):
+        if self.grafico_mensal is not None and self.grafico_mensal.tela.winfo_exists():
+            self.grafico_mensal.tela.destroy()
+        self.grafico_mensal = JanelaGrafico(self)
 
     def mostrar_historico(self):
         if self.historico is not None and self.historico.winfo_exists():
@@ -66,6 +75,15 @@ class OperacoesMixin:
         entrada_busca.pack(side='left', fill='x', expand=True)
         aplicar_formato(entrada_busca, self.busca, capitalizar_inicio)
         self.busca.trace_add('write', lambda *_: self.atualizar())
+        filtros = ttk.Frame(corpo)
+        filtros.pack(fill='x', pady=(0, 12))
+        self.filtro = tk.StringVar(value='todas')
+        self.botoes_filtro = {}
+        for valor in ('todas', 'pendente', 'atrasada', 'recebida'):
+            botao = ttk.Radiobutton(filtros, variable=self.filtro, value=valor, style='Filtro.TRadiobutton',
+                                    command=self.atualizar, takefocus=False)
+            botao.pack(side='left', padx=(0, 8))
+            self.botoes_filtro[valor] = botao
 
         quadro = ttk.Frame(corpo)
         quadro.pack(fill='both', expand=True)
@@ -169,6 +187,15 @@ class OperacoesMixin:
         registros = self.banco.listar(self.busca.get().strip())
         if self.ordenacao:
             registros = ordenar(registros, *self.ordenacao)
+        situacoes = {str(r['id']): situacao(r) for r in registros}
+        totais = {valor: sum(s == valor for s in situacoes.values()) for valor in ('pendente', 'atrasada', 'recebida')}
+        totais['todas'] = len(registros)
+        for valor, titulo in (('todas', 'Todas'), ('pendente', 'Pendentes'), ('atrasada', 'Atrasadas'), ('recebida', 'Recebidas')):
+            self.botoes_filtro[valor].configure(text=f'{titulo}  {totais[valor]}', style='FiltroAlerta.TRadiobutton'
+                                                if valor == 'atrasada' and totais[valor] else 'Filtro.TRadiobutton')
+        if self.filtro.get() != 'todas':
+            registros = [r for r in registros if situacoes[str(r['id'])] == self.filtro.get()]
+        self.atrasadas = {i for i, s in situacoes.items() if s == 'atrasada'}
         self.recebimentos = {str(r['id']): r['recebimento'] for r in registros}
         for widgets in self.acoes_linhas.values():
             for widget in widgets:
@@ -176,8 +203,10 @@ class OperacoesMixin:
         self.acoes_linhas.clear()
         self.tabela.delete(*self.tabela.get_children())
         self.tabela.tag_configure('alternada',background=cores()['linha'])
+        self.tabela.tag_configure('atrasada',foreground=cores()['vermelho'])
         for indice,r in enumerate(registros):
-            self.tabela.insert('', 'end', iid=str(r['id']), tags=('alternada',) if indice%2 else (), values=(
+            etiquetas = (('alternada',) if indice%2 else ()) + (('atrasada',) if str(r['id']) in self.atrasadas else ())
+            self.tabela.insert('', 'end', iid=str(r['id']), tags=etiquetas, values=(
                 r['nome'], data_br(r['aquisicao']), 'R$ ' + moeda(r['custo']),
                 'R$ ' + moeda(r['comissao'] or 0),
                 'R$ ' + moeda(r['previsto']), 'R$ ' + moeda(r['previsto'] - r['custo']),
@@ -229,7 +258,7 @@ class OperacoesMixin:
                 continue
             if linha not in self.acoes_linhas:
                 valores = self.tabela.item(linha, 'values')
-                adiada = data_iso(valores[-2]) > data_iso(valores[-3])
+                adiada = data_iso(valores[-2]) > data_iso(valores[-3]) or linha in self.atrasadas
                 botao = ttk.Label(self.tabela, text=valores[-2], anchor='center', cursor='hand2',
                                   style='PrevisaoAdiada.TLabel' if adiada else 'Previsao.TLabel')
                 data_recebimento = self.recebimentos[linha]

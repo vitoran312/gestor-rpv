@@ -38,6 +38,12 @@ def criar_estilos(janela, estilo, fonte):
                    indicatorbackground=[('disabled',fundo),('selected',c['primario']),('!disabled',campo)],
                    indicatorforeground=[('disabled',c['desabilitado']),('selected',primario_texto),('!disabled',texto)])
 
+    # Filtros em pílulas: o selecionado ganha o tom suave e o contorno da marca.
+    for nome,cor in (('Filtro.TRadiobutton',texto),('FiltroAlerta.TRadiobutton',c['vermelho'])):
+        estilo.configure(nome,padding=(14,6),background=fundo,foreground=cor,anchor='center')
+        estilo.map(nome,background=[('!disabled',fundo)],foreground=[('selected',c['floresta'] if cor==texto else cor),('!disabled',cor)],
+                   font=[('selected',(fonte,10,'bold')),('!selected',(fonte,10))])
+
     # Tipografia: títulos neutros e firmes; a cor da marca fica reservada às ações.
     for nome,tamanho,peso,cor in (
         ('InicioTitulo.TLabel',34,'bold',texto),
@@ -53,6 +59,8 @@ def criar_estilos(janela, estilo, fonte):
     estilo.configure('DataCalculada.TLabel',background=fundo,font=(fonte,10,'bold'))
     estilo.map('DataCalculada.TLabel',background=[('disabled',fundo),('!disabled',fundo)],foreground=[('disabled',c['desabilitado']),('!disabled',texto)])
     estilo.configure('BackupAviso.TLabel',background=fundo,foreground=c['vermelho'],font=(fonte,9))
+    estilo.configure('LegendaInvestido.TLabel',foreground=c['floresta'],font=(fonte,12))
+    estilo.configure('LegendaRecebido.TLabel',foreground=c['verde'],font=(fonte,12))
     estilo.configure('Recebido.TLabel',foreground=c['verde'],font=(fonte,10,'bold'))
     estilo.configure('Ajuda.TLabel',font=(fonte,10),background=campo,foreground=texto,padding=12,wraplength=320,
                      relief='solid',borderwidth=1,bordercolor=c['borda_suave'])

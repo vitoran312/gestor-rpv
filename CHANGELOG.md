@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## 0.21.0
+
+- Filtros Todas, Pendentes, Atrasadas e Recebidas em Minhas operações, com a quantidade de cada situação.
+- Operações atrasadas (previsão atual vencida sem recebimento) destacadas em vermelho na tabela e no filtro.
+- Gráfico mensal (Exibir → Gráfico mensal) com capital investido e valor recebido nos últimos 12 meses.
+- Backup automático semanal em uma pasta escolhida, com primeira cópia na ativação, limite das 10 cópias
+  automáticas mais recentes e aviso discreto quando a pasta estiver indisponível.
+- Prorrogação recusada para entradas na lixeira, como as demais alterações.
+- Histórico geral de alterações removido de vez; registros antigos ficam na cópia feita antes da atualização.
+
 ## 0.20.0
 
 - Nova interface Vitoran Pro: base neutra em cinzas frios (claro) e grafite (escuro), com um único acento

@@ -31,6 +31,7 @@ class Aplicativo(OperacoesMixin, RegistroMixin, ArquivosMixin):
         self.janela_contas = None
         self.calculadora = None
         self.sobre = None
+        self.grafico_mensal = None
         tema_salvo = self.banco.configuracao('tema', 'claro')
         self.modo_tema = tk.StringVar(value=tema_salvo if tema_salvo in ('claro', 'escuro') else 'claro')
         self.configurar_tema()
@@ -91,6 +92,9 @@ class Aplicativo(OperacoesMixin, RegistroMixin, ArquivosMixin):
         self.atualizar_alternador_tema()
         self.atualizar_ultimo_backup()
         janela.bind('<FocusIn>',self.atualizar_backup_ao_ativar,add='+')
+        self.falha_backup_automatico = False
+        self.agendamento_backup = janela.after(1500,self.verificar_backup_automatico)
+        janela.bind('<Destroy>',self.cancelar_agendamento_backup,add='+')
         centralizar(janela, 1480, 980)
         janela.deiconify()
 
@@ -218,6 +222,7 @@ class Aplicativo(OperacoesMixin, RegistroMixin, ArquivosMixin):
             self.desenhar_icone_lixeira()
         if hasattr(self,'tabela') and self.tabela.winfo_exists():
             self.tabela.tag_configure('alternada',background=c['linha'])
+            self.tabela.tag_configure('atrasada',foreground=c['vermelho'])
         if self.janela_contas is not None and self.janela_contas.tela.winfo_exists():
             self.janela_contas.atualizar_situacoes()
 

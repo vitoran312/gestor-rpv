@@ -1320,6 +1320,101 @@ class TestInterface(unittest.TestCase):
         self.assertTrue(destino.is_file())
         self.assertIn('2 operação(ões)', aviso.call_args.args[1])
 
+    def test_filtros_por_situacao_com_contagem_e_atrasadas_em_vermelho(self):
+        from test_contas import dados_rpv
+        atrasada = str(self.banco.salvar(dados_rpv(nome='Atrasada', aquisicao='2020-01-01', previsao='2020-02-01')))
+        pendente = str(self.banco.salvar(dados_rpv(nome='Pendente', aquisicao='2020-01-02', previsao='2099-01-01')))
+        recebida = str(self.banco.salvar(dados_rpv(nome='Recebida', aquisicao='2020-01-03', previsao='2020-02-01')))
+        self.banco.registrar_recebimento(int(recebida), '2020-03-01')
+        self.programa.mostrar_historico()
+        self.root.update()
+        tabela = self.programa.tabela
+        botoes = self.programa.botoes_filtro
+        self.assertEqual([botoes[v].cget('text') for v in ('todas', 'pendente', 'atrasada', 'recebida')],
+                         ['Todas  3', 'Pendentes  1', 'Atrasadas  1', 'Recebidas  1'])
+        self.assertEqual(str(botoes['atrasada'].cget('style')), 'FiltroAlerta.TRadiobutton')
+        self.assertIn('atrasada', tabela.item(atrasada, 'tags'))
+        self.assertNotIn('atrasada', tabela.item(pendente, 'tags'))
+        self.assertEqual(str(tabela.tag_configure('atrasada', 'foreground')), cores()['vermelho'])
+        tabela.xview_moveto(1)
+        self.root.update()
+        self.assertEqual(str(self.programa.acoes_linhas[atrasada][0].cget('style')), 'PrevisaoAdiada.TLabel')
+        self.assertEqual(str(self.programa.acoes_linhas[pendente][0].cget('style')), 'Previsao.TLabel')
+        for valor, esperado in (('atrasada', [atrasada]), ('pendente', [pendente]), ('recebida', [recebida]),
+                                ('todas', [recebida, pendente, atrasada])):
+            botoes[valor].invoke()
+            self.root.update()
+            self.assertEqual(list(tabela.get_children()), esperado)
+        botoes['recebida'].invoke()
+        self.assertIn('Registros: 1', texto_resumo(self.programa))
+        self.programa.busca.set('Pendente')
+        self.root.update()
+        self.assertEqual(botoes['todas'].cget('text'), 'Todas  1')
+        self.assertEqual(str(botoes['atrasada'].cget('style')), 'Filtro.TRadiobutton')
+        self.assertEqual(list(tabela.get_children()), [])
+        self.programa.alternar_tema()
+        self.assertEqual(str(tabela.tag_configure('atrasada', 'foreground')), cores()['vermelho'])
+
+    def test_grafico_mensal_pelo_menu_exibir(self):
+        from test_contas import dados_rpv
+        hoje = date.today().isoformat()
+        identificador = self.banco.salvar(dados_rpv(aquisicao=hoje, previsao=hoje, custo=150000, previsto=200000))
+        self.banco.registrar_recebimento(identificador, hoje)
+        self.programa.mostrar_historico()
+        menu = self.programa.menus['Exibir']
+        indice = next(i for i in range(menu.index('end') + 1)
+                      if menu.type(i) == 'command' and menu.entrycget(i, 'label') == 'Gráfico mensal')
+        menu.invoke(indice)
+        self.root.update()
+        janela = self.programa.grafico_mensal
+        self.assertTrue(janela.tela.winfo_viewable())
+        self.assertEqual(janela.dados[-1][1:], (150000, 200000))
+        self.assertTrue(janela.grafico.find_all())
+        grafico = janela.grafico
+        inicio, fim = grafico.barras[-1][:2]
+        grafico.event_generate('<Motion>', x=int((inicio + fim) / 2), y=50)
+        self.root.update()
+        self.assertIn('R$ 1.500,00 investidos', janela.detalhe.get())
+        grafico.event_generate('<Leave>')
+        self.root.update()
+        self.assertIn('Passe o mouse', janela.detalhe.get())
+        self.programa.alternar_tema()
+        self.assertEqual(grafico.cget('bg'), cores()['superficie'])
+        self.programa.mostrar_grafico()
+        self.root.update()
+        self.assertFalse(janela.tela.winfo_exists())
+        self.assertTrue(self.programa.grafico_mensal.tela.winfo_exists())
+
+    def test_backup_automatico_ativar_desativar_e_falha_discreta(self):
+        from backup import PASTA_AUTOMATICA
+        self.programa.mostrar_historico()
+        self.programa.configurar_backup_automatico()
+        self.root.update()
+        tela = [w for w in self.programa.historico.winfo_children() if isinstance(w, tk.Toplevel)][-1]
+        pasta = Path(self.pasta.name) / 'nuvem'
+        pasta.mkdir()
+        with patch.object(filedialog, 'askdirectory', return_value=str(pasta)), patch.object(messagebox, 'showinfo') as aviso:
+            botao(tela, 'Escolher pasta…').invoke()
+        self.assertEqual(self.banco.configuracao(PASTA_AUTOMATICA), str(pasta))
+        self.assertEqual(len(list(pasta.glob('GestorRPV-auto-*.rpvbackup'))), 1)
+        self.assertIn('ativado', aviso.call_args.args[1])
+        self.assertIn('Backup automático semanal ativo', self.programa.texto_ultimo_backup.get())
+        self.assertEqual(self.programa.texto_aviso_backup.get(), '')
+        ausente = Path(self.pasta.name) / 'ausente'
+        with patch.object(filedialog, 'askdirectory', return_value=str(ausente)), patch.object(messagebox, 'showerror') as erro:
+            botao(tela, 'Escolher pasta…').invoke()
+        self.assertIn('Não foi possível usar esta pasta', erro.call_args.args[1])
+        self.assertEqual(self.banco.configuracao(PASTA_AUTOMATICA), str(pasta))
+        botao(tela, 'Desativar').invoke()
+        self.assertIsNone(self.banco.configuracao(PASTA_AUTOMATICA))
+        self.assertNotIn('automático', self.programa.texto_ultimo_backup.get())
+        tela.destroy()
+        self.banco.salvar_configuracao(PASTA_AUTOMATICA, str(ausente))
+        self.banco.registrar_backup('2020-01-01T12:00:00')
+        self.programa.verificar_backup_automatico()
+        self.assertTrue(self.programa.falha_backup_automatico)
+        self.assertIn('backup automático não conseguiu gravar', self.programa.texto_aviso_backup.get())
+
 
 if __name__ == '__main__':
     unittest.main()

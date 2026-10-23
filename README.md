@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.20.0
+# Gestor de RPV — 0.21.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -14,7 +14,7 @@ python app.py
 
 Mantenha todos os arquivos `.py` e a pasta `recursos` juntos. Essa pasta contém o ícone da Vitoran Tech.
 A tela inicial tem os botões **Nova entrada**, **Minhas operações**,
-**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.20.0**, acompanhada do emblema com 50% de opacidade,
+**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.21.0**, acompanhada do emblema com 50% de opacidade,
 aparece no canto inferior direito.
 O número é lido da versão do programa e acompanha cada atualização.
 As janelas abrem centralizadas; o histórico abre maximizado no Windows.
@@ -60,16 +60,20 @@ aparência; o menu **Exibir** do histórico oferece as mesmas opções.
 
 [Ver a prévia do modo escuro](docs/historico-escuro.png)
 
-[Ver a janela Sobre](docs/sobre.png) · [Sobre no modo escuro](docs/sobre-escuro.png)
+[Ver o gráfico mensal](docs/grafico.png) · [Ver a janela Sobre](docs/sobre.png) · [Sobre no modo escuro](docs/sobre-escuro.png)
 
 ## Barra de menus do histórico
 
 - **Arquivo → Nova entrada**: abre o cadastro de uma RPV.
 - **Arquivo → Contas de recebimento**: administra os dados bancários.
+- **Arquivo → Backup automático…**: escolhe uma pasta onde o programa salva sozinho,
+  uma vez por semana, uma cópia completa (veja “Backup automático” abaixo).
 - **Arquivo → Exportar para Excel**: gera uma planilha `.xlsx` com todas as operações
   ativas (sem as da lixeira), na ordem exibida na tabela. Valores em R$, datas reconhecidas
   pelo Excel, cabeçalho fixo e filtro em cada coluna. Não exige o Excel nem pacotes extras.
 - **Editar → Editar registro / Excluir registro**: edita uma linha ou envia as selecionadas à lixeira.
+- **Exibir → Gráfico mensal**: barras dos últimos 12 meses com o capital investido (pela data de
+  aquisição) e o valor recebido (pela data do recebimento). Passe o mouse sobre um mês para ver os valores.
 - **Exibir → Tema claro / Tema escuro**: muda o tema de todas as janelas,
   inclusive formulários, calendários, menus de contexto e calculadora.
   A escolha é lembrada e o aplicativo volta a abrir no último tema usado.
@@ -147,6 +151,10 @@ com altura das linhas e largura da janela ajustadas para a leitura.
 - Os botões **Dados de recebimento**, **Cancelar** e **Salvar registro** têm
   tamanhos e espaçamentos uniformes, separados do formulário por uma linha.
 - O histórico permite buscar por nome/data, editar e enviar para a lixeira com confirmação.
+- Abaixo da busca, os filtros **Todas**, **Pendentes**, **Atrasadas** e **Recebidas** mostram
+  a quantidade de cada situação e limitam a tabela e os totais. Uma operação está **atrasada**
+  quando a previsão atual já passou e o recebimento não foi registrado: a linha fica em vermelho
+  e o filtro Atrasadas também, enquanto houver alguma.
 - Clique nos cabeçalhos para ordenar: valores e datas começam do maior/mais recente
   para o menor; nomes e contas começam em ordem alfabética. O segundo clique inverte
   a direção e o terceiro retorna à ordem original. A ordenação continua funcionando
@@ -217,10 +225,20 @@ O prazo é recalculado ao abrir ou voltar às janelas principais, sem interrompe
 `%LOCALAPPDATA%\GestorRPV\backups_automaticos`. Esse arquivo também pode ser importado
 para voltar ao estado anterior. A pasta guarda somente os 10 backups automáticos mais recentes.
 
+### Backup automático
+
+Em **Arquivo → Backup automático…**, escolha uma pasta — de preferência sincronizada, como OneDrive
+ou Google Drive. Ao ativar, uma primeira cópia é gravada na hora. Depois, ao abrir o programa e a cada
+seis horas com ele aberto, uma nova cópia `GestorRPV-auto-data-hora.rpvbackup` é salva sempre que o
+último backup tiver sete dias ou mais. São mantidas as 10 cópias automáticas mais recentes; backups
+manuais na mesma pasta nunca são apagados. Se a pasta estiver indisponível (por exemplo, um disco
+externo desconectado), o programa não cria outra no lugar: o lembrete de backup avisa a falha, sem
+janelas que interrompam o uso. O rodapé de Minhas operações indica quando o backup automático está ativo.
+A pasta escolhida vale para este computador e é mantida ao importar um backup de outro.
+
 O formato `.rpvbackup` é um ZIP com um snapshot consistente do SQLite, os arquivos
 da pasta `documentos` e um manifesto com hashes SHA-256. Inclui contas, RPVs ativas,
-lixeira, datas e documentos anexados. Dados antigos de auditoria, se existentes,
-também são preservados no arquivo. A importação valida formato, conteúdo,
+lixeira, datas e documentos anexados. A importação valida formato, conteúdo,
 integridade do banco e hashes antes de alterar os dados locais. Em caso de falha
 durante a troca, os documentos anteriores são recuperados e a cópia de segurança permanece.
 
@@ -278,9 +296,9 @@ durante a troca, os documentos anteriores são recuperados e a cópia de seguran
   datas e seus anexos das duas categorias, após confirmação. Somente entradas
   que já estão na lixeira podem ser apagadas dessa forma. Elas não poderão ser
   restauradas pela lixeira; backups feitos anteriormente mantêm seu conteúdo.
-- O histórico geral de alterações foi retirado. O mini-histórico de previsão
-  registra apenas as mudanças de data feitas pela janela Previsão atual.
-  Dados antigos já gravados são preservados internamente por compatibilidade.
+- O histórico geral de alterações, descontinuado na 0.10.0, foi removido de vez na 0.21.0.
+  Registros antigos, se existirem, ficam na cópia `backup-antes-0.21.0-*.sqlite3` criada na atualização.
+  O mini-histórico de previsão continua registrando as mudanças de data feitas pela janela Previsão atual.
 
 ## Dados e atualização
 
