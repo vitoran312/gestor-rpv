@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.16.3
+# Gestor de RPV — 0.17.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -14,7 +14,7 @@ python app.py
 
 Mantenha `app.py`, `dados.py`, `componentes.py`, `contas.py`, `interacao.py`, `tema.py`, `calculadora.py`, `backup.py`, `ordenacao.py`, `selecao.py`, `documentos.py`, `visual.py` e `versao.py` juntos.
 A tela inicial tem os botões **Nova entrada**, **Minhas operações**,
-**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.16.3** aparece no canto inferior direito.
+**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.17.0** aparece no canto inferior direito.
 O número é lido da versão do programa e acompanha cada atualização.
 As janelas abrem centralizadas; o histórico abre maximizado no Windows.
 
@@ -186,6 +186,12 @@ O ícone de **lixeira** continua sozinho no canto inferior direito.
 No rodapé aparece **Último backup: dd/mm/aaaa**, atualizado após a gravação
 de um arquivo de backup. Antes do primeiro, aparece “ainda não realizado”.
 
+A tela inicial e Minhas operações mostram um lembrete discreto quando ainda não
+houver backup ou quando o último tiver sido feito há **sete dias ou mais**.
+Clique no aviso para escolher a pasta e fazer um backup. Ele desaparece após a
+gravação bem-sucedida; cancelar ou ocorrer uma falha mantém o lembrete.
+O prazo é recalculado ao abrir ou voltar às janelas principais, sem interromper o uso.
+
 1. Clique em **Arquivo → Fazer backup** e escolha uma pasta do Windows.
 2. O programa salva um arquivo `GestorRPV-data-hora.rpvbackup`.
 3. No outro computador, abra o aplicativo e escolha **Arquivo → Importar dados**.
@@ -205,6 +211,10 @@ durante a troca, os documentos anteriores são recuperados e a cópia de seguran
 
 ## Documentos da entrada
 
+- **Arquivo → Abrir pasta dos documentos**, em Minhas operações, abre o Explorador
+  de Arquivos na pasta `%LOCALAPPDATA%\GestorRPV\documentos`. A pasta é criada
+  automaticamente caso ainda não existam anexos. Contratos/protocolos ficam
+  nas subpastas de cada entrada; comprovantes bancários ficam em `recebimentos`.
 - Em **Nova entrada** ou **Editar**, clique em **Anexar documentos** e selecione
   um ou vários PDFs ou imagens (PNG, JPEG, WebP, BMP, GIF e TIFF).
 - Ao manter o mouse sobre **Anexar documentos**, um balão explica que o botão

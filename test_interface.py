@@ -1168,6 +1168,50 @@ class TestInterface(unittest.TestCase):
         self.assertIsNone(self.banco.obter(identificador)['conta_id'])
         self.assertEqual(self.banco.obter(identificador)['conta_snapshot'],copia)
 
+    def test_lembrete_backup_no_inicio_e_historico_ate_exportar(self):
+        self.assertIn('ainda não fez',self.programa.texto_aviso_backup.get())
+        with patch.object(app.filedialog,'askdirectory',return_value=''):
+            self.programa.exportar_backup()
+        self.assertIn('ainda não fez',self.programa.texto_aviso_backup.get())
+        self.banco.registrar_backup('2020-01-01T12:00:00')
+        self.root.event_generate('<FocusIn>')
+        self.root.update()
+        self.assertIn('dias sem backup',self.programa.texto_aviso_backup.get())
+        self.programa.mostrar_historico()
+        self.root.update()
+        self.assertIn('dias sem backup',self.programa.texto_aviso_backup.get())
+        destino=str(Path(self.pasta.name)/'exportados')
+        with patch.object(app.filedialog,'askdirectory',return_value=destino),patch.object(app.messagebox,'showerror'),patch.object(app,'criar_backup',side_effect=OSError('Sem espaço')):
+            self.programa.exportar_backup()
+        self.assertIn('dias sem backup',self.programa.texto_aviso_backup.get())
+        self.programa.historico.destroy()
+        with patch.object(app.filedialog,'askdirectory',return_value=destino),patch.object(app.messagebox,'showinfo'):
+            self.programa.aviso_backup_inicio.event_generate('<Button-1>')
+            self.root.update()
+        self.assertEqual(self.programa.texto_aviso_backup.get(),'')
+        self.assertTrue(list(Path(destino).glob('*.rpvbackup')))
+        self.programa.mostrar_historico()
+        self.root.update()
+        self.assertEqual(self.programa.texto_aviso_backup.get(),'')
+
+    def test_menu_abre_pasta_documentos_sem_alterar_anexos(self):
+        from test_contas import dados_rpv
+        self.programa.mostrar_historico()
+        pasta=self.banco.caminho.parent/'documentos'
+        self.assertFalse(pasta.exists())
+        with patch.object(app,'abrir_pasta') as abrir:
+            self.programa.menus['Arquivo'].invoke('Abrir pasta dos documentos')
+        abrir.assert_called_once_with(pasta)
+        self.assertTrue(pasta.is_dir())
+        pdf=Path(self.pasta.name)/'contrato.pdf'
+        pdf.write_bytes(b'%PDF-exemplo')
+        i=self.banco.salvar(dados_rpv(),anexos=[pdf])
+        documento=self.banco.documentos(i)[0]
+        with patch.object(app,'abrir_pasta',side_effect=OSError('Explorador indisponível')),patch.object(app.messagebox,'showerror') as erro:
+            self.programa.menus['Arquivo'].invoke('Abrir pasta dos documentos')
+        erro.assert_called_once()
+        self.assertEqual(self.banco.caminho_documento(documento['id']).read_bytes(),b'%PDF-exemplo')
+
     def test_fontes_indicadores_previsao_e_ultimo_backup_na_interface(self):
         from test_contas import dados_rpv
         identificador=self.banco.salvar(dados_rpv())

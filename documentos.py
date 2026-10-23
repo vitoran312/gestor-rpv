@@ -16,6 +16,17 @@ def validar_anexo(caminho):
 
 def abrir_arquivo(caminho):
     caminho = validar_anexo(caminho)
+    _abrir_no_sistema(caminho)
+
+
+def abrir_pasta(caminho):
+    caminho = Path(caminho).resolve()
+    if not caminho.is_dir():
+        raise ValueError('A pasta de documentos não está disponível neste computador.')
+    _abrir_no_sistema(caminho)
+
+
+def _abrir_no_sistema(caminho):
     if os.name == 'nt':
         os.startfile(str(caminho))
     elif sys.platform == 'darwin':

@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## 0.17.0
+
+- Lembrete discreto de backup no início e em Minhas operações: aparece antes do primeiro backup ou após sete dias sem realizar um.
+- Clique no lembrete para escolher a pasta e fazer o backup; o aviso desaparece somente após a gravação bem-sucedida.
+- Lembrete recalculado ao abrir ou voltar às janelas principais, sem avisos modais.
+- Arquivo → Abrir pasta dos documentos abre o explorador na pasta dos anexos, preservando a separação entre entradas e recebimentos.
+
 ## 0.16.3
 
 - Modos claro e escuro renovados com azul profundo, pêssego, vermelho e vinho.

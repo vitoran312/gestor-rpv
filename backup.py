@@ -8,13 +8,29 @@ import sqlite3
 import stat
 import tempfile
 import time
-from datetime import datetime
+from datetime import date, datetime
 from zipfile import ZipFile, ZIP_DEFLATED, BadZipFile
 
 from versao import VERSAO
 
 
 FORMATO = 'gestor-rpv-backup'
+
+
+def aviso_backup(quando, hoje=None):
+    """Lembrete sem interromper o uso; um backup recente dispensa o aviso."""
+    if not quando:
+        return 'Você ainda não fez um backup. Clique aqui para fazer.'
+    try:
+        data_backup = datetime.fromisoformat(quando)
+        if data_backup.tzinfo is not None:
+            data_backup = data_backup.astimezone()
+    except (TypeError, ValueError):
+        return 'Data do último backup indisponível. Clique aqui para fazer um novo.'
+    dias = ((hoje or date.today()) - data_backup.date()).days
+    if dias >= 7:
+        return f'Há {dias} dias sem backup. Clique aqui para fazer um novo.'
+    return ''
 
 
 def hash_arquivo(caminho):

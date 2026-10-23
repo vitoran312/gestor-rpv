@@ -12,10 +12,10 @@ from versao import VERSAO
 from tema import cores, definir_modo, atualizar_widgets
 from visual import aplicar_superficies, familia_fonte, Icone, icone_tema
 from calculadora import JanelaCalculadora
-from backup import criar_backup, BackupPreparado
+from backup import criar_backup, BackupPreparado, aviso_backup
 from ordenacao import ordenar
 from selecao import habilitar_selecao, pressionar_linha, arrastar
-from documentos import validar_anexo, abrir_arquivo
+from documentos import validar_anexo, abrir_arquivo, abrir_pasta
 from interacao import instalar_menu_texto, aplicar_formato, capitalizar_inicio, menu_copia, novo_menu, mostrar_menu, copiar_texto
 
 
@@ -65,11 +65,18 @@ class Aplicativo:
         self.colunas_inicio = None
         self.grade_inicio.bind('<Configure>',self.organizar_inicio)
         ttk.Frame(inicio).pack(fill='both',expand=True)
+        self.texto_aviso_backup = tk.StringVar()
+        self.aviso_backup_inicio = ttk.Label(inicio,textvariable=self.texto_aviso_backup,
+            style='BackupAviso.TLabel',cursor='hand2',wraplength=760)
+        self.aviso_backup_inicio.pack(anchor='w',pady=(10,0))
+        self.aviso_backup_inicio.bind('<Button-1>',lambda _: self.exportar_backup())
         rodape_inicio = ttk.Frame(inicio)
         rodape_inicio.pack(fill='x',pady=(22,0))
         ttk.Button(rodape_inicio,text='Sair',command=janela.destroy,width=12).pack(side='left')
         ttk.Label(rodape_inicio,text=f'Vitoran Tech · v{VERSAO}',style='Discreto.TLabel').pack(side='right')
         self.atualizar_alternador_tema()
+        self.atualizar_ultimo_backup()
+        janela.bind('<FocusIn>',self.atualizar_backup_ao_ativar,add='+')
         centralizar(janela, 1480, 980)
         janela.deiconify()
 
@@ -134,6 +141,7 @@ class Aplicativo:
         arquivo.add_separator()
         arquivo.add_command(label='Fazer backup', command=self.exportar_backup)
         arquivo.add_command(label='Importar dados', command=self.importar_dados)
+        arquivo.add_command(label='Abrir pasta dos documentos', command=self.abrir_pasta_documentos)
         arquivo.add_separator()
         arquivo.add_command(label='Fechar operações', command=self.historico.destroy)
         editar = novo_menu(barra)
@@ -197,6 +205,7 @@ class Aplicativo:
                 ('ResumoValor.TLabel',19,'bold',texto),('ResumoRealizado.TLabel',19,'bold',c['verde'])):
                 estilo.configure(nome,background=c['superficie'],font=(fonte,tamanho,peso),foreground=cor)
             estilo.configure('DataCalculada.TLabel',background=fundo,font=(fonte,10,'bold'))
+            estilo.configure('BackupAviso.TLabel',background=fundo,foreground=c['vermelho'],font=(fonte,9))
             estilo.map('DataCalculada.TLabel',background=[('disabled',fundo),('!disabled',fundo)],foreground=[('disabled',c['desabilitado']),('!disabled',texto)])
             estilo.configure('Dinheiro.TFrame',background=campo)
             estilo.configure('Dinheiro.TLabel',background=campo)
@@ -332,12 +341,16 @@ class Aplicativo:
         self.desenhar_icone_lixeira()
         self.botao_lixeira = ttk.Button(rodape, text='Lixeira', image=self.icone_lixeira, compound='image',
                                        width=3, command=self.mostrar_lixeira)
-        self.botao_lixeira.grid(row=0,column=1,rowspan=2,sticky='se',padx=(16,0))
+        self.botao_lixeira.grid(row=0,column=1,rowspan=3,sticky='se',padx=(16,0))
         self.texto_ultimo_backup=tk.StringVar()
         ttk.Label(rodape,textvariable=self.texto_ultimo_backup,style='Discreto.TLabel').grid(row=1,column=0,sticky='w',padx=6,pady=(8,0))
+        aviso = ttk.Label(rodape,textvariable=self.texto_aviso_backup,style='BackupAviso.TLabel',cursor='hand2',wraplength=760)
+        aviso.grid(row=2,column=0,sticky='w',padx=6)
+        aviso.bind('<Button-1>',lambda _: self.exportar_backup())
         self.historico.bind('<Control-f>',lambda _: entrada_busca.focus_set())
         self.historico.bind('<Control-n>',lambda _: self.formulario())
         self.historico.bind('<F5>',lambda _: self.atualizar())
+        self.historico.bind('<FocusIn>',self.atualizar_backup_ao_ativar,add='+')
         self.atualizar()
         centralizar(self.historico, 1100, 650)
         self.historico.deiconify()
@@ -360,9 +373,19 @@ class Aplicativo:
             for valor in cartao.winfo_children()[1:]:
                 valor.configure(wraplength=largura)
 
+    def atualizar_backup_ao_ativar(self,evento):
+        if evento.widget is self.janela or evento.widget is self.historico:
+            self.atualizar_ultimo_backup()
+
     def atualizar_ultimo_backup(self):
         quando=self.banco.ultimo_backup()
-        self.texto_ultimo_backup.set('Último backup: '+(datetime.fromisoformat(quando).strftime('%d/%m/%Y') if quando else 'ainda não realizado'))
+        self.texto_aviso_backup.set(aviso_backup(quando))
+        try:
+            data = datetime.fromisoformat(quando).astimezone().strftime('%d/%m/%Y') if quando else 'ainda não realizado'
+        except (ValueError,TypeError):
+            data = 'não disponível'
+        if hasattr(self,'texto_ultimo_backup'):
+            self.texto_ultimo_backup.set('Último backup: '+data)
 
     def atualizar(self):
         if self.historico is None or not self.historico.winfo_exists():
@@ -414,16 +437,27 @@ class Aplicativo:
         self.atualizar()
 
     def exportar_backup(self):
-        pasta = filedialog.askdirectory(parent=self.historico, title='Escolha onde salvar o backup')
+        pai = self.historico if self.historico is not None and self.historico.winfo_exists() else self.janela
+        pasta = filedialog.askdirectory(parent=pai, title='Escolha onde salvar o backup')
         if not pasta:
             return
         try:
             arquivo = criar_backup(self.banco, pasta)
         except (OSError, sqlite3.Error, ValueError) as erro:
-            messagebox.showerror('Backup', 'Não foi possível criar o backup. ' + str(erro), parent=self.historico)
+            messagebox.showerror('Backup', 'Não foi possível criar o backup. ' + str(erro), parent=pai)
             return
         self.atualizar_ultimo_backup()
-        messagebox.showinfo('Backup concluído', f'Backup salvo em:\n{arquivo}', parent=self.historico)
+        messagebox.showinfo('Backup concluído', f'Backup salvo em:\n{arquivo}', parent=pai)
+
+    def abrir_pasta_documentos(self):
+        pai = self.historico if self.historico is not None and self.historico.winfo_exists() else self.janela
+        try:
+            pasta = self.banco.caminho.parent / 'documentos'
+            pasta.mkdir(parents=True,exist_ok=True)
+            abrir_pasta(pasta)
+        except (OSError,ValueError) as erro:
+            messagebox.showerror('Abrir pasta dos documentos',
+                'Não foi possível abrir a pasta dos documentos. ' + str(erro),parent=pai)
 
     def importar_dados(self):
         arquivo = filedialog.askopenfilename(parent=self.historico, title='Importar backup do Gestor de RPV',
