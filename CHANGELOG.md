@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## 0.12.0
+
+- Prazo em dias corridos após a aquisição calcula a previsão inicial de recebimento.
+- Prazo e calendário sincronizados, com validação de dias inteiros não negativos.
+- Coluna Comissão entre aquisição e Valor Total RPV, com zero por padrão e ordenação.
+- Lucro realizado e capital investido em aberto no rodapé, respeitando busca e lixeira.
+- Comissão permanece informativa e não altera os cálculos financeiros.
+- Ações de previsão e recebimento usam os nomes das colunas para preservar os cliques.
+
 ## 0.11.0
 
 - Anexar PDFs e imagens na janela de recebimento, com consulta e abertura dos comprovantes.

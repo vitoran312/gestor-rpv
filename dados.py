@@ -8,7 +8,7 @@ import re
 import unicodedata
 from contextlib import contextmanager
 import sqlite3
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
@@ -51,6 +51,18 @@ def moeda(valor):
     inteiro, fracao = divmod(abs(valor), 100)
     prefixo = '-' if valor < 0 else ''
     return prefixo + f'{inteiro:,}'.replace(',', '.') + f',{fracao:02d}'
+
+
+def previsao_por_prazo(aquisicao, prazo):
+    """Soma dias corridos à aquisição e retorna a previsão em DD/MM/AAAA."""
+    if not re.fullmatch(r'[0-9]+', prazo.strip()):
+        raise ValueError('Informe o prazo em dias como um número inteiro maior ou igual a zero.')
+    try:
+        inicio = date.fromisoformat(data_iso(aquisicao))
+        resultado = inicio + timedelta(days=int(prazo))
+    except (OverflowError, ValueError):
+        raise ValueError('Confira a data de aquisição e o prazo informado.') from None
+    return resultado.strftime('%d/%m/%Y')
 
 
 def data_iso(texto):

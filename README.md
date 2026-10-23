@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.11.0
+# Gestor de RPV — 0.12.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -67,16 +67,32 @@ A busca continua acima da tabela. Os menus de clique direito permanecem disponí
 - O campo e a coluna **Valor Total RPV** representam o valor integral do crédito.
 - A coluna **Data de Aquisição** informa a data da compra.
 - A aquisição deve ser maior que zero e não pode superar o Valor Total RPV.
-- Comissão é opcional e apenas informativa: não altera o lucro.
+- Comissão é opcional e apenas informativa: não altera o lucro. Na tabela, fica
+  entre Valor de aquisição e Valor Total RPV; mostra R$ 0,00 quando não cadastrada
+  e permite ordenar pelo valor com os mesmos três cliques dos outros cabeçalhos.
 - Os valores são guardados em centavos, sem ponto flutuante.
 - As datas têm calendários com navegação por mês e ano.
+- Abaixo da previsão inicial, **Prazo após a aquisição (dias corridos)** calcula
+  a data automaticamente: aquisição + quantidade de dias. Exemplo: 28/12/2026
+  com 10 dias resulta em 07/01/2027. Zero dias indica a própria data de aquisição.
+  O prazo aceita apenas números inteiros não negativos e é opcional.
+- Selecionar a previsão pelo calendário atualiza o prazo em dias. Alterar a data
+  de aquisição com um prazo preenchido recalcula a previsão. Na edição, o prazo
+  é derivado das datas já salvas, sem modificar a previsão atual de recebimento.
 - O histórico permite buscar por nome/data, editar e enviar para a lixeira com confirmação.
 - Clique nos cabeçalhos para ordenar: valores e datas começam do maior/mais recente
   para o menor; nomes e contas começam em ordem alfabética. O segundo clique inverte
   a direção e o terceiro retorna à ordem original. A ordenação continua funcionando
   com a busca. Os números são comparados em centavos, não como texto.
-- A visualização de total investido foi retirada. O Valor Total RPV permanece fixo
-  como valor esperado de recebimento; não há um segundo campo de valor realizado.
+- O rodapé mostra quantidade de registros, lucro previsto, **Lucro realizado** e
+  **Capital investido em aberto**. O lucro previsto soma Valor Total RPV menos
+  aquisição de todas as linhas exibidas; o realizado considera apenas as marcadas
+  como recebidas; o capital em aberto soma a aquisição das ainda não recebidas.
+  Comissão não interfere nesses totais. A busca limita os totais às linhas exibidas;
+  entradas na lixeira ficam fora deles. Marcar/desmarcar recebimento e restaurar ou
+  excluir uma entrada atualiza os totais.
+- O Valor Total RPV permanece fixo como valor esperado de recebimento;
+  não há um segundo campo de valor realizado.
 - O histórico mostra somente **Previsão inicial** e **Previsão atual**, sem a
   coluna Prorrogação. Clique na data atual ou use o menu de contexto
   **Editar previsão atual** para alterá-la pelo calendário.

@@ -5,7 +5,7 @@ import tkinter as tk
 from datetime import date, datetime
 from tkinter import messagebox, ttk, filedialog
 
-from dados import Banco, centavos, moeda, data_iso, data_br, nome_formatado
+from dados import Banco, centavos, moeda, data_iso, data_br, nome_formatado, previsao_por_prazo
 from componentes import CampoMoeda, CampoData, centralizar, maximizar
 from contas import JanelaContas, dados_para_copiar
 from versao import VERSAO
@@ -164,9 +164,9 @@ class Aplicativo:
 
         quadro = ttk.Frame(corpo)
         quadro.pack(fill='both', expand=True)
-        colunas = ('nome', 'data', 'custo', 'previsto', 'lucro', 'conta', 'previsao', 'previsao_atual', 'recebido')
+        colunas = ('nome', 'data', 'custo', 'comissao', 'previsto', 'lucro', 'conta', 'previsao', 'previsao_atual', 'recebido')
         self.tabela = ttk.Treeview(quadro, columns=colunas, show='headings', selectmode='browse')
-        titulos = ('Titular original', 'Data de Aquisição', 'Valor de aquisição', 'Valor Total RPV',
+        titulos = ('Titular original', 'Data de Aquisição', 'Valor de aquisição', 'Comissão', 'Valor Total RPV',
                    'Lucro previsto', 'Conta de destino', 'Previsão inicial', 'Previsão atual', 'Recebido')
         self.ordenacao = None
         self.titulos_colunas = dict(zip(colunas, titulos))
@@ -199,7 +199,8 @@ class Aplicativo:
         rodape = ttk.Frame(corpo)
         rodape.pack(fill='x',pady=(12,0))
         self.resumo = ttk.Label(rodape)
-        self.resumo.pack(side='left')
+        self.resumo.pack(side='left', fill='x', expand=True)
+        rodape.bind('<Configure>', lambda e: self.resumo.configure(wraplength=max(200,e.width-90)))
         self.desenhar_icone_lixeira()
         self.botao_lixeira = ttk.Button(rodape, text='Lixeira', image=self.icone_lixeira, compound='image',
                                        width=3, command=self.mostrar_lixeira)
@@ -229,6 +230,7 @@ class Aplicativo:
         for r in registros:
             self.tabela.insert('', 'end', iid=str(r['id']), values=(
                 r['nome'], data_br(r['aquisicao']), 'R$ ' + moeda(r['custo']),
+                'R$ ' + moeda(r['comissao'] or 0),
                 'R$ ' + moeda(r['previsto']), 'R$ ' + moeda(r['previsto'] - r['custo']),
                 r['conta'], data_br(r['previsao']), data_br(r['previsao_atual']),
                 ''))
@@ -238,7 +240,9 @@ class Aplicativo:
             self.tabela.focus(foco)
         self.agendar_acoes()
         self.resumo.config(text=f'{len(registros)} registro(s) • '
-            f"Lucro previsto: R$ {moeda(sum(r['previsto'] - r['custo'] for r in registros))}")
+            f"Lucro previsto: R$ {moeda(sum(r['previsto'] - r['custo'] for r in registros))}\n"
+            f"Lucro realizado: R$ {moeda(sum(r['previsto'] - r['custo'] for r in registros if r['recebimento']))} • "
+            f"Capital investido em aberto: R$ {moeda(sum(r['custo'] for r in registros if not r['recebimento']))}")
 
     def ordenar_coluna(self, coluna):
         primeira = 'asc' if coluna in ('nome', 'conta') else 'desc'
@@ -527,11 +531,11 @@ class Aplicativo:
             return
         if self.tabela.identify_region(evento.x, evento.y) != 'cell':
             return
-        coluna = self.tabela.identify_column(evento.x)
+        coluna = self.tabela.column(self.tabela.identify_column(evento.x), 'id')
         linha = self.tabela.identify_row(evento.y)
-        if linha and coluna in ('#8', '#9'):
+        if linha and coluna in ('previsao_atual', 'recebido'):
             self.tabela.selection_set(linha)
-            if coluna == '#8':
+            if coluna == 'previsao_atual':
                 self.editar_previsao(int(linha))
             else:
                 self.abrir_recebimento(int(linha))
@@ -540,7 +544,7 @@ class Aplicativo:
     def duplo_clique_historico(self, evento):
         if self.tabela.identify_region(evento.x, evento.y) != 'cell':
             return 'break'
-        if self.tabela.identify_column(evento.x) not in ('#8', '#9'):
+        if self.tabela.column(self.tabela.identify_column(evento.x), 'id') not in ('previsao_atual', 'recebido'):
             self.abrir()
         return 'break'
 
@@ -660,9 +664,49 @@ class Aplicativo:
                 entrada.focus_set()
                 aplicar_formato(entrada, campos['nome'], str.title)
 
+        ttk.Label(quadro, text='Prazo após a aquisição (dias corridos)').grid(row=6,column=0,sticky='w',pady=6,padx=(0,16))
+        prazo = tk.StringVar()
+        entrada_prazo = ttk.Entry(quadro,textvariable=prazo,width=32,name='prazo_dias')
+        entrada_prazo.grid(row=6,column=1,sticky='ew',pady=6)
+        sincronizando_prazo = False
+
+        def calcular_data(*_):
+            nonlocal sincronizando_prazo
+            if sincronizando_prazo or not prazo.get().strip():
+                return
+            try:
+                prevista = previsao_por_prazo(campos['aquisicao'].get(),prazo.get())
+            except ValueError:
+                return  # Validação definitiva ocorre ao salvar, sem interromper a digitação.
+            sincronizando_prazo = True
+            try:
+                campos['previsao'].set(prevista)
+            finally:
+                sincronizando_prazo = False
+
+        def calcular_dias(*_):
+            nonlocal sincronizando_prazo
+            if sincronizando_prazo:
+                return
+            try:
+                dias = (date.fromisoformat(data_iso(campos['previsao'].get())) -
+                        date.fromisoformat(data_iso(campos['aquisicao'].get()))).days
+            except ValueError:
+                return
+            sincronizando_prazo = True
+            try:
+                prazo.set(str(dias) if dias >= 0 else '')
+            finally:
+                sincronizando_prazo = False
+
+        prazo.trace_add('write',calcular_data)
+        campos['aquisicao'].trace_add('write',calcular_data)
+        campos['previsao'].trace_add('write',calcular_dias)
+        calcular_dias()
+
         lucro = tk.StringVar()
-        ttk.Label(quadro, text='Lucro previsto').grid(row=6, column=0, sticky='w', pady=6)
-        ttk.Label(quadro, textvariable=lucro).grid(row=6, column=1, sticky='w')
+        ttk.Label(quadro, text='Lucro previsto').grid(row=7, column=0, sticky='w', pady=6)
+        ttk.Label(quadro, textvariable=lucro).grid(row=7, column=1, sticky='w')
 
         def atualizar_lucro(*_):
             try:
@@ -673,15 +717,15 @@ class Aplicativo:
         for chave in ('previsto', 'custo'):
             campos[chave].trace_add('write', lambda *_: tela.after_idle(atualizar_lucro))
         atualizar_lucro()
-        ttk.Label(quadro, text='Há comissão?').grid(row=7, column=0, sticky='w', pady=6)
+        ttk.Label(quadro, text='Há comissão?').grid(row=8, column=0, sticky='w', pady=6)
         tem_comissao = tk.StringVar(value='Sim' if registro and registro['comissao'] is not None else 'Não')
         escolha = ttk.Combobox(quadro, textvariable=tem_comissao, values=('Não', 'Sim'), state='readonly', width=29)
-        escolha.grid(row=7, column=1, sticky='ew')
+        escolha.grid(row=8, column=1, sticky='ew')
         valor_comissao = tk.StringVar(value=moeda(registro['comissao']) if registro and registro['comissao'] is not None else '')
         rotulo_comissao = ttk.Label(quadro, text='Valor da comissão')
         entrada_comissao = CampoMoeda(quadro, valor_comissao)
-        rotulo_comissao.grid(row=8, column=0, sticky='w', pady=6)
-        entrada_comissao.grid(row=8, column=1, sticky='ew')
+        rotulo_comissao.grid(row=9, column=0, sticky='w', pady=6)
+        entrada_comissao.grid(row=9, column=1, sticky='ew')
 
         def exibir_comissao(*_):
             for widget in (rotulo_comissao, entrada_comissao):
@@ -693,12 +737,12 @@ class Aplicativo:
 
         tem_comissao.trace_add('write', exibir_comissao)
         exibir_comissao()
-        ttk.Label(quadro, text='Observações').grid(row=9, column=0, sticky='nw', pady=10)
+        ttk.Label(quadro, text='Observações').grid(row=10, column=0, sticky='nw', pady=10)
         observacoes = tk.Text(quadro, height=4, width=32, wrap='word', font=('Verdana', 10),
                               bg=cores()['campo'], fg=cores()['texto'], insertbackground=cores()['texto'],
                               selectbackground=cores()['selecao'], selectforeground=cores()['texto_selecao'],
                               relief='flat', padx=6, pady=6)
-        observacoes.grid(row=9, column=1, pady=10)
+        observacoes.grid(row=10, column=1, pady=10)
 
         def capitalizar_observacoes(_evento=None):
             texto = observacoes.get('1.0', 'end-1c')
@@ -714,7 +758,7 @@ class Aplicativo:
             observacoes.insert('1.0', registro['observacoes'])
 
         painel_documentos = ttk.Frame(quadro)
-        painel_documentos.grid(row=10,column=0,columnspan=2,sticky='ew',pady=(8,0))
+        painel_documentos.grid(row=11,column=0,columnspan=2,sticky='ew',pady=(8,0))
         anexos_pendentes = self.criar_painel_documentos(painel_documentos, tela, identificador)
 
         def salvar():
@@ -722,6 +766,8 @@ class Aplicativo:
                 dados = {chave: variavel.get().strip() for chave, variavel in campos.items()}
                 if not dados['nome']:
                     raise ValueError('Informe o nome completo do titular original.')
+                if prazo.get().strip():
+                    previsao_por_prazo(dados['aquisicao'],prazo.get())
                 for chave in ('aquisicao', 'previsao'):
                     dados[chave] = data_iso(dados[chave])
                 if dados['previsao'] < dados['aquisicao']:
@@ -742,7 +788,7 @@ class Aplicativo:
             tela.destroy()
 
         botoes = ttk.Frame(quadro)
-        botoes.grid(row=11, column=0, columnspan=2, sticky='e', pady=(10, 0))
+        botoes.grid(row=12, column=0, columnspan=2, sticky='e', pady=(10, 0))
         ttk.Button(botoes, text='Dados de recebimento',
                    command=lambda: self.ver_dados_recebimento(tela, registro, mapa_contas.get(campos['conta'].get()))).pack(side='left', padx=8)
         ttk.Button(botoes, text='Cancelar', command=tela.destroy).pack(side='left', padx=8)

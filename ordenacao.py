@@ -5,6 +5,7 @@ CHAVES = {
     'nome': lambda r: normalizar(r['nome']),
     'data': lambda r: r['aquisicao'],
     'custo': lambda r: r['custo'],
+    'comissao': lambda r: r['comissao'] or 0,
     'previsto': lambda r: r['previsto'],
     'lucro': lambda r: r['previsto'] - r['custo'],
     'conta': lambda r: normalizar(r['conta']),
