@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## 0.19.0
+
+- Exportação para Excel em Minhas operações (Arquivo → Exportar para Excel), com valores em R$,
+  datas, situação de recebimento, cabeçalho fixo e filtros, sem dependências externas.
+- O tema claro ou escuro escolhido é lembrado ao reabrir o programa.
+- Emblema Vitoran Tech no cabeçalho da tela inicial e, com 50% de opacidade, ao lado da assinatura.
+- Instalações novas começam sem contas pré-cadastradas; cadastros antigos são preservados.
+- Backups automáticos e cópias anteriores às atualizações limitados às 10 mais recentes.
+- Código da interface dividido por tela (`tela_operacoes.py`, `tela_registro.py`, `tela_arquivos.py`)
+  e estilos em `estilos.py`, sem mudança de comportamento.
+
 ## 0.18.0
 
 - Ícone Vitoran Tech com emblema vinho e V em pêssego nas janelas e no executável Windows.

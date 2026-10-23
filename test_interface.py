@@ -2,15 +2,18 @@
 import os
 import tempfile
 import tkinter as tk
+from tkinter import filedialog, messagebox, ttk, font as tkfont
 import unittest
 from datetime import date
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import patch
 
 import app
+import estilos
+import tela_arquivos
+import tela_registro
 from componentes import CampoData, CampoMoeda, AreaRolavel
-from dados import Banco
+from test_contas import banco_com_contas
 from tema import cores, PALETAS
 
 
@@ -21,7 +24,7 @@ def filhos(widget):
 
 
 def botao(widget, texto):
-    return next(w for w in filhos(widget) if isinstance(w, app.ttk.Button) and w.cget('text') == texto)
+    return next(w for w in filhos(widget) if isinstance(w, ttk.Button) and w.cget('text') == texto)
 
 
 def texto_resumo(programa):
@@ -36,7 +39,7 @@ def texto_resumo(programa):
 class TestInterface(unittest.TestCase):
     def setUp(self):
         self.pasta = tempfile.TemporaryDirectory()
-        self.banco = Banco(Path(self.pasta.name) / 'teste.sqlite3')
+        self.banco = banco_com_contas(Path(self.pasta.name) / 'teste.sqlite3')
         self.root = tk.Tk()
         self.erros = []
         self.root.report_callback_exception = lambda *args: self.erros.append(args)
@@ -76,7 +79,7 @@ class TestInterface(unittest.TestCase):
         moedas[1].entrada.focus_force()
         self.root.update()
         self.assertEqual(campo.variavel.get(), '10.560,50')
-        nome = next(w for w in filhos(form) if isinstance(w, app.ttk.Entry))
+        nome = next(w for w in filhos(form) if isinstance(w, ttk.Entry))
         nome.insert(0, 'pessoa de TESTE')
         datas = [w for w in filhos(form) if isinstance(w, CampoData)]
         datas[0].variavel.set('01/02/2028')
@@ -90,7 +93,7 @@ class TestInterface(unittest.TestCase):
         self.assertEqual(self.root.grab_current(), form)
         for custo in ('0', '20000'):
             moedas[1].variavel.set(custo)
-            with patch.object(app.messagebox, 'showerror') as erro:
+            with patch.object(messagebox, 'showerror') as erro:
                 botao(form, 'Salvar registro').invoke()
                 self.root.update()
                 erro.assert_called_once()
@@ -109,14 +112,14 @@ class TestInterface(unittest.TestCase):
         botao(janela.tela, 'Cadastrar nova conta').invoke()
         self.root.update()
         form = next(w for w in janela.tela.winfo_children() if isinstance(w, tk.Toplevel))
-        entradas = [w for w in filhos(form) if isinstance(w, app.ttk.Entry)]
+        entradas = [w for w in filhos(form) if isinstance(w, ttk.Entry)]
         self.assertEqual(str(entradas[6].cget('state')), 'readonly')
         self.assertEqual(len(entradas[6].cget('values')), 27)
         self.assertIn('SP', entradas[6].cget('values'))
         self.assertIn('PR', entradas[6].cget('values'))
         valores = ('Conta teste', 'pessoa DE teste', '52998224725', 'Endereço teste', '12', 'Cidade Teste', 'SP', 'Banco teste', '0001', '12345-6', 'teste@example.com')
         for entrada, valor in zip(entradas, valores):
-            if isinstance(entrada, app.ttk.Combobox):
+            if isinstance(entrada, ttk.Combobox):
                 entrada.set(valor)
             else:
                 entrada.insert(0, valor)
@@ -124,19 +127,19 @@ class TestInterface(unittest.TestCase):
         self.root.update()
         conta = next(c for c in self.banco.contas() if c['identificacao'] == 'Conta teste')
         janela.tabela.selection_set(str(conta['id']))
-        with patch.object(app.messagebox, 'askyesno', return_value=True):
+        with patch.object(messagebox, 'askyesno', return_value=True):
             janela.alterar_status()
         self.root.update()
         self.assertFalse(self.banco.obter_conta(conta['id'])['ativa'])
         form = self.formulario()
-        combo = next(w for w in filhos(form) if isinstance(w, app.ttk.Combobox))
+        combo = next(w for w in filhos(form) if isinstance(w, ttk.Combobox))
         self.assertNotIn('Conta teste', combo.cget('values'))
         form.destroy()
         janela.tabela.selection_set(str(conta['id']))
-        with patch.object(app.messagebox, 'askyesno', return_value=True):
+        with patch.object(messagebox, 'askyesno', return_value=True):
             janela.alterar_status()
         form = self.formulario()
-        combo = next(w for w in filhos(form) if isinstance(w, app.ttk.Combobox))
+        combo = next(w for w in filhos(form) if isinstance(w, ttk.Combobox))
         self.assertIn('Conta teste', combo.cget('values'))
 
     def test_previsao_atual_edicao_cor_e_preservacao_historico(self):
@@ -156,7 +159,7 @@ class TestInterface(unittest.TestCase):
         rotulo = self.programa.acoes_linhas[str(identificador)][0]
         self.assertEqual(rotulo.cget('text'), '20/02/2027')
         self.assertEqual(rotulo.cget('style'), 'PrevisaoAdiada.TLabel')
-        self.assertEqual(str(app.ttk.Style().lookup('PrevisaoAdiada.TLabel', 'foreground')), cores()['vermelho'])
+        self.assertEqual(str(ttk.Style().lookup('PrevisaoAdiada.TLabel', 'foreground')), cores()['vermelho'])
         rotulo.event_generate('<Button-1>')
         rotulo.event_generate('<ButtonRelease-1>')
         self.root.update()
@@ -194,7 +197,7 @@ class TestInterface(unittest.TestCase):
         botao(form, 'Dados de recebimento').invoke()
         self.root.update()
         tela = next(w for w in form.winfo_children() if isinstance(w, tk.Toplevel))
-        rotulo = next(w for w in filhos(tela) if isinstance(w, app.ttk.Label) and 'Nome completo:' in w.cget('text'))
+        rotulo = next(w for w in filhos(tela) if isinstance(w, ttk.Label) and 'Nome completo:' in w.cget('text'))
         rotulo.event_generate('<Button-3>', x=5, y=5)
         self.root.update()
         menu = next(w for w in rotulo.winfo_children() if isinstance(w, tk.Menu))
@@ -213,12 +216,12 @@ class TestInterface(unittest.TestCase):
         for linha in janela.tabela.get_children():
             self.assertIn('Completar cadastro', janela.tabela.item(linha, 'values')[-1])
             self.assertIn('incompleta', janela.tabela.item(linha, 'tags'))
-        self.assertEqual(str(app.ttk.Style().lookup('ContaIncompleta.TLabel','foreground')),cores()['vermelho'])
+        self.assertEqual(str(ttk.Style().lookup('ContaIncompleta.TLabel','foreground')),cores()['vermelho'])
         self.assertEqual(str(janela.tabela.tag_configure('incompleta','foreground')),'')
         janela.formulario()
         self.root.update()
         tela = next(w for w in janela.tela.winfo_children() if isinstance(w, tk.Toplevel))
-        entradas = [w for w in filhos(tela) if isinstance(w, app.ttk.Entry)]
+        entradas = [w for w in filhos(tela) if isinstance(w, ttk.Entry)]
         cpf = entradas[2]
         cpf.focus_force()
         self.root.update()
@@ -246,12 +249,12 @@ class TestInterface(unittest.TestCase):
         entradas[0].event_generate('<KeyRelease>', keysym='e')
         self.assertEqual(entradas[0].get(), 'Conta teste')
         for entrada, valor in zip(entradas[3:], ('rua teste', '12', 'cidade teste', 'SP', 'banco teste', '001', '123-4', 'ChaveCaseSensitive')):
-            if isinstance(entrada, app.ttk.Combobox):
+            if isinstance(entrada, ttk.Combobox):
                 entrada.set(valor)
             else:
                 entrada.insert(0, valor)
         cpf.delete(0, tk.END)
-        with patch.object(app.messagebox, 'showerror') as erro:
+        with patch.object(messagebox, 'showerror') as erro:
             botao(tela, 'Salvar conta').invoke()
             self.root.update()
             erro.assert_called_once()
@@ -268,7 +271,7 @@ class TestInterface(unittest.TestCase):
 
     def test_menu_texto_recorta_copia_cola_e_preserva_modal(self):
         form = self.formulario()
-        nome = next(w for w in filhos(form) if isinstance(w, app.ttk.Entry))
+        nome = next(w for w in filhos(form) if isinstance(w, ttk.Entry))
         nome.insert(0, 'Vitor Silva')
         nome.selection_range(0, 5)
 
@@ -313,7 +316,7 @@ class TestInterface(unittest.TestCase):
         tabela.event_generate('<Button-3>', x=x+5, y=y+5)
         self.root.update()
         menu = [w for w in tabela.winfo_children() if isinstance(w, tk.Menu)][-1]
-        with patch.object(app.messagebox, 'askyesno', return_value=False):
+        with patch.object(messagebox, 'askyesno', return_value=False):
             menu.invoke('Excluir')
         menu.unpost()
         self.root.update()
@@ -342,7 +345,7 @@ class TestInterface(unittest.TestCase):
         custo.entrada.event_generate('<<Paste>>')
         self.root.update()
         self.assertEqual(custo.variavel.get(), '15.236,59')
-        nome = next(w for w in filhos(form) if isinstance(w, app.ttk.Entry))
+        nome = next(w for w in filhos(form) if isinstance(w, ttk.Entry))
         nome.insert(0, 'Titular Teste')
         datas = [w for w in filhos(form) if isinstance(w, CampoData)]
         datas[0].variavel.set('01/01/2026')
@@ -380,7 +383,7 @@ class TestInterface(unittest.TestCase):
         self.assertLessEqual(abs((caixa.winfo_x() + caixa.winfo_width()/2) - (x + largura/2)), 1)
         self.assertEqual(caixa.cget('text'), '22/10/2026')
         self.assertEqual(caixa.cget('style'), 'Recebido.TCheckbutton')
-        estilo = app.ttk.Style()
+        estilo = ttk.Style()
         self.assertEqual(str(estilo.lookup('Recebido.TCheckbutton', 'foreground')), cores()['verde'])
         self.assertIn('bold', str(estilo.lookup('Recebido.TCheckbutton', 'font')))
         caixa.invoke()
@@ -399,7 +402,7 @@ class TestInterface(unittest.TestCase):
         caixa.invoke()
         self.root.update()
         tela = next(w for w in self.programa.historico.winfo_children() if isinstance(w, tk.Toplevel))
-        with patch.object(app.messagebox, 'askyesno', return_value=True):
+        with patch.object(messagebox, 'askyesno', return_value=True):
             botao(tela, 'Desmarcar recebimento').invoke()
         self.root.update()
         self.assertIsNone(self.banco.obter(identificador)['recebimento'])
@@ -411,7 +414,7 @@ class TestInterface(unittest.TestCase):
         janela.formulario()
         self.root.update()
         tela = next(w for w in janela.tela.winfo_children() if isinstance(w, tk.Toplevel))
-        entradas = [w for w in filhos(tela) if isinstance(w, app.ttk.Entry)]
+        entradas = [w for w in filhos(tela) if isinstance(w, ttk.Entry)]
         endereco = entradas[3]
         endereco.focus_force()
         self.root.update()
@@ -424,10 +427,10 @@ class TestInterface(unittest.TestCase):
         tela.destroy()
         conta = self.banco.contas()[0]
         janela.tabela.selection_set(str(conta['id']))
-        with patch.object(app.messagebox, 'askyesno', return_value=False):
+        with patch.object(messagebox, 'askyesno', return_value=False):
             botao(janela.tela, 'Remover').invoke()
         self.assertIsNotNone(self.banco.obter_conta(conta['id']))
-        with patch.object(app.messagebox, 'askyesno', return_value=True):
+        with patch.object(messagebox, 'askyesno', return_value=True):
             botao(janela.tela, 'Remover').invoke()
         self.root.update()
         self.assertIsNone(self.banco.obter_conta(conta['id']))
@@ -459,12 +462,12 @@ class TestInterface(unittest.TestCase):
         self.assertEqual(str(self.programa.historico.cget('menu')), str(menus['barra']))
         self.assertEqual(self.programa.tabela.heading('previsto', 'text'), 'Valor Total RPV')
         self.assertEqual(self.programa.tabela.heading('data', 'text'), 'Data de Aquisição')
-        textos = [w.cget('text') for w in filhos(self.programa.historico) if isinstance(w, app.ttk.Label)]
+        textos = [w.cget('text') for w in filhos(self.programa.historico) if isinstance(w, ttk.Label)]
         self.assertFalse(any('Comissão apenas informativa' in texto for texto in textos))
         menus['Arquivo'].invoke('Nova entrada')
         self.root.update()
         form = next(w for w in self.root.winfo_children() if isinstance(w, tk.Toplevel) and w.title() == 'Nova entrada')
-        textos = [w.cget('text') for w in filhos(form) if isinstance(w, app.ttk.Label)]
+        textos = [w.cget('text') for w in filhos(form) if isinstance(w, ttk.Label)]
         self.assertIn('Valor Total RPV', textos)
         observacoes = next(w for w in filhos(form) if isinstance(w, tk.Text))
         menus['Exibir'].invoke('Tema claro')
@@ -472,7 +475,7 @@ class TestInterface(unittest.TestCase):
         self.assertEqual(self.root.cget('bg'), PALETAS['claro']['fundo'])
         self.assertEqual(form.cget('bg'), PALETAS['claro']['fundo'])
         self.assertEqual(observacoes.cget('bg'), PALETAS['claro']['campo'])
-        self.assertEqual(str(app.ttk.Style().lookup('Treeview', 'fieldbackground')), PALETAS['claro']['campo'])
+        self.assertEqual(str(ttk.Style().lookup('Treeview', 'fieldbackground')), PALETAS['claro']['campo'])
         form.destroy()
         menus['barra'].invoke('Calculadora')
         self.root.update()
@@ -512,7 +515,7 @@ class TestInterface(unittest.TestCase):
         caixa.invoke()
         self.root.update()
         tela = next(w for w in self.programa.historico.winfo_children() if isinstance(w, tk.Toplevel))
-        with patch.object(app.messagebox, 'askyesno', return_value=True):
+        with patch.object(messagebox, 'askyesno', return_value=True):
             botao(tela, 'Desmarcar recebimento').invoke()
         self.root.update()
         caixa = self.programa.acoes_linhas[str(identificador)][1]
@@ -536,14 +539,14 @@ class TestInterface(unittest.TestCase):
         self.root.update()
         self.assertNotIn('Investido',texto_resumo(self.programa))
         self.programa.tabela.selection_set(str(identificador))
-        with patch.object(app.messagebox,'askyesno',return_value=True):
+        with patch.object(messagebox,'askyesno',return_value=True):
             self.programa.excluir()
         self.root.update()
         self.assertEqual(self.programa.tabela.get_children(),())
         botao(self.programa.historico,'Lixeira').invoke()
         self.root.update()
         tela = next(w for w in self.programa.historico.winfo_children() if isinstance(w,tk.Toplevel) and w.title()=='Lixeira')
-        tabela = next(w for w in filhos(tela) if isinstance(w,app.ttk.Treeview))
+        tabela = next(w for w in filhos(tela) if isinstance(w,ttk.Treeview))
         tabela.selection_set(str(identificador))
         botao(tela,'Restaurar entradas').invoke()
         self.root.update()
@@ -591,23 +594,23 @@ class TestInterface(unittest.TestCase):
         dados = dict(nome='Primeira',aquisicao='2026-10-01',previsto=2000000,
                      custo=1200000,conta='Vitor',previsao='2026-12-20',comissao=None,observacoes='')
         self.banco.salvar(dados)
-        botoes_iniciais = [w.cget('text') for w in filhos(self.root) if isinstance(w,app.ttk.Button)]
+        botoes_iniciais = [w.cget('text') for w in filhos(self.root) if isinstance(w,ttk.Button)]
         self.assertNotIn('Backup',botoes_iniciais)
         self.assertNotIn('Lixeira',botoes_iniciais)
         self.programa.mostrar_historico()
         self.root.update()
-        botoes = [w.cget('text') for w in filhos(self.programa.historico) if isinstance(w,app.ttk.Button)]
+        botoes = [w.cget('text') for w in filhos(self.programa.historico) if isinstance(w,ttk.Button)]
         self.assertNotIn('Backup',botoes)
         self.assertNotIn('Importar dados',botoes)
         pasta = Path(self.pasta.name)/'exportados'
-        with patch.object(app.filedialog,'askdirectory',return_value=str(pasta)), patch.object(app.messagebox,'showinfo'):
+        with patch.object(filedialog,'askdirectory',return_value=str(pasta)), patch.object(messagebox,'showinfo'):
             self.programa.menus['Arquivo'].invoke('Fazer backup')
         arquivo = next(pasta.glob('*.rpvbackup'))
         self.banco.salvar(dict(dados,nome='Segunda'))
-        with patch.object(app.filedialog,'askopenfilename',return_value=str(arquivo)), patch.object(app.messagebox,'askyesno',return_value=False):
+        with patch.object(filedialog,'askopenfilename',return_value=str(arquivo)), patch.object(messagebox,'askyesno',return_value=False):
             self.programa.menus['Arquivo'].invoke('Importar dados')
         self.assertEqual(len(self.banco.listar()),2)
-        with patch.object(app.filedialog,'askopenfilename',return_value=str(arquivo)), patch.object(app.messagebox,'askyesno',return_value=True), patch.object(app.messagebox,'showinfo'):
+        with patch.object(filedialog,'askopenfilename',return_value=str(arquivo)), patch.object(messagebox,'askyesno',return_value=True), patch.object(messagebox,'showinfo'):
             self.programa.menus['Arquivo'].invoke('Importar dados')
         self.root.update()
         self.assertEqual(len(self.banco.listar()),1)
@@ -651,7 +654,7 @@ class TestInterface(unittest.TestCase):
         tabela.event_generate('<KeyPress>',keysym='Down',state=1)
         self.root.update()
         self.assertEqual(set(tabela.selection()),set(linhas[:2]))
-        with patch.object(app.messagebox,'askyesno',return_value=True):
+        with patch.object(messagebox,'askyesno',return_value=True):
             tabela.event_generate('<KeyPress>',keysym='Delete')
             self.root.update()
         self.assertEqual(len(self.banco.listar_lixeira()),2)
@@ -663,9 +666,9 @@ class TestInterface(unittest.TestCase):
         self.assertTrue(restaurar.winfo_ismapped())
         self.assertGreater(restaurar.winfo_width(),150)
         self.assertLess(restaurar.winfo_rooty()+restaurar.winfo_height(),tela.winfo_rooty()+tela.winfo_height()+1)
-        estilo = app.ttk.Style(self.root)
+        estilo = ttk.Style(self.root)
         self.assertNotEqual(estilo.lookup('Restaurar.TButton','foreground'),estilo.lookup('Restaurar.TButton','background'))
-        lixeira = next(w for w in filhos(tela) if isinstance(w,app.ttk.Treeview))
+        lixeira = next(w for w in filhos(tela) if isinstance(w,ttk.Treeview))
         lixeira.focus_force()
         self.root.update()
         lixeira.event_generate('<Control-a>')
@@ -682,20 +685,20 @@ class TestInterface(unittest.TestCase):
         self.programa.formulario(identificador)
         self.root.update()
         form = next(w for w in self.root.winfo_children() if isinstance(w,tk.Toplevel))
-        with patch.object(app.filedialog,'askopenfilenames',return_value=(str(arquivo),)):
+        with patch.object(filedialog,'askopenfilenames',return_value=(str(arquivo),)):
             botao(form,'Anexar documentos').invoke()
             botao(form,'Anexar documentos').invoke()
         self.root.update()
         self.assertEqual(self.banco.documentos(identificador),[])
-        documentos = next(w for w in filhos(form) if isinstance(w,app.ttk.Button)
+        documentos = next(w for w in filhos(form) if isinstance(w,ttk.Button)
                           and w.cget('textvariable') and self.root.getvar(w.cget('textvariable'))=='Documentos (1)')
         documentos.invoke()
         self.root.update()
         janela = next(w for w in form.winfo_children() if isinstance(w,tk.Toplevel))
-        lista = next(w for w in filhos(janela) if isinstance(w,app.ttk.Treeview))
+        lista = next(w for w in filhos(janela) if isinstance(w,ttk.Treeview))
         self.assertEqual(len(lista.get_children()),1)
         lista.selection_set(lista.get_children()[0])
-        with patch.object(app,'abrir_arquivo') as abrir:
+        with patch.object(tela_registro,'abrir_arquivo') as abrir:
             botao(janela,'Abrir documento').invoke()
             abrir.assert_called_once_with(arquivo)
         botao(janela,'Fechar').invoke()
@@ -726,12 +729,12 @@ class TestInterface(unittest.TestCase):
             return next(w for w in self.programa.historico.winfo_children()
                         if isinstance(w,tk.Toplevel) and w.title()=='Recebimento')
         tela = abrir()
-        with patch.object(app.filedialog,'askopenfilenames',return_value=(str(recibo),)):
+        with patch.object(filedialog,'askopenfilenames',return_value=(str(recibo),)):
             botao(tela,'Anexar documentos').invoke()
         botao(tela,'Cancelar').invoke()
         self.assertEqual(self.banco.documentos(identificador,tipo='recebimento'),[])
         tela = abrir()
-        with patch.object(app.filedialog,'askopenfilenames',return_value=(str(recibo),)):
+        with patch.object(filedialog,'askopenfilenames',return_value=(str(recibo),)):
             botao(tela,'Anexar documentos').invoke()
         botao(tela,'Salvar recebimento').invoke()
         self.root.update()
@@ -740,19 +743,19 @@ class TestInterface(unittest.TestCase):
         self.assertEqual(len(recibos),1)
         recibo.unlink()
         tela = abrir()
-        documentos = next(w for w in filhos(tela) if isinstance(w,app.ttk.Button)
+        documentos = next(w for w in filhos(tela) if isinstance(w,ttk.Button)
                           and w.cget('textvariable') and self.root.getvar(w.cget('textvariable'))=='Documentos (1)')
         documentos.invoke()
         self.root.update()
         janela = next(w for w in tela.winfo_children() if isinstance(w,tk.Toplevel))
-        lista = next(w for w in filhos(janela) if isinstance(w,app.ttk.Treeview))
+        lista = next(w for w in filhos(janela) if isinstance(w,ttk.Treeview))
         self.assertEqual([lista.item(i,'values')[0] for i in lista.get_children()],['recibo.pdf'])
         lista.selection_set(lista.get_children()[0])
-        with patch.object(app,'abrir_arquivo') as abrir_arquivo:
+        with patch.object(tela_registro,'abrir_arquivo') as abrir_arquivo:
             botao(janela,'Abrir documento').invoke()
             abrir_arquivo.assert_called_once_with(self.banco.caminho_documento(recibos[0]['id']))
         botao(janela,'Fechar').invoke()
-        with patch.object(app.messagebox,'askyesno',return_value=True):
+        with patch.object(messagebox,'askyesno',return_value=True):
             botao(tela,'Desmarcar recebimento').invoke()
         self.root.update()
         self.assertIsNone(self.banco.obter(identificador)['recebimento'])
@@ -760,12 +763,12 @@ class TestInterface(unittest.TestCase):
 
     def test_prazo_calcula_data_sincroniza_calendario_valida_e_persiste(self):
         form = self.formulario()
-        prazo = next(w for w in filhos(form) if isinstance(w,app.ttk.Entry) and w.winfo_name()=='prazo_dias')
+        prazo = next(w for w in filhos(form) if isinstance(w,ttk.Entry) and w.winfo_name()=='prazo_dias')
         datas = [w for w in filhos(form) if isinstance(w,CampoData)]
         datas[0].variavel.set('28/02/2028')
         self.assertTrue(prazo.instate(['disabled']))
         self.assertFalse(datas[1].botao.instate(['disabled']))
-        modos = {w.cget('value'):w for w in filhos(form) if isinstance(w,app.ttk.Radiobutton)}
+        modos = {w.cget('value'):w for w in filhos(form) if isinstance(w,ttk.Radiobutton)}
         modos['dias'].invoke()
         self.assertFalse(prazo.instate(['disabled']))
         self.assertTrue(datas[1].entrada.instate(['disabled']))
@@ -793,7 +796,7 @@ class TestInterface(unittest.TestCase):
         self.root.update()
         datas[1].selecionar(date(2029,1,10))
         self.assertEqual(prazo.get(),'13')
-        nome = next(w for w in filhos(form) if isinstance(w,app.ttk.Entry))
+        nome = next(w for w in filhos(form) if isinstance(w,ttk.Entry))
         nome.insert(0,'teste prazo')
         moedas = [w for w in filhos(form) if isinstance(w,CampoMoeda)]
         moedas[0].variavel.set('20.000,00')
@@ -802,7 +805,7 @@ class TestInterface(unittest.TestCase):
         for invalido in ('','abc','-1','1,5','999999999999999'):
             prazo.delete(0,'end')
             prazo.insert(0,invalido)
-            with patch.object(app.messagebox,'showerror') as erro:
+            with patch.object(messagebox,'showerror') as erro:
                 botao(form,'Salvar registro').invoke()
                 erro.assert_called_once()
             self.assertEqual(self.banco.listar(),[])
@@ -810,7 +813,7 @@ class TestInterface(unittest.TestCase):
         prazo.insert(0,'10')
         modos['calendario'].invoke()
         datas[1].variavel.set('31/02/2029')
-        with patch.object(app.messagebox,'showerror') as erro:
+        with patch.object(messagebox,'showerror') as erro:
             botao(form,'Salvar registro').invoke()
             erro.assert_called_once()
         self.assertEqual(self.banco.listar(),[])
@@ -822,7 +825,7 @@ class TestInterface(unittest.TestCase):
         self.programa.formulario(registro['id'])
         self.root.update()
         form = next(w for w in self.root.winfo_children() if isinstance(w,tk.Toplevel))
-        prazo = next(w for w in filhos(form) if isinstance(w,app.ttk.Entry) and w.winfo_name()=='prazo_dias')
+        prazo = next(w for w in filhos(form) if isinstance(w,ttk.Entry) and w.winfo_name()=='prazo_dias')
         self.assertEqual(prazo.get(),'10')
 
     def test_comissao_e_saldos_recebimento_filtro_lixeira_e_colunas(self):
@@ -902,7 +905,7 @@ class TestInterface(unittest.TestCase):
         self.assertEqual(len({b.winfo_rooty() for b in botoes}),1)
         self.assertEqual(len({b.winfo_height() for b in botoes}),1)
         self.assertLessEqual(max(b.winfo_width() for b in botoes)-min(b.winfo_width() for b in botoes),1)
-        modos = {w.cget('value'):w for w in filhos(form) if isinstance(w,app.ttk.Radiobutton)}
+        modos = {w.cget('value'):w for w in filhos(form) if isinstance(w,ttk.Radiobutton)}
         modos['dias'].invoke()
         prazo = next(w for w in filhos(form) if w.winfo_name()=='prazo_dias')
         prazo.delete(0,'end')
@@ -912,22 +915,22 @@ class TestInterface(unittest.TestCase):
         self.programa.menus['Exibir'].invoke('Tema claro')
         self.root.update()
         self.assertTrue(datas[1].entrada.instate(['disabled']))
-        self.assertEqual(str(app.ttk.Style().lookup('ResumoRealizado.TLabel','foreground')),PALETAS['claro']['verde'])
+        self.assertEqual(str(ttk.Style().lookup('ResumoRealizado.TLabel','foreground')),PALETAS['claro']['verde'])
         botao(form,'Salvar registro').invoke()
         self.root.update()
         self.assertEqual(self.banco.obter(identificador)['previsao'],'2026-11-21')
 
     def test_previsao_legivel_com_mouse_nos_dois_temas(self):
         form = self.formulario()
-        opcoes = [w for w in filhos(form) if isinstance(w,app.ttk.Radiobutton)]
+        opcoes = [w for w in filhos(form) if isinstance(w,ttk.Radiobutton)]
         self.assertEqual(len(opcoes),2)
-        assinatura = [w.cget('text') for w in filhos(self.root) if isinstance(w,app.ttk.Label)]
+        assinatura = [w.cget('text') for w in filhos(self.root) if isinstance(w,ttk.Label)]
         self.assertIn(f'Vitoran Tech · v{app.VERSAO}',assinatura)
         def luminancia(cor):
             canais = [n/65535 for n in self.root.winfo_rgb(cor)]
             canais = [n/12.92 if n<=0.04045 else ((n+0.055)/1.055)**2.4 for n in canais]
             return sum(a*b for a,b in zip(canais,(0.2126,0.7152,0.0722)))
-        estilo = app.ttk.Style(self.root)
+        estilo = ttk.Style(self.root)
         for modo in ('escuro','claro'):
             self.programa.modo_tema.set(modo)
             self.programa.configurar_tema()
@@ -958,7 +961,7 @@ class TestInterface(unittest.TestCase):
 
     def test_inicio_moss_acoes_visiveis_e_temas_sem_recriar_imagens(self):
         self.assertEqual(self.programa.modo_tema.get(),'claro')
-        self.assertEqual([w for w in filhos(self.root) if isinstance(w,app.ttk.Entry)],[])
+        self.assertEqual([w for w in filhos(self.root) if isinstance(w,ttk.Entry)],[])
         for largura,colunas in ((1286,3),(944,1)):
             self.root.geometry(f'{largura}x668')
             self.root.update()
@@ -1016,10 +1019,10 @@ class TestInterface(unittest.TestCase):
 
     def test_baloes_documentos_distintos_preservam_modal_e_cancelam_ao_sair(self):
         form=self.formulario()
-        rotulos=[w.cget('text') for w in filhos(form) if isinstance(w,app.ttk.Label)]
+        rotulos=[w.cget('text') for w in filhos(form) if isinstance(w,ttk.Label)]
         self.assertIn('Valor de aquisição',rotulos)
         self.assertNotIn('Valor de aquisição (R$)',rotulos)
-        entrada=next(w for w in filhos(form) if isinstance(w,app.ttk.Entry))
+        entrada=next(w for w in filhos(form) if isinstance(w,ttk.Entry))
         entrada.focus_force()
         self.root.update()
         foco=self.root.focus_get()
@@ -1036,7 +1039,7 @@ class TestInterface(unittest.TestCase):
         self.assertIn('contratos e protocolos',ajuda.texto)
         self.assertEqual(self.root.grab_current(),form)
         self.assertEqual(self.root.focus_get(),foco)
-        with patch.object(app.filedialog,'askopenfilenames',return_value=()):
+        with patch.object(filedialog,'askopenfilenames',return_value=()):
             b.event_generate('<ButtonPress-1>',x=5,y=5)
             self.root.update()
             self.assertIsNone(ajuda.janela)
@@ -1060,12 +1063,12 @@ class TestInterface(unittest.TestCase):
         self.assertLessEqual(ajuda.janela.winfo_rootx()+ajuda.janela.winfo_width(),self.root.winfo_screenwidth())
         self.programa.alternar_tema()
         self.root.update()
-        self.assertEqual(str(app.ttk.Style().lookup('Ajuda.TLabel','foreground')),cores()['texto'])
+        self.assertEqual(str(ttk.Style().lookup('Ajuda.TLabel','foreground')),cores()['texto'])
         ajuda.ocultar()
         botao(tela,'Cancelar').invoke()
 
     def test_temas_reutilizados_icones_e_fonte_das_contas(self):
-        textos=[w.cget('text') for w in filhos(self.root) if isinstance(w,app.ttk.Label)]
+        textos=[w.cget('text') for w in filhos(self.root) if isinstance(w,ttk.Label)]
         self.assertFalse(any(t in ('01','02','03') or t.startswith('VITORAN') for t in textos))
         claro=str(self.programa.botao_alternar_tema.cget('image'))
         self.assertTrue(claro)
@@ -1073,7 +1076,7 @@ class TestInterface(unittest.TestCase):
         self.root.update()
         escuro=str(self.programa.botao_alternar_tema.cget('image'))
         self.assertNotEqual(claro,escuro)
-        with patch.object(app,'aplicar_superficies',side_effect=AssertionError('Superfícies não devem ser recriadas')), \
+        with patch.object(estilos,'aplicar_superficies',side_effect=AssertionError('Superfícies não devem ser recriadas')), \
              patch('visual.tkfont.families',side_effect=AssertionError('Fontes não devem ser enumeradas novamente')):
             for _ in range(3):
                 self.programa.alternar_tema()
@@ -1082,8 +1085,8 @@ class TestInterface(unittest.TestCase):
         self.programa.mostrar_contas()
         self.root.update()
         tabela=self.programa.janela_contas.tabela
-        estilo=app.ttk.Style()
-        fonte=app.tkfont.Font(font=estilo.lookup(tabela.cget('style'),'font'))
+        estilo=ttk.Style()
+        fonte=tkfont.Font(font=estilo.lookup(tabela.cget('style'),'font'))
         self.assertEqual(fonte.actual('size'),12)
         self.assertGreaterEqual(int(estilo.lookup(tabela.cget('style'),'rowheight')),40)
 
@@ -1098,12 +1101,12 @@ class TestInterface(unittest.TestCase):
         self.programa.mostrar_lixeira()
         self.root.update()
         tela=next(w for w in self.programa.historico.winfo_children() if isinstance(w,tk.Toplevel))
-        tabela=next(w for w in filhos(tela) if isinstance(w,app.ttk.Treeview))
+        tabela=next(w for w in filhos(tela) if isinstance(w,ttk.Treeview))
         tabela.selection_set(str(identificador))
-        with patch.object(app.messagebox,'askyesno',return_value=False):
+        with patch.object(messagebox,'askyesno',return_value=False):
             botao(tela,'Excluir permanentemente').invoke()
         self.assertIsNotNone(self.banco.obter(identificador))
-        with patch.object(app.messagebox,'askyesno',return_value=True):
+        with patch.object(messagebox,'askyesno',return_value=True):
             botao(tela,'Excluir permanentemente').invoke()
         self.root.update()
         self.assertIsNone(self.banco.obter(identificador))
@@ -1123,15 +1126,15 @@ class TestInterface(unittest.TestCase):
             self.root.update()
             dono=self.root if tipo=='entrada' else self.programa.historico
             tela=next(w for w in dono.winfo_children() if isinstance(w,tk.Toplevel) and w.title() in ('Editar registro','Recebimento'))
-            abrir=next(w for w in filhos(tela) if isinstance(w,app.ttk.Button) and w.cget('textvariable') and self.root.getvar(w.cget('textvariable'))=='Documentos (1)')
+            abrir=next(w for w in filhos(tela) if isinstance(w,ttk.Button) and w.cget('textvariable') and self.root.getvar(w.cget('textvariable'))=='Documentos (1)')
             abrir.invoke()
             self.root.update()
             documentos=next(w for w in tela.winfo_children() if isinstance(w,tk.Toplevel))
-            lista=next(w for w in filhos(documentos) if isinstance(w,app.ttk.Treeview))
+            lista=next(w for w in filhos(documentos) if isinstance(w,ttk.Treeview))
             lista.selection_set(lista.get_children()[0])
-            with patch.object(app.messagebox,'askyesno',return_value=False):botao(documentos,'Remover documento').invoke()
+            with patch.object(messagebox,'askyesno',return_value=False):botao(documentos,'Remover documento').invoke()
             self.assertEqual(len(self.banco.documentos(identificador,tipo)),1)
-            with patch.object(app.messagebox,'askyesno',return_value=True):botao(documentos,'Remover documento').invoke()
+            with patch.object(messagebox,'askyesno',return_value=True):botao(documentos,'Remover documento').invoke()
             self.root.update()
             self.assertEqual(self.banco.documentos(identificador,tipo),[])
             self.assertEqual(lista.get_children(),())
@@ -1150,10 +1153,10 @@ class TestInterface(unittest.TestCase):
         linha=str(conta['id'])
         rotulo=janela.situacoes_labels[linha]
         self.assertEqual(str(rotulo.cget('style')),'ContaIncompleta.TLabel')
-        self.assertIn('bold',str(app.ttk.Style().lookup('ContaIncompleta.TLabel','font')))
+        self.assertIn('bold',str(ttk.Style().lookup('ContaIncompleta.TLabel','font')))
         self.assertEqual(str(janela.tabela.tag_configure('incompleta','foreground')),'')
         janela.tabela.selection_set(linha)
-        with patch.object(app.messagebox,'askyesno',return_value=True):botao(janela.tela,'Remover').invoke()
+        with patch.object(messagebox,'askyesno',return_value=True):botao(janela.tela,'Remover').invoke()
         self.root.update()
         self.assertIsNone(self.banco.obter_conta(conta['id']))
         self.assertEqual(self.banco.obter(identificador)['conta_snapshot'],copia)
@@ -1161,7 +1164,7 @@ class TestInterface(unittest.TestCase):
         self.programa.formulario(identificador)
         self.root.update()
         tela=next(w for w in self.root.winfo_children() if isinstance(w,tk.Toplevel) and w.title()=='Editar registro')
-        escolha=next(w for w in filhos(tela) if isinstance(w,app.ttk.Combobox))
+        escolha=next(w for w in filhos(tela) if isinstance(w,ttk.Combobox))
         self.assertIn('conta removida',escolha.get())
         botao(tela,'Salvar registro').invoke()
         self.root.update()
@@ -1174,7 +1177,7 @@ class TestInterface(unittest.TestCase):
         botao(self.root,'Sobre').invoke()
         self.root.update()
         tela=self.programa.sobre
-        textos=[w.cget('text') for w in filhos(tela) if isinstance(w,app.ttk.Label)]
+        textos=[w.cget('text') for w in filhos(tela) if isinstance(w,ttk.Label)]
         for texto in ('Gestor de RPV','Vitoran Tech','Desenvolvido por Vitor Alves Nascimento',f'Versão {app.VERSAO}'):
             self.assertIn(texto,textos)
         fechar=botao(tela,'Fechar')
@@ -1197,7 +1200,7 @@ class TestInterface(unittest.TestCase):
 
     def test_lembrete_backup_no_inicio_e_historico_ate_exportar(self):
         self.assertIn('ainda não fez',self.programa.texto_aviso_backup.get())
-        with patch.object(app.filedialog,'askdirectory',return_value=''):
+        with patch.object(filedialog,'askdirectory',return_value=''):
             self.programa.exportar_backup()
         self.assertIn('ainda não fez',self.programa.texto_aviso_backup.get())
         self.banco.registrar_backup('2020-01-01T12:00:00')
@@ -1208,11 +1211,11 @@ class TestInterface(unittest.TestCase):
         self.root.update()
         self.assertIn('dias sem backup',self.programa.texto_aviso_backup.get())
         destino=str(Path(self.pasta.name)/'exportados')
-        with patch.object(app.filedialog,'askdirectory',return_value=destino),patch.object(app.messagebox,'showerror'),patch.object(app,'criar_backup',side_effect=OSError('Sem espaço')):
+        with patch.object(filedialog,'askdirectory',return_value=destino),patch.object(messagebox,'showerror'),patch.object(tela_arquivos,'criar_backup',side_effect=OSError('Sem espaço')):
             self.programa.exportar_backup()
         self.assertIn('dias sem backup',self.programa.texto_aviso_backup.get())
         self.programa.historico.destroy()
-        with patch.object(app.filedialog,'askdirectory',return_value=destino),patch.object(app.messagebox,'showinfo'):
+        with patch.object(filedialog,'askdirectory',return_value=destino),patch.object(messagebox,'showinfo'):
             self.programa.aviso_backup_inicio.event_generate('<Button-1>')
             self.root.update()
         self.assertEqual(self.programa.texto_aviso_backup.get(),'')
@@ -1226,7 +1229,7 @@ class TestInterface(unittest.TestCase):
         self.programa.mostrar_historico()
         pasta=self.banco.caminho.parent/'documentos'
         self.assertFalse(pasta.exists())
-        with patch.object(app,'abrir_pasta') as abrir:
+        with patch.object(tela_arquivos,'abrir_pasta') as abrir:
             self.programa.menus['Arquivo'].invoke('Abrir pasta dos documentos')
         abrir.assert_called_once_with(pasta)
         self.assertTrue(pasta.is_dir())
@@ -1234,7 +1237,7 @@ class TestInterface(unittest.TestCase):
         pdf.write_bytes(b'%PDF-exemplo')
         i=self.banco.salvar(dados_rpv(),anexos=[pdf])
         documento=self.banco.documentos(i)[0]
-        with patch.object(app,'abrir_pasta',side_effect=OSError('Explorador indisponível')),patch.object(app.messagebox,'showerror') as erro:
+        with patch.object(tela_arquivos,'abrir_pasta',side_effect=OSError('Explorador indisponível')),patch.object(messagebox,'showerror') as erro:
             self.programa.menus['Arquivo'].invoke('Abrir pasta dos documentos')
         erro.assert_called_once()
         self.assertEqual(self.banco.caminho_documento(documento['id']).read_bytes(),b'%PDF-exemplo')
@@ -1246,22 +1249,66 @@ class TestInterface(unittest.TestCase):
         self.banco.atualizar_previsao(identificador,'2026-11-20')
         self.programa.mostrar_historico()
         self.root.update()
-        estilo=app.ttk.Style()
-        self.assertEqual(app.tkfont.Font(font=estilo.lookup('Operacoes.Treeview','font')).actual('size'),12)
-        self.assertEqual(app.tkfont.Font(font=estilo.lookup('Operacoes.Treeview.Heading','font')).actual('size'),18)
+        estilo=ttk.Style()
+        self.assertEqual(tkfont.Font(font=estilo.lookup('Operacoes.Treeview','font')).actual('size'),12)
+        self.assertEqual(tkfont.Font(font=estilo.lookup('Operacoes.Treeview.Heading','font')).actual('size'),18)
         ultimo=self.programa.cartoes_resumo[-1][1]
         self.assertEqual(ultimo.cget('text'),'Lucro realizado')
         self.assertIn('ainda não realizado',self.programa.texto_ultimo_backup.get())
         destino=str(Path(self.pasta.name)/'exportados')
-        with patch.object(app.filedialog,'askdirectory',return_value=destino),patch.object(app.messagebox,'showinfo'):
+        with patch.object(filedialog,'askdirectory',return_value=destino),patch.object(messagebox,'showinfo'):
             self.programa.exportar_backup()
         self.assertRegex(self.programa.texto_ultimo_backup.get(),r'Último backup: \d{2}/\d{2}/\d{4}')
         self.programa.editar_previsao(identificador)
         self.root.update()
         tela=next(w for w in self.programa.historico.winfo_children() if isinstance(w,tk.Toplevel))
-        historico=next(w for w in filhos(tela) if isinstance(w,app.ttk.Treeview))
+        historico=next(w for w in filhos(tela) if isinstance(w,ttk.Treeview))
         self.assertEqual(len(historico.get_children()),2)
         self.assertEqual(historico.item(historico.get_children()[0],'values')[:2],('20/01/2027','20/11/2026'))
+
+    def test_tema_escolhido_volta_ao_reabrir(self):
+        self.programa.alternar_tema()
+        self.assertEqual(self.banco.configuracao('tema'), 'escuro')
+        self.root.destroy()
+        self.root = tk.Tk()
+        self.root.report_callback_exception = lambda *args: self.erros.append(args)
+        with patch.object(app, 'Banco', return_value=self.banco):
+            self.programa = app.Aplicativo(self.root)
+        self.root.update()
+        self.assertEqual(self.programa.modo_tema.get(), 'escuro')
+        self.assertEqual(self.programa.texto_alternar_tema.get(), 'Modo claro')
+        self.programa.alternar_tema()
+        self.assertEqual(self.banco.configuracao('tema'), 'claro')
+
+    def test_emblema_no_inicio_e_assinatura_com_icone(self):
+        self.assertEqual([str(i) for i in self.programa.emblema_inicio.cget('image')], [str(self.root._marca_cabecalho)])
+        self.assertEqual(self.programa.emblema_inicio.pack_info()['side'], 'right')
+        assinatura = self.programa.assinatura_inicio
+        self.assertEqual(assinatura.cget('text'), f'Vitoran Tech · v{app.VERSAO}')
+        self.assertEqual([str(i) for i in assinatura.cget('image')], [str(self.root._marca_rodape)])
+        self.assertEqual(str(assinatura.cget('compound')), 'left')
+
+    def test_exportar_excel_pelo_menu(self):
+        from test_contas import dados_rpv
+        self.programa.mostrar_historico()
+        menu = self.programa.menus['Arquivo']
+        rotulos = [menu.entrycget(i, 'label') for i in range(menu.index('end') + 1) if menu.type(i) == 'command']
+        self.assertIn('Exportar para Excel', rotulos)
+        with patch.object(messagebox, 'showinfo') as aviso, patch.object(filedialog, 'asksaveasfilename') as escolher:
+            self.programa.exportar_excel()
+        escolher.assert_not_called()
+        self.assertIn('Ainda não há operações', aviso.call_args.args[1])
+        self.banco.salvar(dados_rpv(nome='Primeira'))
+        self.banco.salvar(dados_rpv(nome='Segunda', aquisicao='2026-10-23'))
+        with patch.object(filedialog, 'asksaveasfilename', return_value=''), patch.object(messagebox, 'showinfo') as aviso:
+            self.programa.exportar_excel()
+        aviso.assert_not_called()
+        destino = Path(self.pasta.name) / 'planilhas' / 'operacoes.xlsx'
+        with patch.object(filedialog, 'asksaveasfilename', return_value=str(destino)), \
+                patch.object(messagebox, 'showinfo') as aviso:
+            self.programa.exportar_excel()
+        self.assertTrue(destino.is_file())
+        self.assertIn('2 operação(ões)', aviso.call_args.args[1])
 
 
 if __name__ == '__main__':

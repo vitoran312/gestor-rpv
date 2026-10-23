@@ -1,4 +1,4 @@
-import json
+import os
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -7,8 +7,8 @@ from unittest.mock import patch
 from zipfile import ZipFile, ZIP_DEFLATED
 
 from backup import criar_backup, BackupPreparado
-from dados import Banco
-from test_contas import dados_rpv, dados_conta
+from dados import Banco, limitar_backups
+from test_contas import banco_com_contas, dados_rpv, dados_conta
 
 
 class TestBackupHistorico(unittest.TestCase):
@@ -16,8 +16,8 @@ class TestBackupHistorico(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.pasta = Path(self.temp.name)
-        self.origem = Banco(self.pasta / 'origem' / 'gestor.sqlite3')
-        self.destino = Banco(self.pasta / 'destino' / 'gestor.sqlite3')
+        self.origem = banco_com_contas(self.pasta / 'origem' / 'gestor.sqlite3')
+        self.destino = banco_com_contas(self.pasta / 'destino' / 'gestor.sqlite3')
 
     def test_backup_portatil_tudo_inclusive_documentos_lixeira_auditoria(self):
         conta = self.origem.salvar_conta(dados_conta())
@@ -146,6 +146,42 @@ class TestBackupHistorico(unittest.TestCase):
         with BackupPreparado(segundo) as preparado:
             self.assertEqual(preparado.resumo['documentos'],1)
         self.assertTrue(primeiro.exists())
+
+    def test_backups_automaticos_mantem_somente_os_dez_mais_recentes(self):
+        automaticos = self.destino.caminho.parent / 'backups_automaticos'
+        automaticos.mkdir()
+        for indice in range(12):
+            antigo = automaticos / f'GestorRPV-202001{indice:02d}.rpvbackup'
+            antigo.write_bytes(b'antigo')
+            os.utime(antigo, (1_600_000_000 + indice, 1_600_000_000 + indice))
+        outro = automaticos / 'manter.txt'
+        outro.write_text('não é backup')
+        self.origem.salvar(dados_rpv(nome='Origem'))
+        arquivo = criar_backup(self.origem, self.pasta / 'exportado')
+        with BackupPreparado(arquivo) as pacote:
+            seguranca = pacote.restaurar(self.destino)
+        restantes = list(automaticos.glob('*.rpvbackup'))
+        self.assertEqual(len(restantes), 10)
+        self.assertIn(seguranca, restantes)
+        self.assertFalse((automaticos / 'GestorRPV-20200100.rpvbackup').exists())
+        self.assertTrue(outro.exists())
+        limitar_backups(automaticos, '*.rpvbackup', manter=3)
+        self.assertEqual(len(list(automaticos.glob('*.rpvbackup'))), 3)
+        self.assertTrue(seguranca.exists())
+
+    def test_backups_antes_da_atualizacao_mantem_somente_os_dez_mais_recentes(self):
+        pasta = self.destino.caminho.parent
+        for indice in range(11):
+            antigo = pasta / f'backup-antes-0.9.0-202001{indice:02d}.sqlite3'
+            antigo.write_bytes(b'antigo')
+            os.utime(antigo, (1_600_000_000 + indice, 1_600_000_000 + indice))
+        with self.destino.conectar() as con:
+            con.execute('PRAGMA user_version=6')
+        Banco(self.destino.caminho)
+        restantes = list(pasta.glob('backup-antes-*.sqlite3'))
+        self.assertEqual(len(restantes), 10)
+        self.assertEqual(len(list(pasta.glob('backup-antes-0.16.0-*.sqlite3'))), 1)
+        self.assertFalse((pasta / 'backup-antes-0.9.0-20200100.sqlite3').exists())
 
 
 if __name__ == '__main__':

@@ -6,7 +6,7 @@ from tkinter import ttk, messagebox
 
 from componentes import centralizar, AreaRolavel
 from selecao import habilitar_selecao, pressionar_linha, arrastar
-from dados import nome_formatado, validar_cpf, ESTADOS
+from dados import validar_cpf, ESTADOS
 from interacao import aplicar_formato, aplicar_cpf, capitalizar_inicio, formatar_cpf, novo_menu, mostrar_menu, copiar_texto
 
 
