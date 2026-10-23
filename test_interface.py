@@ -101,9 +101,16 @@ class TestInterface(unittest.TestCase):
         self.root.update()
         form = next(w for w in janela.tela.winfo_children() if isinstance(w, tk.Toplevel))
         entradas = [w for w in filhos(form) if isinstance(w, app.ttk.Entry)]
-        valores = ('Conta teste', 'pessoa DE teste', '52998224725', 'Endereço teste', 'Banco teste', '0001', '12345-6', 'teste@example.com')
+        self.assertEqual(str(entradas[6].cget('state')), 'readonly')
+        self.assertEqual(len(entradas[6].cget('values')), 27)
+        self.assertIn('SP', entradas[6].cget('values'))
+        self.assertIn('PR', entradas[6].cget('values'))
+        valores = ('Conta teste', 'pessoa DE teste', '52998224725', 'Endereço teste', '12', 'Cidade Teste', 'SP', 'Banco teste', '0001', '12345-6', 'teste@example.com')
         for entrada, valor in zip(entradas, valores):
-            entrada.insert(0, valor)
+            if isinstance(entrada, app.ttk.Combobox):
+                entrada.set(valor)
+            else:
+                entrada.insert(0, valor)
         botao(form, 'Salvar conta').invoke()
         self.root.update()
         conta = next(c for c in self.banco.contas() if c['identificacao'] == 'Conta teste')
@@ -123,49 +130,49 @@ class TestInterface(unittest.TestCase):
         combo = next(w for w in filhos(form) if isinstance(w, app.ttk.Combobox))
         self.assertIn('Conta teste', combo.cget('values'))
 
-    def test_coluna_prorrogacao_e_historico(self):
+    def test_previsao_atual_edicao_cor_e_preservacao_historico(self):
         identificador = self.banco.salvar(dict(nome='Teste', aquisicao='2026-10-22', previsto=2000000,
             custo=1200000, conta='Vitor', previsao='2026-12-20', comissao=None, observacoes=''))
+        self.banco.prorrogar(identificador, '2027-01-20')
+        self.banco.prorrogar(identificador, '2027-02-20')
         self.programa.mostrar_historico()
         self.root.update()
         tabela = self.programa.tabela
+        self.assertNotIn('prorrogacao', tabela.cget('columns'))
         for coluna in tabela.cget('columns'):
             self.assertEqual(str(tabela.column(coluna, 'anchor')), 'center')
             self.assertEqual(str(tabela.heading(coluna, 'anchor')), 'center')
         tabela.xview_moveto(1)
         self.root.update()
-        self.root.update()
-        botao_coluna = self.programa.acoes_linhas[str(identificador)][0]
-        self.assertIn('Adicionar / Ver', botao_coluna.cget('text'))
-        botao_coluna.invoke()
+        rotulo = self.programa.acoes_linhas[str(identificador)][0]
+        self.assertEqual(rotulo.cget('text'), '20/02/2027')
+        self.assertEqual(rotulo.cget('style'), 'PrevisaoAdiada.TLabel')
+        self.assertEqual(str(app.ttk.Style().lookup('PrevisaoAdiada.TLabel', 'foreground')), '#ff6b6b')
+        rotulo.event_generate('<Button-1>')
         self.root.update()
         tela = next(w for w in self.programa.historico.winfo_children() if isinstance(w, tk.Toplevel))
-        self.assertEqual([w for w in filhos(tela) if isinstance(w, CampoData)], [])
-        botao(tela, 'Nova prorrogação').invoke()
+        campo = next(w for w in filhos(tela) if isinstance(w, CampoData))
+        campo.abrir()
         self.root.update()
-        entrada = next(w for w in tela.winfo_children() if isinstance(w, tk.Toplevel))
-        calendario = next(w for w in filhos(entrada) if isinstance(w, CampoData))
-        calendario.abrir()
+        campo.selecionar(date(2027, 3, 20))
+        botao(tela, 'Salvar previsão').invoke()
         self.root.update()
-        calendario.selecionar(date(2027, 1, 20))
-        botao(entrada, 'Salvar prorrogação').invoke()
-        self.root.update()
-        self.assertEqual(self.banco.listar()[0]['previsao_atual'], '2027-01-20')
-        self.assertEqual(self.root.grab_current(), tela)
-        botao(tela, 'Nova prorrogação').invoke()
-        self.root.update()
-        entrada = next(w for w in tela.winfo_children() if isinstance(w, tk.Toplevel))
-        calendario = next(w for w in filhos(entrada) if isinstance(w, CampoData))
-        calendario.variavel.set('20/02/2027')
-        botao(entrada, 'Salvar prorrogação').invoke()
-        self.root.update()
+        registro = self.banco.obter(identificador)
+        self.assertEqual(registro['previsao_atual'], '2027-03-20')
+        self.assertEqual(registro['previsao'], '2026-12-20')
         self.assertEqual(len(self.banco.prorrogacoes(identificador)), 2)
-        self.assertIn('2', tabela.item(str(identificador), 'values')[-2])
-        botao(tela, 'Fechar').invoke()
+        self.programa.acoes_linhas[str(identificador)][0].event_generate('<Button-1>')
+        self.root.update()
+        tela = next(w for w in self.programa.historico.winfo_children() if isinstance(w, tk.Toplevel))
+        campo = next(w for w in filhos(tela) if isinstance(w, CampoData))
+        campo.variavel.set('20/12/2026')
+        botao(tela, 'Salvar previsão').invoke()
+        self.root.update()
+        self.assertEqual(self.programa.acoes_linhas[str(identificador)][0].cget('style'), 'Previsao.TLabel')
         self.programa.historico.destroy()
         self.programa.mostrar_historico()
         self.root.update()
-        self.assertEqual(self.banco.listar()[0]['total_prorrogacoes'], 2)
+        self.assertEqual(self.banco.obter(identificador)['previsao_atual'], '2026-12-20')
 
     def test_dados_preservados_copiar_e_grab(self):
         registro = self.banco.salvar(dict(nome='Teste', aquisicao='2026-10-22', previsto=2000000,
@@ -226,8 +233,11 @@ class TestInterface(unittest.TestCase):
         entradas[0].insert(0, 'conta teste')
         entradas[0].event_generate('<KeyRelease>', keysym='e')
         self.assertEqual(entradas[0].get(), 'Conta teste')
-        for entrada, valor in zip(entradas[3:], ('rua teste', 'banco teste', '001', '123-4', 'ChaveCaseSensitive')):
-            entrada.insert(0, valor)
+        for entrada, valor in zip(entradas[3:], ('rua teste', '12', 'cidade teste', 'SP', 'banco teste', '001', '123-4', 'ChaveCaseSensitive')):
+            if isinstance(entrada, app.ttk.Combobox):
+                entrada.set(valor)
+            else:
+                entrada.insert(0, valor)
         cpf.delete(0, tk.END)
         with patch.object(app.messagebox, 'showerror') as erro:
             botao(tela, 'Salvar conta').invoke()
@@ -354,6 +364,8 @@ class TestInterface(unittest.TestCase):
         self.assertEqual(self.banco.obter(identificador)['recebimento'], '2026-10-22')
         caixa = self.programa.acoes_linhas[str(identificador)][1]
         self.assertTrue(caixa.estado.get())
+        x, y, largura, altura = tabela.bbox(str(identificador), 'recebido')
+        self.assertLessEqual(abs((caixa.winfo_x() + caixa.winfo_width()/2) - (x + largura/2)), 1)
         self.assertEqual(caixa.cget('text'), '22/10/2026')
         self.assertEqual(caixa.cget('style'), 'Recebido.TCheckbutton')
         estilo = app.ttk.Style()

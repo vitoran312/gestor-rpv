@@ -10,6 +10,16 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 
+ESTADOS = ('AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS',
+           'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO')
+
+CONSULTA_RPVS = '''SELECT r.*,
+    COALESCE(r.previsao_atual_definida,
+        (SELECT MAX(data) FROM prorrogacoes WHERE rpv_id=r.id), r.previsao) AS previsao_atual,
+    (SELECT COUNT(*) FROM prorrogacoes WHERE rpv_id=r.id) AS total_prorrogacoes
+    FROM rpvs r'''
+
+
 def pasta_dados():
     base = Path(os.environ.get('LOCALAPPDATA', Path.home() / '.local' / 'share'))
     return base / 'GestorRPV'
@@ -88,8 +98,12 @@ class Banco:
         self.caminho.parent.mkdir(parents=True, exist_ok=True)
         with self.conectar() as con:
             colunas = {r['name'] for r in con.execute('PRAGMA table_info(rpvs)')}
-        if colunas and ('conta_id' not in colunas or 'recebimento' not in colunas):
-            versao_backup = '0.4.0' if 'conta_id' not in colunas else '0.6.0'
+            colunas_contas = {r['name'] for r in con.execute('PRAGMA table_info(contas)')}
+        migrar = ('previsao_atual_definida' not in colunas or 'recebimento' not in colunas or
+                  not {'numero_endereco', 'cidade', 'estado'}.issubset(colunas_contas))
+        if colunas and migrar:
+            versao_backup = ('0.4.0' if 'conta_id' not in colunas else
+                             '0.6.0' if 'recebimento' not in colunas else '0.7.0')
             backup = self.caminho.with_name(f'backup-antes-{versao_backup}-' +
                 datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.sqlite3')
             with self.conectar() as origem:
@@ -104,11 +118,16 @@ class Banco:
                 id INTEGER PRIMARY KEY, identificacao TEXT NOT NULL,
                 identificacao_chave TEXT NOT NULL UNIQUE,
                 nome TEXT NOT NULL DEFAULT '', cpf TEXT UNIQUE,
-                endereco TEXT NOT NULL DEFAULT '', banco TEXT NOT NULL DEFAULT '',
+                endereco TEXT NOT NULL DEFAULT '', numero_endereco TEXT NOT NULL DEFAULT '',
+                cidade TEXT NOT NULL DEFAULT '', estado TEXT NOT NULL DEFAULT '', banco TEXT NOT NULL DEFAULT '',
                 agencia TEXT NOT NULL DEFAULT '', numero TEXT NOT NULL DEFAULT '',
                 pix TEXT NOT NULL DEFAULT '', ativa INTEGER NOT NULL DEFAULT 1,
                 banco_chave TEXT, agencia_chave TEXT, numero_chave TEXT,
                 UNIQUE(banco_chave, agencia_chave, numero_chave))''')
+            existentes = {r['name'] for r in con.execute('PRAGMA table_info(contas)')}
+            for campo in ('numero_endereco', 'cidade', 'estado'):
+                if campo not in existentes:
+                    con.execute(f"ALTER TABLE contas ADD COLUMN {campo} TEXT NOT NULL DEFAULT ''")
             for nome in (('Vitor', 'Lilian') if not colunas or 'conta_id' not in colunas else ()):
                 con.execute('''INSERT OR IGNORE INTO contas (identificacao, identificacao_chave)
                                VALUES (?, ?)''', (nome, normalizar(nome)))
@@ -132,7 +151,9 @@ class Banco:
             atuais = {r['name'] for r in con.execute('PRAGMA table_info(rpvs)')}
             if 'recebimento' not in atuais:
                 con.execute('ALTER TABLE rpvs ADD COLUMN recebimento TEXT')
-            con.execute('PRAGMA user_version=2')
+            if 'previsao_atual_definida' not in atuais:
+                con.execute('ALTER TABLE rpvs ADD COLUMN previsao_atual_definida TEXT')
+            con.execute('PRAGMA user_version=3')
 
     @staticmethod
     def criar_rpvs(con, tabela):
@@ -143,7 +164,7 @@ class Banco:
             custo INTEGER NOT NULL CHECK(custo >= 0), conta TEXT NOT NULL,
             previsao TEXT NOT NULL, comissao INTEGER CHECK(comissao >= 0),
             observacoes TEXT NOT NULL DEFAULT '',
-            conta_id INTEGER NOT NULL REFERENCES contas(id), conta_snapshot TEXT NOT NULL, recebimento TEXT)''')
+            conta_id INTEGER NOT NULL REFERENCES contas(id), conta_snapshot TEXT NOT NULL, recebimento TEXT, previsao_atual_definida TEXT)''')
 
     @contextmanager
     def conectar(self):
@@ -158,7 +179,7 @@ class Banco:
 
     @staticmethod
     def snapshot(conta):
-        campos = ('identificacao', 'nome', 'cpf', 'endereco', 'banco', 'agencia', 'numero', 'pix')
+        campos = ('identificacao', 'nome', 'cpf', 'endereco', 'numero_endereco', 'cidade', 'estado', 'banco', 'agencia', 'numero', 'pix')
         return json.dumps({k: conta[k] for k in campos}, ensure_ascii=False)
 
     def contas(self, somente_ativas=False):
@@ -172,12 +193,16 @@ class Banco:
 
     def salvar_conta(self, dados, identificador=None):
         dados = {k: dados.get(k, '').strip() for k in
-                 ('identificacao', 'nome', 'cpf', 'endereco', 'banco', 'agencia', 'numero', 'pix')}
-        for campo in ('identificacao', 'nome', 'cpf', 'endereco', 'banco', 'numero', 'pix'):
+                 ('identificacao', 'nome', 'cpf', 'endereco', 'numero_endereco', 'cidade', 'estado', 'banco', 'agencia', 'numero', 'pix')}
+        for campo in ('identificacao', 'nome', 'cpf', 'endereco', 'numero_endereco', 'cidade', 'estado', 'banco', 'numero', 'pix'):
             if not dados[campo]:
-                raise ValueError('Preencha identificação, nome completo, CPF, endereço, banco, conta e chave Pix.')
+                raise ValueError('Preencha identificação, nome completo, CPF, endereço, número, cidade, estado, banco, conta e chave Pix.')
         dados['nome'] = nome_formatado(dados['nome'])
         dados['endereco'] = nome_formatado(dados['endereco'])
+        dados['cidade'] = nome_formatado(dados['cidade'])
+        dados['estado'] = dados['estado'].upper()
+        if dados['estado'] not in ESTADOS:
+            raise ValueError('Selecione um estado brasileiro válido.')
         for campo in ('identificacao', 'endereco', 'banco'):
             dados[campo] = dados[campo][:1].upper() + dados[campo][1:]
         dados['cpf'] = validar_cpf(dados['cpf'])
@@ -246,9 +271,9 @@ class Banco:
             if anterior:
                 if anterior['recebimento'] and dados['aquisicao'] > anterior['recebimento']:
                     raise ValueError('A aquisição não pode ser posterior à data do recebimento.')
-                ultima = con.execute('SELECT MIN(data) FROM prorrogacoes WHERE rpv_id=?', (identificador,)).fetchone()[0]
-                if ultima and dados['previsao'] >= ultima:
-                    raise ValueError('A previsão inicial deve ser anterior às prorrogações já registradas.')
+                atual = con.execute(CONSULTA_RPVS + ' WHERE r.id=?', (identificador,)).fetchone()
+                if (atual['previsao_atual_definida'] or atual['total_prorrogacoes']) and dados['aquisicao'] > atual['previsao_atual']:
+                    raise ValueError('A aquisição não pode ser posterior à previsão atual.')
             if identificador is None:
                 return con.execute('INSERT INTO rpvs (' + ','.join(campos) + ') VALUES (' +
                                    ','.join(':' + k for k in campos) + ')', dados).lastrowid
@@ -258,15 +283,12 @@ class Banco:
 
     def listar(self, busca=''):
         with self.conectar() as con:
-            registros = con.execute('''SELECT r.*,
-                COALESCE((SELECT MAX(data) FROM prorrogacoes WHERE rpv_id=r.id), r.previsao) AS previsao_atual,
-                (SELECT COUNT(*) FROM prorrogacoes WHERE rpv_id=r.id) AS total_prorrogacoes
-                FROM rpvs r ORDER BY aquisicao DESC, id DESC''').fetchall()
+            registros = con.execute(CONSULTA_RPVS + ' ORDER BY aquisicao DESC, id DESC').fetchall()
         return [r for r in registros if busca.casefold() in r['nome'].casefold() or busca in data_br(r['aquisicao'])]
 
     def obter(self, identificador):
         with self.conectar() as con:
-            return con.execute('SELECT * FROM rpvs WHERE id=?', (identificador,)).fetchone()
+            return con.execute(CONSULTA_RPVS + ' WHERE r.id=?', (identificador,)).fetchone()
 
     def excluir(self, identificador):
         with self.conectar() as con:
@@ -302,3 +324,13 @@ class Banco:
                 if data > date.today().isoformat():
                     raise ValueError('O recebimento não pode estar no futuro.')
             con.execute('UPDATE rpvs SET recebimento=? WHERE id=?', (data, identificador))
+
+    def atualizar_previsao(self, identificador, nova_data):
+        nova_data = data_iso(data_br(nova_data))
+        with self.conectar() as con:
+            registro = con.execute('SELECT * FROM rpvs WHERE id=?', (identificador,)).fetchone()
+            if registro is None:
+                raise ValueError('Registro não encontrado.')
+            if nova_data < registro['aquisicao']:
+                raise ValueError('A previsão atual não pode ser anterior à aquisição.')
+            con.execute('UPDATE rpvs SET previsao_atual_definida=? WHERE id=?', (nova_data, identificador))

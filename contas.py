@@ -4,12 +4,13 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 from componentes import centralizar
-from dados import nome_formatado, validar_cpf
+from dados import nome_formatado, validar_cpf, ESTADOS
 from interacao import aplicar_formato, aplicar_cpf, capitalizar_inicio, formatar_cpf, novo_menu, mostrar_menu, copiar_texto
 
 
 def dados_para_copiar(conta):
     campos = (('nome', 'Nome completo'), ('cpf', 'CPF'), ('endereco', 'Endereço'),
+              ('numero_endereco', 'Número do endereço'), ('cidade', 'Cidade'), ('estado', 'Estado'),
               ('banco', 'Banco'), ('agencia', 'Agência'), ('numero', 'Conta'), ('pix', 'Chave Pix'))
     return '\n'.join(f'{titulo}: {(formatar_cpf(conta[chave]) if chave == "cpf" and conta.get(chave) else conta.get(chave)) or "Não informado"}' for chave, titulo in campos)
 
@@ -47,7 +48,7 @@ class JanelaContas:
         self.tabela.delete(*self.tabela.get_children())
         for conta in self.banco.contas():
             status = 'Ativa' if conta['ativa'] else 'Desativada'
-            incompleta = any(not conta[c] for c in ('nome', 'cpf', 'endereco', 'banco', 'numero', 'pix'))
+            incompleta = any(not conta[c] for c in ('nome', 'cpf', 'endereco', 'numero_endereco', 'cidade', 'estado', 'banco', 'numero', 'pix'))
             if not incompleta:
                 try:
                     validar_cpf(conta['cpf'])
@@ -130,19 +131,23 @@ class JanelaContas:
         quadro.pack(fill='both', expand=True)
         campos = {}
         definicoes = (('identificacao', 'Identificação (ex.: Vitor)'), ('nome', 'Nome completo'),
-                      ('cpf', 'CPF'), ('endereco', 'Endereço'), ('banco', 'Nome do banco'),
+                      ('cpf', 'CPF'), ('endereco', 'Endereço'), ('numero_endereco', 'Número'),
+                      ('cidade', 'Cidade'), ('estado', 'Estado (UF)'), ('banco', 'Nome do banco'),
                       ('agencia', 'Agência'), ('numero', 'Conta bancária'), ('pix', 'Chave Pix'))
         for linha, (chave, titulo) in enumerate(definicoes):
             ttk.Label(quadro, text=titulo).grid(row=linha, column=0, sticky='w', padx=(0, 16), pady=6)
             campos[chave] = tk.StringVar(value=(conta[chave] or '') if conta else '')
-            entrada = ttk.Entry(quadro, textvariable=campos[chave], width=40)
+            if chave == 'estado':
+                entrada = ttk.Combobox(quadro, textvariable=campos[chave], values=ESTADOS, state='readonly', height=12, width=37)
+            else:
+                entrada = ttk.Entry(quadro, textvariable=campos[chave], width=40)
             entrada.grid(row=linha, column=1, sticky='ew', pady=6)
             if chave == 'cpf':
                 aplicar_cpf(entrada, campos[chave])
-            elif chave in ('identificacao', 'nome', 'endereco', 'banco'):
-                aplicar_formato(entrada, campos[chave], str.title if chave in ('nome', 'endereco') else capitalizar_inicio)
+            elif chave in ('identificacao', 'nome', 'endereco', 'cidade', 'banco'):
+                aplicar_formato(entrada, campos[chave], str.title if chave in ('nome', 'endereco', 'cidade') else capitalizar_inicio)
         ttk.Label(quadro, text='Alterações não modificam os dados de recebimento guardados nas RPVs antigas.',
-                  wraplength=600).grid(row=8, column=0, columnspan=2, pady=12)
+                  wraplength=600).grid(row=11, column=0, columnspan=2, pady=12)
 
         def salvar():
             try:
@@ -160,7 +165,7 @@ class JanelaContas:
             tela.destroy()
 
         botoes = ttk.Frame(quadro)
-        botoes.grid(row=9, column=0, columnspan=2, sticky='e')
+        botoes.grid(row=12, column=0, columnspan=2, sticky='e')
         ttk.Button(botoes, text='Cancelar', command=tela.destroy).pack(side='left', padx=5)
         ttk.Button(botoes, text='Salvar conta', command=salvar).pack(side='left')
         centralizar(tela)

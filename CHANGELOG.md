@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## 0.7.0
+
+- Endereço com número, cidade e estado selecionado pelas siglas das 27 UFs.
+- Migração com backup, preservando endereços, snapshots, recebimentos e datas existentes.
+- Retirada da coluna Prorrogação; edição direta da previsão atual pelo calendário.
+- Previsão atual em vermelho quando posterior à inicial.
+- Controle e data de recebimento centralizados na coluna.
+
 ## 0.6.0
 
 - Iniciais maiúsculas também após espaços nos endereços.

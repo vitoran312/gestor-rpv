@@ -61,6 +61,8 @@ class Aplicativo:
         estilo.configure('DiaSelecionado.TButton', background='#345777')
         estilo.configure('Recebido.TCheckbutton', foreground='#63df8a', font=('Verdana', 10, 'bold'))
         estilo.map('Recebido.TCheckbutton', foreground=[('!disabled', '#63df8a')])
+        estilo.configure('Previsao.TLabel', background=campo, anchor='center')
+        estilo.configure('PrevisaoAdiada.TLabel', background=campo, foreground='#ff6b6b', anchor='center')
         estilo.configure('Recebido.TLabel', foreground='#63df8a', font=('Verdana', 10, 'bold'))
         estilo.configure('Celula.TButton', padding=(2, 2))
         estilo.configure('Menu.TButton', font=('Verdana', 16, 'bold'), padding=(20, 15))
@@ -111,10 +113,10 @@ class Aplicativo:
 
         quadro = ttk.Frame(corpo)
         quadro.pack(fill='both', expand=True)
-        colunas = ('nome', 'data', 'custo', 'previsto', 'lucro', 'conta', 'previsao', 'previsao_atual', 'prorrogacao', 'recebido')
+        colunas = ('nome', 'data', 'custo', 'previsto', 'lucro', 'conta', 'previsao', 'previsao_atual', 'recebido')
         self.tabela = ttk.Treeview(quadro, columns=colunas, show='headings', selectmode='browse')
         titulos = ('Titular original', 'Aquisição', 'Valor de aquisição', 'Recebimento previsto',
-                   'Lucro previsto', 'Conta de destino', 'Previsão inicial', 'Previsão atual', 'Prorrogação', 'Recebido')
+                   'Lucro previsto', 'Conta de destino', 'Previsão inicial', 'Previsão atual', 'Recebido')
         for coluna, titulo in zip(colunas, titulos):
             self.tabela.heading(coluna, text=titulo, anchor='center')
             self.tabela.column(coluna, width=170 if coluna == 'nome' else 145, minwidth=100, anchor='center')
@@ -162,7 +164,6 @@ class Aplicativo:
                 r['nome'], data_br(r['aquisicao']), 'R$ ' + moeda(r['custo']),
                 'R$ ' + moeda(r['previsto']), 'R$ ' + moeda(r['previsto'] - r['custo']),
                 r['conta'], data_br(r['previsao']), data_br(r['previsao_atual']),
-                f"Adicionar / Ver ({r['total_prorrogacoes']})",
                 data_br(r['recebimento']) if r['recebimento'] else 'Não recebido'))
         self.agendar_acoes()
         self.resumo.config(text=f'{len(registros)} registro(s) • '
@@ -181,7 +182,7 @@ class Aplicativo:
         if not self.tabela.winfo_exists():
             return
         for linha in self.tabela.get_children():
-            caixas = [self.tabela.bbox(linha, coluna) for coluna in ('prorrogacao', 'recebido')]
+            caixas = [self.tabela.bbox(linha, coluna) for coluna in ('previsao_atual', 'recebido')]
             visivel = any(caixa and caixa[0] < self.tabela.winfo_width() and caixa[0] + caixa[2] > 0 for caixa in caixas)
             if not visivel:
                 for widget in self.acoes_linhas.pop(linha, ()):
@@ -189,8 +190,10 @@ class Aplicativo:
                 continue
             if linha not in self.acoes_linhas:
                 valores = self.tabela.item(linha, 'values')
-                botao = ttk.Button(self.tabela, text=valores[-2], style='Celula.TButton',
-                                   command=lambda i=int(linha): self.prorrogar(i))
+                adiada = data_iso(valores[-2]) > data_iso(valores[-3])
+                botao = ttk.Label(self.tabela, text=valores[-2], anchor='center', cursor='hand2',
+                                  style='PrevisaoAdiada.TLabel' if adiada else 'Previsao.TLabel')
+                botao.bind('<Button-1>', lambda _, i=int(linha): self.editar_previsao(i))
                 recebido = valores[-1] != 'Não recebido'
                 estado = tk.BooleanVar(value=recebido)
                 caixa = ttk.Checkbutton(self.tabela, variable=estado,
@@ -204,7 +207,11 @@ class Aplicativo:
             for widget, caixa in zip(self.acoes_linhas[linha], caixas):
                 if caixa:
                     x, y, largura, altura = caixa
-                    widget.place(x=x+2, y=y+2, width=max(1, largura-4), height=max(1, altura-4))
+                    if isinstance(widget, ttk.Checkbutton):
+                        tamanho = min(widget.winfo_reqwidth(), max(1, largura-4))
+                        widget.place(x=x+(largura-tamanho)//2, y=y+2, width=tamanho, height=max(1, altura-4))
+                    else:
+                        widget.place(x=x+2, y=y+2, width=max(1, largura-4), height=max(1, altura-4))
                 else:
                     widget.place_forget()
 
@@ -271,7 +278,7 @@ class Aplicativo:
             menu.add_command(label='Editar', command=self.abrir)
             menu.add_command(label='Excluir', command=self.excluir)
             menu.add_command(label='Recebido', command=lambda: self.abrir_recebimento(int(linha)))
-            menu.add_command(label='Prorrogação', command=lambda: self.prorrogar(int(linha)))
+            menu.add_command(label='Editar previsão atual', command=lambda: self.editar_previsao(int(linha)))
             menu.add_command(label='Copiar', command=lambda: copiar_texto(self.tabela, '\t'.join(self.tabela.item(linha, 'values'))))
             menu.add_separator()
         menu.add_command(label='Nova entrada', command=self.formulario)
@@ -282,10 +289,10 @@ class Aplicativo:
             return
         coluna = self.tabela.identify_column(evento.x)
         linha = self.tabela.identify_row(evento.y)
-        if linha and coluna in ('#9', '#10'):
+        if linha and coluna in ('#8', '#9'):
             self.tabela.selection_set(linha)
-            if coluna == '#9':
-                self.prorrogar(int(linha))
+            if coluna == '#8':
+                self.editar_previsao(int(linha))
             else:
                 self.abrir_recebimento(int(linha))
             return 'break'
@@ -293,85 +300,45 @@ class Aplicativo:
     def duplo_clique_historico(self, evento):
         if self.tabela.identify_region(evento.x, evento.y) != 'cell':
             return 'break'
-        if self.tabela.identify_column(evento.x) not in ('#9', '#10'):
+        if self.tabela.identify_column(evento.x) not in ('#8', '#9'):
             self.abrir()
         return 'break'
 
-    def prorrogar(self, identificador):
+    def editar_previsao(self, identificador):
         registro = self.banco.obter(identificador)
         if registro is None:
             self.atualizar()
             return
         tela = tk.Toplevel(self.historico)
         tela.withdraw()
-        tela.title('Prorrogação')
+        tela.title('Previsão atual')
         tela.configure(bg='#181a1f')
         tela.resizable(False, False)
         tela.transient(self.historico)
         corpo = ttk.Frame(tela, padding=20)
         corpo.pack(fill='both', expand=True)
-        ttk.Label(corpo, text=registro['nome'], font=('Verdana', 12, 'bold')).pack(anchor='w')
-        ttk.Label(corpo, text='Previsão inicial: ' + data_br(registro['previsao'])).pack(anchor='w', pady=8)
-        lista = self.banco.prorrogacoes(identificador)
-        quadro = ttk.Frame(corpo)
-        quadro.pack(fill='both', expand=True)
-        historico = ttk.Treeview(quadro, columns=('ordem', 'data'), show='headings', height=5)
-        historico.heading('ordem', text='Prorrogação', anchor='center')
-        historico.heading('data', text='Nova previsão', anchor='center')
-        for chave in ('ordem', 'data'):
-            historico.column(chave, width=160, anchor='center')
-        rolagem = ttk.Scrollbar(quadro, orient='vertical', command=historico.yview)
-        historico.configure(yscrollcommand=rolagem.set)
-        historico.pack(side='left', fill='both', expand=True)
-        rolagem.pack(side='right', fill='y')
-        for ordem, item in enumerate(lista, 1):
-            historico.insert('', 'end', values=(ordem, data_br(item['data'])))
-        def nova_prorrogacao():
-            entrada = tk.Toplevel(tela)
-            entrada.withdraw()
-            entrada.title('Nova prorrogação')
-            entrada.configure(bg='#181a1f')
-            entrada.resizable(False, False)
-            entrada.transient(tela)
-            campos = ttk.Frame(entrada, padding=20)
-            campos.pack(fill='both', expand=True)
-            ttk.Label(campos, text='Nova previsão de recebimento').pack(anchor='w', pady=(0, 8))
-            valor = tk.StringVar()
-            CampoData(campos, valor).pack(fill='x')
+        ttk.Label(corpo, text=registro['nome']).pack(anchor='w')
+        ttk.Label(corpo, text='Previsão inicial: ' + data_br(registro['previsao'])).pack(anchor='w', pady=10)
+        ttk.Label(corpo, text='Previsão atual de recebimento').pack(anchor='w', pady=(0, 6))
+        valor = tk.StringVar(value=data_br(registro['previsao_atual']))
+        CampoData(corpo, valor).pack(fill='x')
 
-            def fechar():
-                entrada.destroy()
-                tela.grab_set()
+        def salvar():
+            try:
+                self.banco.atualizar_previsao(identificador, data_iso(valor.get()))
+            except ValueError as erro:
+                messagebox.showerror('Confira a previsão', str(erro), parent=tela)
+                return
+            except sqlite3.Error:
+                messagebox.showerror('Previsão atual', 'Não foi possível salvar.', parent=tela)
+                return
+            self.atualizar()
+            tela.destroy()
 
-            def salvar():
-                try:
-                    self.banco.prorrogar(identificador, data_iso(valor.get()))
-                except ValueError as erro:
-                    messagebox.showerror('Confira a data', str(erro), parent=entrada)
-                    return
-                except sqlite3.Error:
-                    messagebox.showerror('Prorrogação', 'Não foi possível salvar a nova data.', parent=entrada)
-                    return
-                historico.delete(*historico.get_children())
-                for ordem, item in enumerate(self.banco.prorrogacoes(identificador), 1):
-                    historico.insert('', 'end', values=(ordem, data_br(item['data'])))
-                self.atualizar()
-                fechar()
-
-            rodape = ttk.Frame(campos)
-            rodape.pack(fill='x', pady=(15, 0))
-            ttk.Button(rodape, text='Cancelar', command=fechar).pack(side='right')
-            ttk.Button(rodape, text='Salvar prorrogação', command=salvar).pack(side='right', padx=8)
-            entrada.protocol('WM_DELETE_WINDOW', fechar)
-            entrada.bind('<Escape>', lambda _: fechar())
-            centralizar(entrada)
-            entrada.deiconify()
-            entrada.grab_set()
-
-        botoes = ttk.Frame(corpo)
-        botoes.pack(fill='x', pady=(15, 0))
-        ttk.Button(botoes, text='Nova prorrogação', command=nova_prorrogacao).pack(side='left')
-        ttk.Button(botoes, text='Fechar', command=tela.destroy).pack(side='right')
+        rodape = ttk.Frame(corpo)
+        rodape.pack(fill='x', pady=(15, 0))
+        ttk.Button(rodape, text='Cancelar', command=tela.destroy).pack(side='right')
+        ttk.Button(rodape, text='Salvar previsão', command=salvar).pack(side='right', padx=8)
         centralizar(tela)
         tela.deiconify()
         tela.grab_set()

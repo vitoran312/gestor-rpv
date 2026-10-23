@@ -15,7 +15,7 @@ def dados_rpv(**valores):
 
 
 def dados_conta(**valores):
-    dados = dict(identificacao='Conta teste', nome='titular DE teste', cpf='52998224725', endereco='Endereço compartilhado',
+    dados = dict(identificacao='Conta teste', nome='titular DE teste', cpf='52998224725', endereco='Endereço compartilhado', numero_endereco='12', cidade='Cidade Teste', estado='SP',
                  banco='Banco Teste', agencia='0001', numero='12345-6', pix='teste@example.com')
     dados.update(valores)
     return dados
@@ -156,6 +156,49 @@ class TestContas(unittest.TestCase):
             self.assertNotIn('recebimento', colunas)
         Banco(self.caminho)
         self.assertEqual(len(list(Path(self.pasta.name).glob('backup-antes-0.6.0-*.sqlite3'))), 1)
+
+    def test_endereco_completo_uf_e_snapshot(self):
+        from dados import ESTADOS
+        self.assertEqual(len(set(ESTADOS)), 27)
+        self.assertTrue({'SP', 'PR', 'DF'}.issubset(ESTADOS))
+        conta = self.banco.salvar_conta(dados_conta(numero_endereco='S/N', cidade='sao paulo', estado='sp'))
+        self.assertEqual(self.banco.obter_conta(conta)['cidade'], 'Sao Paulo')
+        self.assertEqual(self.banco.obter_conta(conta)['estado'], 'SP')
+        rpv = self.banco.salvar(dados_rpv(conta_id=conta))
+        snapshot = self.banco.obter(rpv)['conta_snapshot']
+        self.assertEqual(json.loads(snapshot)['numero_endereco'], 'S/N')
+        self.banco.salvar_conta(dados_conta(cidade='Curitiba', estado='PR'), conta)
+        self.assertEqual(self.banco.obter(rpv)['conta_snapshot'], snapshot)
+        for uf in ('ZZ', ''):
+            with self.subTest(uf=uf), self.assertRaises(ValueError):
+                self.banco.salvar_conta(dados_conta(estado=uf), conta)
+
+    def test_migracao_060_e_edicao_previsao(self):
+        identificador = self.banco.salvar(dados_rpv())
+        self.banco.prorrogar(identificador, '2027-01-20')
+        self.banco.registrar_recebimento(identificador, '2026-10-22')
+        snapshot = self.banco.obter(identificador)['conta_snapshot']
+        with self.banco.conectar() as con:
+            con.execute('ALTER TABLE rpvs DROP COLUMN previsao_atual_definida')
+            for campo in ('numero_endereco', 'cidade', 'estado'):
+                con.execute(f'ALTER TABLE contas DROP COLUMN {campo}')
+            con.execute('PRAGMA user_version=2')
+        migrado = Banco(self.caminho)
+        self.assertEqual(migrado.obter(identificador)['previsao_atual'], '2027-01-20')
+        self.assertEqual(migrado.obter(identificador)['recebimento'], '2026-10-22')
+        self.assertEqual(migrado.obter(identificador)['conta_snapshot'], snapshot)
+        self.assertEqual(migrado.contas()[0]['cidade'], '')
+        self.assertEqual(len(list(Path(self.pasta.name).glob('backup-antes-0.7.0-*.sqlite3'))), 1)
+        migrado.atualizar_previsao(identificador, '2027-02-20')
+        migrado.atualizar_previsao(identificador, '2026-12-20')
+        self.assertEqual(migrado.obter(identificador)['previsao_atual'], '2026-12-20')
+        self.assertEqual(len(migrado.prorrogacoes(identificador)), 1)
+        migrado.atualizar_previsao(identificador, '2026-12-01')
+        with self.assertRaises(ValueError):
+            migrado.atualizar_previsao(identificador, '2026-10-01')
+        self.assertEqual(migrado.obter(identificador)['previsao_atual'], '2026-12-01')
+        Banco(self.caminho)
+        self.assertEqual(len(list(Path(self.pasta.name).glob('backup-antes-0.7.0-*.sqlite3'))), 1)
 
 
 if __name__ == '__main__':

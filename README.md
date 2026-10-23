@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.6.0
+# Gestor de RPV — 0.7.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -22,7 +22,8 @@ As janelas abrem centralizadas; o histórico abre maximizado no Windows.
 - Vitor e Lilian aparecem inicialmente sem dados bancários inventados. Use
   **Ver / Editar** para completar os cadastros.
 - **Cadastrar nova conta** permite informar identificação, nome completo, endereço,
-  banco, agência, conta e chave Pix. CPF é obrigatório, válido e exclusivo entre
+  número, cidade, estado, banco, agência, conta e chave Pix.
+  O estado é selecionado pela sigla em uma lista com as 27 UFs, incluindo DF. CPF é obrigatório, válido e exclusivo entre
   as contas. Cadastros antigos sem CPF aparecem como **⚠ Completar cadastro**,
   em vermelho, e precisam ser completados ao editar.
 - Identificação, CPF, chave Pix e combinação banco/agência/conta não podem se repetir,
@@ -53,15 +54,16 @@ As janelas abrem centralizadas; o histórico abre maximizado no Windows.
 - Os valores são guardados em centavos, sem ponto flutuante.
 - As datas têm calendários com navegação por mês e ano.
 - O histórico permite buscar por nome/data, editar e excluir com confirmação.
-- A coluna **Prorrogação** tem um botão **Adicionar / Ver** em cada linha.
-  Ele abre o histórico de datas. Use **Nova prorrogação** para abrir um novo
-  campo com calendário. Cada data deve ser posterior à previsão atual;
-  a previsão inicial é preservada.
-- Cada prorrogação é um registro separado, sem criar colunas adicionais por data.
-  A tabela mostra a previsão atual e a quantidade de prorrogações.
+- O histórico mostra somente **Previsão inicial** e **Previsão atual**, sem a
+  coluna Prorrogação. Clique na data atual ou use o menu de contexto
+  **Editar previsão atual** para alterá-la pelo calendário.
+- A previsão atual fica vermelha quando posterior à inicial. É possível corrigir
+  a data, inclusive antecipá-la; datas anteriores à aquisição não são aceitas.
+- As prorrogações cadastradas em versões anteriores permanecem no banco. Sua
+  última data é usada até você definir outra previsão atual explicitamente.
 - Cabeçalhos e valores da tabela são centralizados.
 - A última coluna, **Recebido**, tem uma caixa clicável. Informe a data pelo
-  calendário e salve: a confirmação e a data ficam em verde e negrito.
+  calendário e salve: a confirmação e a data ficam centralizadas, em verde e negrito.
   A data não pode ser anterior à aquisição nem estar no futuro. Ao clicar de novo,
   é possível corrigir a data ou desmarcar o recebimento com confirmação.
 - A frase explicativa de centavos foi retirada do formulário; a máscara permanece.
@@ -72,7 +74,7 @@ As janelas abrem centralizadas; o histórico abre maximizado no Windows.
   Os atalhos de teclado continuam funcionando. Campos somente de leitura
   permitem copiar, mas não alterar o conteúdo.
 - Histórico: clique direito em uma linha para **Editar**, **Excluir**,
-  adicionar **Prorrogação** ou **Copiar**.
+  **Editar previsão atual**, marcar **Recebido** ou **Copiar**.
 - Contas: clique direito em uma linha para **Editar**, **Desativar/Reativar**, **Remover**
   ou **Copiar** os dados completos.
 - Não há mais botão “Copiar dados”; a ação está no menu de contexto.
@@ -83,8 +85,11 @@ O banco é criado em `%LOCALAPPDATA%\GestorRPV\gestor.sqlite3`, fora da pasta do
 código. Atualizar os arquivos do programa preserva esse banco.
 Na primeira abertura após uma mudança de estrutura, o banco é adaptado
 automaticamente após criar uma cópia na mesma pasta: `backup-antes-0.4.0-*.sqlite3`
-para bancos antigos, ou `backup-antes-0.6.0-*.sqlite3` para bancos da versão 0.5.0.
-A migração mantém os cadastros, as cópias de dados bancários e as prorrogações.
+para bancos antigos, `backup-antes-0.6.0-*.sqlite3` para bancos da versão 0.5.0, ou
+`backup-antes-0.7.0-*.sqlite3` para bancos da versão 0.6.0.
+A migração mantém os cadastros, as cópias de dados bancários, os recebimentos
+e as datas anteriores. Número, cidade e UF ficam vazios nos cadastros antigos
+até serem preenchidos; não são inferidos do endereço existente.
 Registros antigos são preservados, mesmo se precisarem de correção pelas novas
 regras de valores quando forem editados.
 
