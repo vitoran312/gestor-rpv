@@ -110,6 +110,53 @@ class TestContas(unittest.TestCase):
         self.assertEqual(len(reaberto.contas()), 2)
         self.assertNotIn('Vitor', [c['identificacao'] for c in reaberto.contas()])
 
+    def test_remocao_conta_sem_vinculo_e_bloqueio_com_historico(self):
+        conta = self.banco.salvar_conta(dados_conta(endereco='rua das flores'))
+        self.assertEqual(self.banco.obter_conta(conta)['endereco'], 'Rua Das Flores')
+        rpv = self.banco.salvar(dados_rpv(conta_id=conta))
+        snapshot = self.banco.obter(rpv)['conta_snapshot']
+        with self.assertRaises(ValueError):
+            self.banco.remover_conta(conta)
+        self.assertEqual(self.banco.obter(rpv)['conta_snapshot'], snapshot)
+        self.banco.ativar_conta(conta, False)
+        self.assertIsNotNone(self.banco.obter_conta(conta))
+        outra = self.banco.salvar_conta(dados_conta(identificacao='Outra', cpf='11144477735', numero='999', pix='outra@example.com'))
+        self.banco.remover_conta(outra)
+        self.assertIsNone(self.banco.obter_conta(outra))
+
+    def test_recebimento_persistencia_limites_e_correcao(self):
+        from datetime import date, timedelta
+        identificador = self.banco.salvar(dados_rpv())
+        self.banco.registrar_recebimento(identificador, '2026-10-22')
+        reaberto = Banco(self.caminho)
+        self.assertEqual(reaberto.obter(identificador)['recebimento'], '2026-10-22')
+        for data in ('2026-10-01', (date.today() + timedelta(days=1)).isoformat()):
+            with self.subTest(data=data), self.assertRaises(ValueError):
+                reaberto.registrar_recebimento(identificador, data)
+        reaberto.salvar(dados_rpv(observacoes='Editado'), identificador)
+        self.assertEqual(reaberto.obter(identificador)['recebimento'], '2026-10-22')
+        reaberto.registrar_recebimento(identificador, None)
+        self.assertIsNone(reaberto.obter(identificador)['recebimento'])
+
+    def test_migracao_050_preserva_contas_snapshots_e_prorrogacoes(self):
+        identificador = self.banco.salvar(dados_rpv())
+        self.banco.prorrogar(identificador, '2027-01-20')
+        snapshot = self.banco.obter(identificador)['conta_snapshot']
+        with self.banco.conectar() as con:
+            con.execute('ALTER TABLE rpvs DROP COLUMN recebimento')
+            con.execute('PRAGMA user_version=1')
+        migrado = Banco(self.caminho)
+        self.assertEqual(migrado.obter(identificador)['conta_snapshot'], snapshot)
+        self.assertIsNone(migrado.obter(identificador)['recebimento'])
+        self.assertEqual(len(migrado.prorrogacoes(identificador)), 1)
+        backups = list(Path(self.pasta.name).glob('backup-antes-0.6.0-*.sqlite3'))
+        self.assertEqual(len(backups), 1)
+        with sqlite3.connect(backups[0]) as con:
+            colunas = [r[1] for r in con.execute('PRAGMA table_info(rpvs)')]
+            self.assertNotIn('recebimento', colunas)
+        Banco(self.caminho)
+        self.assertEqual(len(list(Path(self.pasta.name).glob('backup-antes-0.6.0-*.sqlite3'))), 1)
+
 
 if __name__ == '__main__':
     unittest.main()

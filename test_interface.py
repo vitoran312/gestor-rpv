@@ -134,26 +134,34 @@ class TestInterface(unittest.TestCase):
             self.assertEqual(str(tabela.heading(coluna, 'anchor')), 'center')
         tabela.xview_moveto(1)
         self.root.update()
-        x, y, largura, altura = tabela.bbox(str(identificador), 'prorrogacao')
-        self.programa.clicar_historico(SimpleNamespace(x=x+largura//2, y=y+altura//2))
+        self.root.update()
+        botao_coluna = self.programa.acoes_linhas[str(identificador)][0]
+        self.assertIn('Adicionar / Ver', botao_coluna.cget('text'))
+        botao_coluna.invoke()
         self.root.update()
         tela = next(w for w in self.programa.historico.winfo_children() if isinstance(w, tk.Toplevel))
-        calendario = next(w for w in filhos(tela) if isinstance(w, CampoData))
+        self.assertEqual([w for w in filhos(tela) if isinstance(w, CampoData)], [])
+        botao(tela, 'Nova prorrogação').invoke()
+        self.root.update()
+        entrada = next(w for w in tela.winfo_children() if isinstance(w, tk.Toplevel))
+        calendario = next(w for w in filhos(entrada) if isinstance(w, CampoData))
         calendario.abrir()
         self.root.update()
         calendario.selecionar(date(2027, 1, 20))
-        botao(tela, 'Salvar prorrogação').invoke()
+        botao(entrada, 'Salvar prorrogação').invoke()
         self.root.update()
         self.assertEqual(self.banco.listar()[0]['previsao_atual'], '2027-01-20')
-        self.programa.prorrogar(identificador)
+        self.assertEqual(self.root.grab_current(), tela)
+        botao(tela, 'Nova prorrogação').invoke()
         self.root.update()
-        tela = next(w for w in self.programa.historico.winfo_children() if isinstance(w, tk.Toplevel))
-        calendario = next(w for w in filhos(tela) if isinstance(w, CampoData))
+        entrada = next(w for w in tela.winfo_children() if isinstance(w, tk.Toplevel))
+        calendario = next(w for w in filhos(entrada) if isinstance(w, CampoData))
         calendario.variavel.set('20/02/2027')
-        botao(tela, 'Salvar prorrogação').invoke()
+        botao(entrada, 'Salvar prorrogação').invoke()
         self.root.update()
         self.assertEqual(len(self.banco.prorrogacoes(identificador)), 2)
-        self.assertIn('2', tabela.item(str(identificador), 'values')[-1])
+        self.assertIn('2', tabela.item(str(identificador), 'values')[-2])
+        botao(tela, 'Fechar').invoke()
         self.programa.historico.destroy()
         self.programa.mostrar_historico()
         self.root.update()
@@ -322,6 +330,103 @@ class TestInterface(unittest.TestCase):
         registro = self.banco.listar()[0]
         self.assertEqual(registro['previsto'], 5200000)
         self.assertEqual(registro['custo'], 1523659)
+
+    def test_recebimento_caixa_data_cor_e_reabertura(self):
+        identificador = self.banco.salvar(dict(nome='Teste', aquisicao='2026-10-01', previsto=2000000,
+            custo=1200000, conta='Vitor', previsao='2026-12-20', comissao=None, observacoes=''))
+        self.programa.mostrar_historico()
+        self.root.update()
+        tabela = self.programa.tabela
+        self.assertEqual(tabela.cget('columns')[-1], 'recebido')
+        tabela.xview_moveto(1)
+        self.root.update()
+        caixa = self.programa.acoes_linhas[str(identificador)][1]
+        self.assertFalse(caixa.estado.get())
+        caixa.invoke()
+        self.root.update()
+        tela = next(w for w in self.programa.historico.winfo_children() if isinstance(w, tk.Toplevel))
+        campo = next(w for w in filhos(tela) if isinstance(w, CampoData))
+        campo.abrir()
+        self.root.update()
+        campo.selecionar(date(2026, 10, 22))
+        botao(tela, 'Salvar recebimento').invoke()
+        self.root.update()
+        self.assertEqual(self.banco.obter(identificador)['recebimento'], '2026-10-22')
+        caixa = self.programa.acoes_linhas[str(identificador)][1]
+        self.assertTrue(caixa.estado.get())
+        self.assertEqual(caixa.cget('text'), '22/10/2026')
+        self.assertEqual(caixa.cget('style'), 'Recebido.TCheckbutton')
+        estilo = app.ttk.Style()
+        self.assertEqual(str(estilo.lookup('Recebido.TCheckbutton', 'foreground')), '#63df8a')
+        self.assertIn('bold', str(estilo.lookup('Recebido.TCheckbutton', 'font')))
+        caixa.invoke()
+        self.root.update()
+        tela = next(w for w in self.programa.historico.winfo_children() if isinstance(w, tk.Toplevel))
+        botao(tela, 'Cancelar').invoke()
+        self.root.update()
+        self.assertEqual(self.banco.obter(identificador)['recebimento'], '2026-10-22')
+        self.programa.historico.destroy()
+        self.programa.mostrar_historico()
+        self.root.update()
+        self.programa.tabela.xview_moveto(1)
+        self.root.update()
+        caixa = self.programa.acoes_linhas[str(identificador)][1]
+        self.assertTrue(caixa.estado.get())
+        caixa.invoke()
+        self.root.update()
+        tela = next(w for w in self.programa.historico.winfo_children() if isinstance(w, tk.Toplevel))
+        with patch.object(app.messagebox, 'askyesno', return_value=True):
+            botao(tela, 'Desmarcar recebimento').invoke()
+        self.root.update()
+        self.assertIsNone(self.banco.obter(identificador)['recebimento'])
+
+    def test_remover_conta_confirmacao_e_endereco_capitalizado(self):
+        self.programa.mostrar_contas()
+        self.root.update()
+        janela = self.programa.janela_contas
+        janela.formulario()
+        self.root.update()
+        tela = next(w for w in janela.tela.winfo_children() if isinstance(w, tk.Toplevel))
+        entradas = [w for w in filhos(tela) if isinstance(w, app.ttk.Entry)]
+        endereco = entradas[3]
+        endereco.focus_force()
+        self.root.update()
+        for char in 'rua das flores':
+            tecla = 'space' if char == ' ' else char
+            endereco.event_generate('<KeyPress>', keysym=tecla)
+            endereco.event_generate('<KeyRelease>', keysym=tecla)
+        self.root.update()
+        self.assertEqual(endereco.get(), 'Rua Das Flores')
+        tela.destroy()
+        conta = self.banco.contas()[0]
+        janela.tabela.selection_set(str(conta['id']))
+        with patch.object(app.messagebox, 'askyesno', return_value=False):
+            botao(janela.tela, 'Remover').invoke()
+        self.assertIsNotNone(self.banco.obter_conta(conta['id']))
+        with patch.object(app.messagebox, 'askyesno', return_value=True):
+            botao(janela.tela, 'Remover').invoke()
+        self.root.update()
+        self.assertIsNone(self.banco.obter_conta(conta['id']))
+
+    def test_botoes_de_linha_acompanham_rolagem_e_busca(self):
+        for indice in range(35):
+            self.banco.salvar(dict(nome=f'Pessoa {indice}', aquisicao='2026-10-01', previsto=2000000,
+                custo=1200000, conta='Vitor', previsao='2026-12-20', comissao=None, observacoes=''))
+        self.programa.mostrar_historico()
+        self.root.update()
+        tabela = self.programa.tabela
+        tabela.xview_moveto(1)
+        tabela.yview_moveto(1)
+        self.root.update()
+        ultima = tabela.get_children()[-1]
+        self.assertIn(ultima, self.programa.acoes_linhas)
+        botao, caixa = self.programa.acoes_linhas[ultima]
+        self.assertTrue(botao.winfo_ismapped())
+        self.assertTrue(caixa.winfo_ismapped())
+        self.programa.busca.set('Pessoa 0')
+        self.root.update()
+        self.assertEqual(len(tabela.get_children()), 1)
+        self.assertEqual(set(self.programa.acoes_linhas), set(tabela.get_children()))
 
 
 if __name__ == '__main__':

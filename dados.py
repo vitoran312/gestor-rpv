@@ -5,7 +5,7 @@ import re
 import unicodedata
 from contextlib import contextmanager
 import sqlite3
-from datetime import datetime
+from datetime import datetime, date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
@@ -88,8 +88,9 @@ class Banco:
         self.caminho.parent.mkdir(parents=True, exist_ok=True)
         with self.conectar() as con:
             colunas = {r['name'] for r in con.execute('PRAGMA table_info(rpvs)')}
-        if colunas and 'conta_id' not in colunas:
-            backup = self.caminho.with_name('backup-antes-0.4.0-' +
+        if colunas and ('conta_id' not in colunas or 'recebimento' not in colunas):
+            versao_backup = '0.4.0' if 'conta_id' not in colunas else '0.6.0'
+            backup = self.caminho.with_name(f'backup-antes-{versao_backup}-' +
                 datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.sqlite3')
             with self.conectar() as origem:
                 destino = sqlite3.connect(backup)
@@ -128,7 +129,10 @@ class Banco:
                 id INTEGER PRIMARY KEY, rpv_id INTEGER NOT NULL REFERENCES rpvs(id) ON DELETE CASCADE,
                 data TEXT NOT NULL, criada_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(rpv_id, data))''')
-            con.execute('PRAGMA user_version=1')
+            atuais = {r['name'] for r in con.execute('PRAGMA table_info(rpvs)')}
+            if 'recebimento' not in atuais:
+                con.execute('ALTER TABLE rpvs ADD COLUMN recebimento TEXT')
+            con.execute('PRAGMA user_version=2')
 
     @staticmethod
     def criar_rpvs(con, tabela):
@@ -139,7 +143,7 @@ class Banco:
             custo INTEGER NOT NULL CHECK(custo >= 0), conta TEXT NOT NULL,
             previsao TEXT NOT NULL, comissao INTEGER CHECK(comissao >= 0),
             observacoes TEXT NOT NULL DEFAULT '',
-            conta_id INTEGER NOT NULL REFERENCES contas(id), conta_snapshot TEXT NOT NULL)''')
+            conta_id INTEGER NOT NULL REFERENCES contas(id), conta_snapshot TEXT NOT NULL, recebimento TEXT)''')
 
     @contextmanager
     def conectar(self):
@@ -173,6 +177,7 @@ class Banco:
             if not dados[campo]:
                 raise ValueError('Preencha identificação, nome completo, CPF, endereço, banco, conta e chave Pix.')
         dados['nome'] = nome_formatado(dados['nome'])
+        dados['endereco'] = nome_formatado(dados['endereco'])
         for campo in ('identificacao', 'endereco', 'banco'):
             dados[campo] = dados[campo][:1].upper() + dados[campo][1:]
         dados['cpf'] = validar_cpf(dados['cpf'])
@@ -206,6 +211,13 @@ class Banco:
         with self.conectar() as con:
             con.execute('UPDATE contas SET ativa=? WHERE id=?', (int(ativa), identificador))
 
+    def remover_conta(self, identificador):
+        with self.conectar() as con:
+            con.execute('BEGIN IMMEDIATE')
+            if con.execute('SELECT 1 FROM rpvs WHERE conta_id=? LIMIT 1', (identificador,)).fetchone():
+                raise ValueError('Esta conta está vinculada a uma RPV. Use Desativar para preservar o histórico.')
+            con.execute('DELETE FROM contas WHERE id=?', (identificador,))
+
     def salvar(self, dados, identificador=None):
         dados = dict(dados)
         dados['nome'] = nome_formatado(dados['nome'])
@@ -232,6 +244,8 @@ class Banco:
             dados['conta_snapshot'] = anterior['conta_snapshot'] if mesma_conta else self.snapshot(conta)
             campos = ('nome','aquisicao','previsto','custo','conta','previsao','comissao','observacoes','conta_id','conta_snapshot')
             if anterior:
+                if anterior['recebimento'] and dados['aquisicao'] > anterior['recebimento']:
+                    raise ValueError('A aquisição não pode ser posterior à data do recebimento.')
                 ultima = con.execute('SELECT MIN(data) FROM prorrogacoes WHERE rpv_id=?', (identificador,)).fetchone()[0]
                 if ultima and dados['previsao'] >= ultima:
                     raise ValueError('A previsão inicial deve ser anterior às prorrogações já registradas.')
@@ -274,3 +288,17 @@ class Banco:
             if nova_data <= max(ultima or rpv['previsao'], rpv['aquisicao'], rpv['previsao']):
                 raise ValueError('A nova previsão deve ser posterior à previsão atual e à aquisição.')
             con.execute('INSERT INTO prorrogacoes (rpv_id, data) VALUES (?,?)', (identificador, nova_data))
+
+    def registrar_recebimento(self, identificador, data):
+        if data is not None:
+            data = data_iso(data_br(data))
+        with self.conectar() as con:
+            registro = con.execute('SELECT * FROM rpvs WHERE id=?', (identificador,)).fetchone()
+            if registro is None:
+                raise ValueError('Registro não encontrado.')
+            if data is not None:
+                if data < registro['aquisicao']:
+                    raise ValueError('O recebimento não pode ser anterior à aquisição.')
+                if data > date.today().isoformat():
+                    raise ValueError('O recebimento não pode estar no futuro.')
+            con.execute('UPDATE rpvs SET recebimento=? WHERE id=?', (data, identificador))

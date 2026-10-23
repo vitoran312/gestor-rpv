@@ -29,6 +29,7 @@ class JanelaContas:
         ttk.Button(barra, text='Cadastrar nova conta', command=self.formulario).pack(side='left')
         ttk.Button(barra, text='Ver / Editar', command=self.editar).pack(side='left', padx=8)
         ttk.Button(barra, text='Desativar / Reativar', command=self.alterar_status).pack(side='left')
+        ttk.Button(barra, text='Remover', command=self.remover).pack(side='left', padx=8)
         self.tabela = ttk.Treeview(corpo, columns=('nome', 'banco', 'status'), show='headings', selectmode='browse')
         for chave, titulo in (('nome', 'Identificação'), ('banco', 'Banco'), ('status', 'Situação')):
             self.tabela.heading(chave, text=titulo, anchor='center')
@@ -65,6 +66,7 @@ class JanelaContas:
             conta = self.banco.obter_conta(int(linha))
             menu.add_command(label='Editar', command=self.editar)
             menu.add_command(label='Desativar' if conta['ativa'] else 'Reativar', command=self.alterar_status)
+            menu.add_command(label='Remover', command=self.remover)
             menu.add_command(label='Copiar', command=lambda: copiar_texto(self.tabela, dados_para_copiar(dict(conta))))
             menu.add_separator()
         menu.add_command(label='Cadastrar nova conta', command=self.formulario)
@@ -97,6 +99,25 @@ class JanelaContas:
             return
         self.atualizar()
 
+    def remover(self):
+        conta = self.selecionada()
+        if conta is None:
+            return
+        if not messagebox.askyesno('Remover conta',
+            f"Remover permanentemente a conta {conta['identificacao']}?\n\n"
+            'Esta ação não pode ser desfeita. Contas vinculadas a RPVs devem ser desativadas.',
+            parent=self.tela, icon='warning', default='no'):
+            return
+        try:
+            self.banco.remover_conta(conta['id'])
+        except ValueError as erro:
+            messagebox.showinfo('Preservar histórico', str(erro), parent=self.tela)
+            return
+        except sqlite3.Error:
+            messagebox.showerror('Remover conta', 'Não foi possível remover a conta.', parent=self.tela)
+            return
+        self.atualizar()
+
     def formulario(self, identificador=None):
         conta = self.banco.obter_conta(identificador) if identificador else None
         tela = tk.Toplevel(self.tela)
@@ -119,7 +140,7 @@ class JanelaContas:
             if chave == 'cpf':
                 aplicar_cpf(entrada, campos[chave])
             elif chave in ('identificacao', 'nome', 'endereco', 'banco'):
-                aplicar_formato(entrada, campos[chave], str.title if chave == 'nome' else capitalizar_inicio)
+                aplicar_formato(entrada, campos[chave], str.title if chave in ('nome', 'endereco') else capitalizar_inicio)
         ttk.Label(quadro, text='Alterações não modificam os dados de recebimento guardados nas RPVs antigas.',
                   wraplength=600).grid(row=8, column=0, columnspan=2, pady=12)
 

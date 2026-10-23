@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## 0.6.0
+
+- Iniciais maiúsculas também após espaços nos endereços.
+- Remoção de contas sem vínculos, com confirmação; proteção das contas usadas em RPVs.
+- Retirada da frase de ajuda sobre centavos no cadastro.
+- Botão real “Adicionar / Ver” nas linhas do histórico de prorrogações e
+  cadastro de nova prorrogação em janela separada.
+- Coluna “Recebido” com caixa clicável, calendário, data persistida e destaque
+  verde em negrito; permite corrigir ou desmarcar com confirmação.
+- Migração com backup dos bancos da versão 0.5.0.
+
 ## 0.5.0
 
 - CPF obrigatório com máscara automática; agência sem o texto “se houver”.

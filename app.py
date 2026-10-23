@@ -59,6 +59,10 @@ class Aplicativo:
         estilo.configure('Dinheiro.TFrame', background=campo)
         estilo.configure('Dinheiro.TLabel', background=campo)
         estilo.configure('DiaSelecionado.TButton', background='#345777')
+        estilo.configure('Recebido.TCheckbutton', foreground='#63df8a', font=('Verdana', 10, 'bold'))
+        estilo.map('Recebido.TCheckbutton', foreground=[('!disabled', '#63df8a')])
+        estilo.configure('Recebido.TLabel', foreground='#63df8a', font=('Verdana', 10, 'bold'))
+        estilo.configure('Celula.TButton', padding=(2, 2))
         estilo.configure('Menu.TButton', font=('Verdana', 16, 'bold'), padding=(20, 15))
         for tipo in ('TEntry', 'TCombobox'):
             estilo.configure(tipo, fieldbackground=campo, foreground=texto,
@@ -107,16 +111,27 @@ class Aplicativo:
 
         quadro = ttk.Frame(corpo)
         quadro.pack(fill='both', expand=True)
-        colunas = ('nome', 'data', 'custo', 'previsto', 'lucro', 'conta', 'previsao', 'previsao_atual', 'prorrogacao')
+        colunas = ('nome', 'data', 'custo', 'previsto', 'lucro', 'conta', 'previsao', 'previsao_atual', 'prorrogacao', 'recebido')
         self.tabela = ttk.Treeview(quadro, columns=colunas, show='headings', selectmode='browse')
         titulos = ('Titular original', 'Aquisição', 'Valor de aquisição', 'Recebimento previsto',
-                   'Lucro previsto', 'Conta de destino', 'Previsão inicial', 'Previsão atual', 'Prorrogação')
+                   'Lucro previsto', 'Conta de destino', 'Previsão inicial', 'Previsão atual', 'Prorrogação', 'Recebido')
         for coluna, titulo in zip(colunas, titulos):
             self.tabela.heading(coluna, text=titulo, anchor='center')
             self.tabela.column(coluna, width=170 if coluna == 'nome' else 145, minwidth=100, anchor='center')
+        self.acoes_linhas = {}
+        self.reposicionar_pendente = False
         vertical = ttk.Scrollbar(quadro, orient='vertical', command=self.tabela.yview)
         horizontal = ttk.Scrollbar(quadro, orient='horizontal', command=self.tabela.xview)
-        self.tabela.configure(yscrollcommand=vertical.set, xscrollcommand=horizontal.set)
+        def rolar_vertical(*args):
+            vertical.set(*args)
+            self.agendar_acoes()
+
+        def rolar_horizontal(*args):
+            horizontal.set(*args)
+            self.agendar_acoes()
+
+        self.tabela.configure(yscrollcommand=rolar_vertical, xscrollcommand=rolar_horizontal)
+        self.tabela.bind('<Configure>', lambda _: self.agendar_acoes())
         self.tabela.grid(row=0, column=0, sticky='nsew')
         vertical.grid(row=0, column=1, sticky='ns')
         horizontal.grid(row=1, column=0, sticky='ew')
@@ -137,24 +152,125 @@ class Aplicativo:
         if self.historico is None or not self.historico.winfo_exists():
             return
         registros = self.banco.listar(self.busca.get().strip())
+        for widgets in self.acoes_linhas.values():
+            for widget in widgets:
+                widget.destroy()
+        self.acoes_linhas.clear()
         self.tabela.delete(*self.tabela.get_children())
         for r in registros:
             self.tabela.insert('', 'end', iid=str(r['id']), values=(
                 r['nome'], data_br(r['aquisicao']), 'R$ ' + moeda(r['custo']),
                 'R$ ' + moeda(r['previsto']), 'R$ ' + moeda(r['previsto'] - r['custo']),
                 r['conta'], data_br(r['previsao']), data_br(r['previsao_atual']),
-                f"☐ Adicionar ({r['total_prorrogacoes']})"))
+                f"Adicionar / Ver ({r['total_prorrogacoes']})",
+                data_br(r['recebimento']) if r['recebimento'] else 'Não recebido'))
+        self.agendar_acoes()
         self.resumo.config(text=f'{len(registros)} registro(s) • '
             f"Investido: R$ {moeda(sum(r['custo'] for r in registros))} • "
             f"Lucro previsto: R$ {moeda(sum(r['previsto'] - r['custo'] for r in registros))}")
 
-    def menu_historico(self, evento):
-        linha = self.tabela.identify_row(evento.y)
+    def agendar_acoes(self):
+        if self.historico is None or not self.historico.winfo_exists():
+            return
+        if not self.reposicionar_pendente:
+            self.reposicionar_pendente = True
+            self.tabela.after_idle(self.posicionar_acoes)
+
+    def posicionar_acoes(self):
+        self.reposicionar_pendente = False
+        if not self.tabela.winfo_exists():
+            return
+        for linha in self.tabela.get_children():
+            caixas = [self.tabela.bbox(linha, coluna) for coluna in ('prorrogacao', 'recebido')]
+            visivel = any(caixa and caixa[0] < self.tabela.winfo_width() and caixa[0] + caixa[2] > 0 for caixa in caixas)
+            if not visivel:
+                for widget in self.acoes_linhas.pop(linha, ()):
+                    widget.destroy()
+                continue
+            if linha not in self.acoes_linhas:
+                valores = self.tabela.item(linha, 'values')
+                botao = ttk.Button(self.tabela, text=valores[-2], style='Celula.TButton',
+                                   command=lambda i=int(linha): self.prorrogar(i))
+                recebido = valores[-1] != 'Não recebido'
+                estado = tk.BooleanVar(value=recebido)
+                caixa = ttk.Checkbutton(self.tabela, variable=estado,
+                    text=valores[-1] if recebido else 'Marcar',
+                    style='Recebido.TCheckbutton' if recebido else 'TCheckbutton',
+                    command=lambda i=int(linha), v=estado, atual=recebido: self.abrir_recebimento(i, v, atual))
+                caixa.estado = estado
+                for widget in (botao, caixa):
+                    widget.bind('<Button-3>', lambda e, i=linha: self.menu_historico(e, i))
+                self.acoes_linhas[linha] = (botao, caixa)
+            for widget, caixa in zip(self.acoes_linhas[linha], caixas):
+                if caixa:
+                    x, y, largura, altura = caixa
+                    widget.place(x=x+2, y=y+2, width=max(1, largura-4), height=max(1, altura-4))
+                else:
+                    widget.place_forget()
+
+    def abrir_recebimento(self, identificador, variavel=None, atual=False):
+        if variavel is not None:
+            variavel.set(atual)
+        registro = self.banco.obter(identificador)
+        if registro is None:
+            self.atualizar()
+            return
+        tela = tk.Toplevel(self.historico)
+        tela.withdraw()
+        tela.title('Recebimento')
+        tela.configure(bg='#181a1f')
+        tela.resizable(False, False)
+        tela.transient(self.historico)
+        corpo = ttk.Frame(tela, padding=20)
+        corpo.pack(fill='both', expand=True)
+        ttk.Label(corpo, text=registro['nome']).pack(anchor='w')
+        ttk.Label(corpo, text='Data do recebimento', style='Recebido.TLabel').pack(anchor='w', pady=(15, 6))
+        valor = tk.StringVar(value=data_br(registro['recebimento']) if registro['recebimento'] else date.today().strftime('%d/%m/%Y'))
+        CampoData(corpo, valor).pack(fill='x')
+
+        def salvar():
+            try:
+                self.banco.registrar_recebimento(identificador, data_iso(valor.get()))
+            except ValueError as erro:
+                messagebox.showerror('Confira o recebimento', str(erro), parent=tela)
+                return
+            except sqlite3.Error:
+                messagebox.showerror('Recebimento', 'Não foi possível salvar.', parent=tela)
+                return
+            self.atualizar()
+            tela.destroy()
+
+        def desmarcar():
+            if not messagebox.askyesno('Desmarcar recebimento', 'Remover a confirmação de recebimento desta RPV?',
+                                      parent=tela, default='no'):
+                return
+            try:
+                self.banco.registrar_recebimento(identificador, None)
+            except (sqlite3.Error, ValueError):
+                messagebox.showerror('Recebimento', 'Não foi possível desmarcar.', parent=tela)
+                return
+            self.atualizar()
+            tela.destroy()
+
+        botoes = ttk.Frame(corpo)
+        botoes.pack(fill='x', pady=(15, 0))
+        if registro['recebimento']:
+            ttk.Button(botoes, text='Desmarcar recebimento', command=desmarcar).pack(side='left', padx=(0, 8))
+        ttk.Button(botoes, text='Cancelar', command=tela.destroy).pack(side='right')
+        ttk.Button(botoes, text='Salvar recebimento', command=salvar).pack(side='right', padx=8)
+        centralizar(tela)
+        tela.deiconify()
+        tela.grab_set()
+        tela.bind('<Escape>', lambda _: tela.destroy())
+
+    def menu_historico(self, evento, linha=None):
+        linha = linha or self.tabela.identify_row(evento.y)
         menu = novo_menu(self.tabela)
         if linha:
             self.tabela.selection_set(linha)
             menu.add_command(label='Editar', command=self.abrir)
             menu.add_command(label='Excluir', command=self.excluir)
+            menu.add_command(label='Recebido', command=lambda: self.abrir_recebimento(int(linha)))
             menu.add_command(label='Prorrogação', command=lambda: self.prorrogar(int(linha)))
             menu.add_command(label='Copiar', command=lambda: copiar_texto(self.tabela, '\t'.join(self.tabela.item(linha, 'values'))))
             menu.add_separator()
@@ -166,15 +282,18 @@ class Aplicativo:
             return
         coluna = self.tabela.identify_column(evento.x)
         linha = self.tabela.identify_row(evento.y)
-        if linha and coluna == '#9':
+        if linha and coluna in ('#9', '#10'):
             self.tabela.selection_set(linha)
-            self.prorrogar(int(linha))
+            if coluna == '#9':
+                self.prorrogar(int(linha))
+            else:
+                self.abrir_recebimento(int(linha))
             return 'break'
 
     def duplo_clique_historico(self, evento):
         if self.tabela.identify_region(evento.x, evento.y) != 'cell':
             return 'break'
-        if self.tabela.identify_column(evento.x) != '#9':
+        if self.tabela.identify_column(evento.x) not in ('#9', '#10'):
             self.abrir()
         return 'break'
 
@@ -207,26 +326,52 @@ class Aplicativo:
         rolagem.pack(side='right', fill='y')
         for ordem, item in enumerate(lista, 1):
             historico.insert('', 'end', values=(ordem, data_br(item['data'])))
-        ttk.Label(corpo, text='Nova previsão de recebimento').pack(anchor='w', pady=(15, 6))
-        valor = tk.StringVar()
-        CampoData(corpo, valor).pack(fill='x')
+        def nova_prorrogacao():
+            entrada = tk.Toplevel(tela)
+            entrada.withdraw()
+            entrada.title('Nova prorrogação')
+            entrada.configure(bg='#181a1f')
+            entrada.resizable(False, False)
+            entrada.transient(tela)
+            campos = ttk.Frame(entrada, padding=20)
+            campos.pack(fill='both', expand=True)
+            ttk.Label(campos, text='Nova previsão de recebimento').pack(anchor='w', pady=(0, 8))
+            valor = tk.StringVar()
+            CampoData(campos, valor).pack(fill='x')
 
-        def salvar():
-            try:
-                self.banco.prorrogar(identificador, data_iso(valor.get()))
-            except ValueError as erro:
-                messagebox.showerror('Confira a data', str(erro), parent=tela)
-                return
-            except sqlite3.Error:
-                messagebox.showerror('Prorrogação', 'Não foi possível salvar a nova data.', parent=tela)
-                return
-            self.atualizar()
-            tela.destroy()
+            def fechar():
+                entrada.destroy()
+                tela.grab_set()
+
+            def salvar():
+                try:
+                    self.banco.prorrogar(identificador, data_iso(valor.get()))
+                except ValueError as erro:
+                    messagebox.showerror('Confira a data', str(erro), parent=entrada)
+                    return
+                except sqlite3.Error:
+                    messagebox.showerror('Prorrogação', 'Não foi possível salvar a nova data.', parent=entrada)
+                    return
+                historico.delete(*historico.get_children())
+                for ordem, item in enumerate(self.banco.prorrogacoes(identificador), 1):
+                    historico.insert('', 'end', values=(ordem, data_br(item['data'])))
+                self.atualizar()
+                fechar()
+
+            rodape = ttk.Frame(campos)
+            rodape.pack(fill='x', pady=(15, 0))
+            ttk.Button(rodape, text='Cancelar', command=fechar).pack(side='right')
+            ttk.Button(rodape, text='Salvar prorrogação', command=salvar).pack(side='right', padx=8)
+            entrada.protocol('WM_DELETE_WINDOW', fechar)
+            entrada.bind('<Escape>', lambda _: fechar())
+            centralizar(entrada)
+            entrada.deiconify()
+            entrada.grab_set()
 
         botoes = ttk.Frame(corpo)
         botoes.pack(fill='x', pady=(15, 0))
-        ttk.Button(botoes, text='Cancelar', command=tela.destroy).pack(side='right')
-        ttk.Button(botoes, text='Salvar prorrogação', command=salvar).pack(side='right', padx=8)
+        ttk.Button(botoes, text='Nova prorrogação', command=nova_prorrogacao).pack(side='left')
+        ttk.Button(botoes, text='Fechar', command=tela.destroy).pack(side='right')
         centralizar(tela)
         tela.deiconify()
         tela.grab_set()
@@ -392,8 +537,6 @@ class Aplicativo:
             self.atualizar()
             tela.destroy()
 
-        ttk.Label(quadro, text='Os dois últimos dígitos são centavos: 1523659 → R$ 15.236,59.',
-                  wraplength=650).grid(row=10, column=0, columnspan=2, sticky='w', pady=(4, 8))
         botoes = ttk.Frame(quadro)
         botoes.grid(row=11, column=0, columnspan=2, sticky='e', pady=(10, 0))
         ttk.Button(botoes, text='Dados de recebimento',
