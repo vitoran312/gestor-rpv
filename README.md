@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.13.1
+# Gestor de RPV — 0.14.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -12,11 +12,33 @@ Se precisar ver uma mensagem de erro, abra o Prompt de Comando nessa pasta:
 python app.py
 ```
 
-Mantenha `app.py`, `dados.py`, `componentes.py`, `contas.py`, `interacao.py`, `tema.py`, `calculadora.py`, `backup.py`, `ordenacao.py`, `selecao.py`, `documentos.py` e `versao.py` juntos.
+Mantenha `app.py`, `dados.py`, `componentes.py`, `contas.py`, `interacao.py`, `tema.py`, `calculadora.py`, `backup.py`, `ordenacao.py`, `selecao.py`, `documentos.py`, `visual.py` e `versao.py` juntos.
 A tela inicial tem os botões **Nova entrada**, **Ver histórico total**,
-**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.13.1** aparece no canto inferior direito.
+**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.14.0** aparece no canto inferior direito.
 O número é lido da versão do programa e acompanha cada atualização.
 As janelas abrem centralizadas; o histórico abre maximizado no Windows.
+
+## Identidade visual Moss
+
+Visual inspirado em verde floresta, sálvia e marfim, com uma versão escura em tons
+verdes profundos. O botão **Modo escuro / Modo claro** da tela inicial alterna a
+aparência; o menu **Exibir** do histórico oferece as mesmas opções.
+
+- Tela inicial com três cartões de ações, ícones desenhados em Python e marca Vitoran Tech.
+- Cantos arredondados, sombras discretas e verde nas ações principais.
+- Fonte Segoe UI no Windows, com alternativas locais em outros sistemas.
+- Histórico com linhas alternadas e quatro indicadores em cartões alinhados.
+- Cadastro de entradas e contas com rolagem e botões fixos no rodapé, inclusive em telas menores.
+  A roda do mouse rola os campos; navegar pelo teclado revela o campo em foco.
+- Calendários, anexos, contas, calculadora e menus acompanham os dois temas.
+- As imagens de interface são geradas pelo próprio Python. Não é necessário instalar
+  pacotes, baixar fontes ou manter uma pasta externa de recursos para executar.
+
+![Tela inicial](docs/tela-inicial.png)
+
+![Histórico com dados demonstrativos](docs/historico.png)
+
+[Ver a prévia do modo escuro](docs/historico-escuro.png)
 
 ## Barra de menus do histórico
 
@@ -25,7 +47,7 @@ As janelas abrem centralizadas; o histórico abre maximizado no Windows.
 - **Editar → Editar registro / Excluir registro**: edita uma linha ou envia as selecionadas à lixeira.
 - **Exibir → Tema claro / Tema escuro**: muda o tema de todas as janelas,
   inclusive formulários, calendários, menus de contexto e calculadora.
-  A escolha vale durante a execução; o aplicativo inicia no tema escuro.
+  A escolha vale durante a execução; o aplicativo inicia no tema claro inspirado na paleta Moss.
 - **Calculadora**: abre uma calculadora independente, sem modificar o cadastro.
   Faz soma, subtração, multiplicação, divisão, porcentagem, troca de sinal e
   apagamento. Aceita vírgula, teclado, Enter para calcular e Esc para limpar.

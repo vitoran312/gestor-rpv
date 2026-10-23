@@ -147,8 +147,19 @@ class CampoData(ttk.Frame):
         self.calendario = None
         self.entrada = ttk.Entry(self, textvariable=variavel, width=25)
         self.entrada.pack(side='left', fill='x', expand=True)
-        self.botao = ttk.Button(self, text='▦', width=3, command=self.abrir)
+        self.botao = ttk.Button(self, text='Calendário', width=3, command=self.abrir)
+        self.atualizar_tema()
         self.botao.pack(side='left', padx=(5, 0))
+
+    def atualizar_tema(self):
+        self.imagem_calendario = tk.PhotoImage(master=self,width=20,height=20)
+        imagem = self.imagem_calendario
+        cor = cores()['texto']
+        for retangulo in ((2,4,18,6),(2,16,18,18),(2,5,4,17),(16,5,18,17),(6,2,8,7),(12,2,14,7),(3,8,17,9)):
+            imagem.put(cor,to=retangulo)
+        for x in (6,10,14):
+            for y in (11,14): imagem.put(cor,to=(x,y,x+1,y+1))
+        self.botao.configure(image=imagem,compound='image')
 
     def habilitar(self, ativo):
         estado = '!disabled' if ativo else 'disabled'
@@ -239,3 +250,68 @@ class CampoData(ttk.Frame):
             self.grab_anterior.grab_set()
         self.focus_set()
         return 'break'
+
+
+class AreaRolavel(ttk.Frame):
+    """Formulários com conteúdo rolável e ações fixas fora da área de rolagem."""
+    def __init__(self,pai):
+        super().__init__(pai)
+        import weakref
+        self.canvas = tk.Canvas(self,bg=cores()['fundo'],highlightthickness=0,bd=0)
+        self.scroll = ttk.Scrollbar(self,orient='vertical',command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=self.scroll.set)
+        self.canvas.grid(row=0,column=0,sticky='nsew')
+        self.scroll.grid(row=0,column=1,sticky='ns')
+        self.rowconfigure(0,weight=1)
+        self.columnconfigure(0,weight=1)
+        self.conteudo = ttk.Frame(self.canvas,padding=(24,16))
+        self.janela_interna = self.canvas.create_window(0,0,window=self.conteudo,anchor='nw')
+        self.conteudo.bind('<Configure>',self.ajustar_conteudo)
+        self.canvas.bind('<Configure>',self.ajustar_canvas)
+        raiz = self._root()
+        if not hasattr(raiz,'_formularios_rolaveis'):
+            raiz._formularios_rolaveis = weakref.WeakSet()
+            def rolar(evento):
+                alvo = raiz.winfo_containing(evento.x_root,evento.y_root)
+                if isinstance(alvo,(tk.Text,ttk.Treeview)):
+                    return
+                while alvo is not None:
+                    if alvo in raiz._formularios_rolaveis:
+                        delta = getattr(evento,'delta',0)
+                        numero = getattr(evento,'num',None)
+                        unidades = -max(1,abs(delta)//120) if delta>0 or numero==4 else max(1,abs(delta)//120)
+                        alvo.canvas.yview_scroll(unidades,'units')
+                        return 'break'
+                    alvo = getattr(alvo,'master',None)
+            for evento in ('<MouseWheel>','<Button-4>','<Button-5>'):
+                raiz.bind_all(evento,rolar,add='+')
+            def revelar(evento):
+                widget = evento.widget
+                alvo = widget
+                while alvo is not None:
+                    if alvo in raiz._formularios_rolaveis:
+                        if not alvo.winfo_ismapped():
+                            return
+                        altura_total = max(1,alvo.conteudo.winfo_height())
+                        inicio = widget.winfo_rooty()-alvo.conteudo.winfo_rooty()
+                        fim = inicio+widget.winfo_height()
+                        primeiro,ultimo = alvo.canvas.yview()
+                        if inicio < primeiro*altura_total:
+                            alvo.canvas.yview_moveto(max(0,inicio-12)/altura_total)
+                        elif fim > ultimo*altura_total:
+                            alvo.canvas.yview_moveto(max(0,fim-alvo.canvas.winfo_height()+12)/altura_total)
+                        return
+                    alvo = getattr(alvo,'master',None)
+            raiz.bind_all('<FocusIn>',revelar,add='+')
+        raiz._formularios_rolaveis.add(self)
+
+    def atualizar_tema(self):
+        self.canvas.configure(bg=cores()['fundo'])
+
+    def ajustar_conteudo(self,_evento=None):
+        self.canvas.configure(scrollregion=self.canvas.bbox('all'),
+                              width=self.conteudo.winfo_reqwidth(),
+                              height=min(self.conteudo.winfo_reqheight(),max(240,self.winfo_screenheight()-270)))
+
+    def ajustar_canvas(self,evento):
+        self.canvas.itemconfigure(self.janela_interna,width=max(evento.width,self.conteudo.winfo_reqwidth()))

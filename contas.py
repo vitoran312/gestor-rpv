@@ -4,7 +4,7 @@ import sqlite3
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-from componentes import centralizar
+from componentes import centralizar, AreaRolavel
 from selecao import habilitar_selecao
 from dados import nome_formatado, validar_cpf, ESTADOS
 from interacao import aplicar_formato, aplicar_cpf, capitalizar_inicio, formatar_cpf, novo_menu, mostrar_menu, copiar_texto
@@ -29,7 +29,7 @@ class JanelaContas:
         corpo.pack(fill='both', expand=True)
         barra = ttk.Frame(corpo)
         barra.pack(fill='x', pady=(0, 15))
-        ttk.Button(barra, text='Cadastrar nova conta', command=self.formulario).pack(side='left')
+        ttk.Button(barra, text='Cadastrar nova conta', style='Principal.TButton', command=self.formulario).pack(side='left')
         ttk.Button(barra, text='Ver / Editar', command=self.editar).pack(side='left', padx=8)
         ttk.Button(barra, text='Desativar / Reativar', command=self.alterar_status).pack(side='left')
         ttk.Button(barra, text='Remover', command=self.remover).pack(side='left', padx=8)
@@ -134,8 +134,12 @@ class JanelaContas:
         tela.configure(bg=cores()['fundo'])
         tela.resizable(False, False)
         tela.transient(self.tela)
-        quadro = ttk.Frame(tela, padding=20)
-        quadro.pack(fill='both', expand=True)
+        cabecalho = ttk.Frame(tela,padding=(24,16,24,0))
+        cabecalho.pack(fill='x')
+        ttk.Label(cabecalho,text='Editar conta' if conta else 'Nova conta',style='Titulo.TLabel').pack(anchor='w')
+        area = AreaRolavel(tela)
+        area.pack(fill='both',expand=True)
+        quadro = area.conteudo
         campos = {}
         definicoes = (('identificacao', 'Identificação (ex.: Vitor)'), ('nome', 'Nome completo'),
                       ('cpf', 'CPF'), ('endereco', 'Endereço'), ('numero_endereco', 'Número'),
@@ -171,10 +175,11 @@ class JanelaContas:
             self.atualizar()
             tela.destroy()
 
-        botoes = ttk.Frame(quadro)
-        botoes.grid(row=12, column=0, columnspan=2, sticky='e')
-        ttk.Button(botoes, text='Cancelar', command=tela.destroy).pack(side='left', padx=5)
-        ttk.Button(botoes, text='Salvar conta', command=salvar).pack(side='left')
+        ttk.Separator(tela).pack(fill='x',padx=24)
+        botoes = ttk.Frame(tela,padding=(24,8,24,12))
+        botoes.pack(fill='x')
+        ttk.Button(botoes, text='Cancelar', command=tela.destroy).pack(side='left',expand=True,fill='x',padx=(0,8))
+        ttk.Button(botoes, text='Salvar conta', style='Salvar.TButton', command=salvar).pack(side='left',expand=True,fill='x')
         centralizar(tela)
         tela.deiconify()
         tela.grab_set()

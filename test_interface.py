@@ -9,8 +9,9 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import app
-from componentes import CampoData, CampoMoeda
+from componentes import CampoData, CampoMoeda, AreaRolavel
 from dados import Banco
+from tema import cores, PALETAS
 
 
 def filhos(widget):
@@ -155,7 +156,7 @@ class TestInterface(unittest.TestCase):
         rotulo = self.programa.acoes_linhas[str(identificador)][0]
         self.assertEqual(rotulo.cget('text'), '20/02/2027')
         self.assertEqual(rotulo.cget('style'), 'PrevisaoAdiada.TLabel')
-        self.assertEqual(str(app.ttk.Style().lookup('PrevisaoAdiada.TLabel', 'foreground')), '#ff6b6b')
+        self.assertEqual(str(app.ttk.Style().lookup('PrevisaoAdiada.TLabel', 'foreground')), cores()['vermelho'])
         rotulo.event_generate('<Button-1>')
         rotulo.event_generate('<ButtonRelease-1>')
         self.root.update()
@@ -212,7 +213,7 @@ class TestInterface(unittest.TestCase):
         for linha in janela.tabela.get_children():
             self.assertIn('Completar cadastro', janela.tabela.item(linha, 'values')[-1])
             self.assertIn('incompleta', janela.tabela.item(linha, 'tags'))
-        self.assertEqual(str(janela.tabela.tag_configure('incompleta', 'foreground')), '#ff6b6b')
+        self.assertEqual(str(janela.tabela.tag_configure('incompleta', 'foreground')), cores()['vermelho'])
         janela.formulario()
         self.root.update()
         tela = next(w for w in janela.tela.winfo_children() if isinstance(w, tk.Toplevel))
@@ -379,7 +380,7 @@ class TestInterface(unittest.TestCase):
         self.assertEqual(caixa.cget('text'), '22/10/2026')
         self.assertEqual(caixa.cget('style'), 'Recebido.TCheckbutton')
         estilo = app.ttk.Style()
-        self.assertEqual(str(estilo.lookup('Recebido.TCheckbutton', 'foreground')), '#63df8a')
+        self.assertEqual(str(estilo.lookup('Recebido.TCheckbutton', 'foreground')), cores()['verde'])
         self.assertIn('bold', str(estilo.lookup('Recebido.TCheckbutton', 'font')))
         caixa.invoke()
         self.root.update()
@@ -467,15 +468,15 @@ class TestInterface(unittest.TestCase):
         observacoes = next(w for w in filhos(form) if isinstance(w, tk.Text))
         menus['Exibir'].invoke('Tema claro')
         self.root.update()
-        self.assertEqual(self.root.cget('bg'), '#f3f5f8')
-        self.assertEqual(form.cget('bg'), '#f3f5f8')
-        self.assertEqual(observacoes.cget('bg'), '#ffffff')
-        self.assertEqual(str(app.ttk.Style().lookup('Treeview', 'fieldbackground')), '#ffffff')
+        self.assertEqual(self.root.cget('bg'), PALETAS['claro']['fundo'])
+        self.assertEqual(form.cget('bg'), PALETAS['claro']['fundo'])
+        self.assertEqual(observacoes.cget('bg'), PALETAS['claro']['campo'])
+        self.assertEqual(str(app.ttk.Style().lookup('Treeview', 'fieldbackground')), PALETAS['claro']['campo'])
         form.destroy()
         menus['barra'].invoke('Calculadora')
         self.root.update()
         calculadora = self.programa.calculadora
-        self.assertEqual(calculadora.tela.cget('bg'), '#f3f5f8')
+        self.assertEqual(calculadora.tela.cget('bg'), PALETAS['claro']['fundo'])
         for tecla in ('1', ',', '5', '+', '2', '='):
             botao(calculadora.tela, tecla).invoke()
         self.assertEqual(calculadora.texto.get(), '3,5')
@@ -483,7 +484,7 @@ class TestInterface(unittest.TestCase):
         self.assertIs(self.programa.calculadora, calculadora)
         menus['Exibir'].invoke('Tema escuro')
         self.root.update()
-        self.assertEqual(calculadora.tela.cget('bg'), '#181a1f')
+        self.assertEqual(calculadora.tela.cget('bg'), PALETAS['escuro']['fundo'])
         self.assertEqual(calculadora.texto.get(), '3,5')
         botao(calculadora.tela, 'C').invoke()
         calculadora.tela.focus_force()
@@ -909,7 +910,7 @@ class TestInterface(unittest.TestCase):
         self.programa.menus['Exibir'].invoke('Tema claro')
         self.root.update()
         self.assertTrue(datas[1].entrada.instate(['disabled']))
-        self.assertEqual(str(app.ttk.Style().lookup('ResumoRealizado.TLabel','foreground')),'#147a38')
+        self.assertEqual(str(app.ttk.Style().lookup('ResumoRealizado.TLabel','foreground')),PALETAS['claro']['verde'])
         botao(form,'Salvar registro').invoke()
         self.root.update()
         self.assertEqual(self.banco.obter(identificador)['previsao'],'2026-11-21')
@@ -952,6 +953,64 @@ class TestInterface(unittest.TestCase):
                 opcao.invoke()
                 opcao.event_generate('<Leave>')
                 self.root.update()
+
+    def test_inicio_moss_acoes_visiveis_e_temas_sem_recriar_imagens(self):
+        self.assertEqual(self.programa.modo_tema.get(),'claro')
+        self.assertEqual([w for w in filhos(self.root) if isinstance(w,app.ttk.Entry)],[])
+        for largura,colunas in ((1286,3),(944,1)):
+            self.root.geometry(f'{largura}x668')
+            self.root.update()
+            self.assertEqual(self.programa.colunas_inicio,colunas)
+            for texto in ('Nova entrada','Ver histórico total','Contas de recebimento','Sair'):
+                b=botao(self.root,texto)
+                self.assertTrue(b.winfo_ismapped())
+                self.assertGreaterEqual(b.winfo_rooty(),self.root.winfo_rooty())
+                self.assertLessEqual(b.winfo_rooty()+b.winfo_height(),self.root.winfo_rooty()+self.root.winfo_height())
+                self.assertLessEqual(b.winfo_rootx()+b.winfo_width(),self.root.winfo_rootx()+self.root.winfo_width())
+        self.programa.alternar_tema()
+        self.root.update()
+        self.assertEqual(self.programa.texto_alternar_tema.get(),'Modo claro')
+        imagens = self.root.tk.call('image','names')
+        self.programa.alternar_tema()
+        self.programa.alternar_tema()
+        self.root.update()
+        self.assertEqual(len(self.root._superficies_moss),2)
+        # Ícones de Canvas não criam novas imagens; as superfícies são reutilizadas.
+        self.assertEqual(set(self.root.tk.call('image','names')),set(imagens))
+
+    def test_formularios_rolaveis_com_acoes_fixas_em_tela_menor(self):
+        with patch.object(tk.Misc,'winfo_screenheight',return_value=768):
+            form=self.formulario()
+            area=next(w for w in filhos(form) if isinstance(w,AreaRolavel))
+            self.assertLess(area.canvas.yview()[1],1)
+            antes=area.canvas.yview()[0]
+            area.canvas.event_generate('<MouseWheel>',delta=-120,x=10,y=10,
+                rootx=area.canvas.winfo_rootx()+10,rooty=area.canvas.winfo_rooty()+10)
+            self.root.update()
+            self.assertGreater(area.canvas.yview()[0],antes)
+            observacoes=next(w for w in filhos(form) if isinstance(w,tk.Text))
+            observacoes.focus_force()
+            self.root.update()
+            self.assertGreaterEqual(observacoes.winfo_rooty(),area.canvas.winfo_rooty())
+            self.assertLessEqual(observacoes.winfo_rooty()+observacoes.winfo_height(),area.canvas.winfo_rooty()+area.canvas.winfo_height())
+            salvar=botao(form,'Salvar registro')
+            self.assertTrue(salvar.winfo_ismapped())
+            self.assertLessEqual(salvar.winfo_rooty()+salvar.winfo_height(),form.winfo_rooty()+form.winfo_height())
+            self.programa.alternar_tema()
+            self.root.update()
+            self.assertEqual(area.canvas.cget('bg'),cores()['fundo'])
+            botao(form,'Cancelar').invoke()
+            self.programa.mostrar_contas()
+            self.root.update()
+            janela=self.programa.janela_contas
+            botao(janela.tela,'Cadastrar nova conta').invoke()
+            self.root.update()
+            conta=next(w for w in janela.tela.winfo_children() if isinstance(w,tk.Toplevel))
+            area=next(w for w in filhos(conta) if isinstance(w,AreaRolavel))
+            self.assertLess(area.canvas.yview()[1],1)
+            salvar=botao(conta,'Salvar conta')
+            self.assertLessEqual(salvar.winfo_rooty()+salvar.winfo_height(),conta.winfo_rooty()+conta.winfo_height())
+            botao(conta,'Cancelar').invoke()
 
 
 if __name__ == '__main__':

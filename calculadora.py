@@ -5,6 +5,7 @@ from tkinter import ttk
 
 from componentes import centralizar
 from tema import cores
+from visual import familia_fonte
 
 
 class MotorCalculadora:
@@ -137,7 +138,7 @@ class JanelaCalculadora:
         corpo.pack(fill='both', expand=True)
         self.texto = tk.StringVar(value='0')
         ttk.Entry(corpo, textvariable=self.texto, state='readonly', justify='right',
-                  font=('Verdana', 16, 'bold'), width=24).pack(fill='x', ipady=12, pady=(0, 12))
+                  font=(familia_fonte(pai), 24, 'bold'), width=24).pack(fill='x', ipady=12, pady=(0, 12))
         painel = ttk.Frame(corpo)
         painel.pack(fill='both', expand=True)
         teclas = (('C', '⌫', '%', '÷'), ('7', '8', '9', '×'),
@@ -145,7 +146,7 @@ class JanelaCalculadora:
         for linha, grupo in enumerate(teclas):
             painel.rowconfigure(linha, weight=1)
             for coluna, tecla in enumerate(grupo):
-                ttk.Button(painel, text=tecla, style='Calculadora.TButton', width=4,
+                ttk.Button(painel, text=tecla, style='Resultado.Calculadora.TButton' if tecla=='=' else 'Calculadora.TButton', width=4,
                            command=lambda t=tecla: self.clicar(t)).grid(row=linha, column=coluna,
                                     sticky='nsew', padx=3, pady=3)
         for coluna in range(4):

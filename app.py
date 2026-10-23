@@ -1,4 +1,4 @@
-"""Primeira versão do Gestor de RPVs: execute python app.py."""
+"""Gestor de RPV: interface desktop em Python."""
 import sqlite3
 import json
 import tkinter as tk
@@ -6,10 +6,11 @@ from datetime import date, datetime
 from tkinter import messagebox, ttk, filedialog, font as tkfont
 
 from dados import Banco, centavos, moeda, data_iso, data_br, nome_formatado, previsao_por_prazo
-from componentes import CampoMoeda, CampoData, centralizar, maximizar
+from componentes import CampoMoeda, CampoData, centralizar, maximizar, AreaRolavel
 from contas import JanelaContas, dados_para_copiar
 from versao import VERSAO
 from tema import cores, definir_modo, atualizar_widgets
+from visual import aplicar_superficies, familia_fonte, Icone
 from calculadora import JanelaCalculadora
 from backup import criar_backup, BackupPreparado
 from ordenacao import ordenar
@@ -29,24 +30,86 @@ class Aplicativo:
         self.historico = None
         self.janela_contas = None
         self.calculadora = None
-        self.modo_tema = tk.StringVar(value='escuro')
+        self.modo_tema = tk.StringVar(value='claro')
         self.configurar_tema()
         instalar_menu_texto(janela)
         janela.bind_all('<Map>', self.tematizar_novo_widget, add='+')
 
-        menu = ttk.Frame(janela, padding=40)
-        menu.place(relx=0.5, rely=0.5, anchor='center', width=440)
-        ttk.Button(menu, text='Nova entrada', style='Menu.TButton',
-                   command=self.formulario).pack(fill='x', pady=(12, 16))
-        ttk.Button(menu, text='Ver histórico total', style='Menu.TButton',
-                   command=self.mostrar_historico).pack(fill='x', pady=(0, 16))
-        ttk.Button(menu, text='Contas de recebimento', style='Menu.TButton',
-                   command=self.mostrar_contas).pack(fill='x', pady=(0, 16))
-        ttk.Button(menu, text='Sair', style='Menu.TButton',
-                   command=janela.destroy).pack(fill='x')
-        ttk.Label(janela, text=f'Vitoran Tech · v{VERSAO}').place(relx=1, rely=1, anchor='se', x=-18, y=-14)
+        inicio = ttk.Frame(janela,padding=(40,24))
+        inicio.pack(fill='both',expand=True)
+        topo = ttk.Frame(inicio)
+        topo.pack(fill='x')
+        ttk.Label(topo,text='VITORAN  /  TECH',style='Marca.TLabel').pack(side='left')
+        self.texto_alternar_tema = tk.StringVar()
+        ttk.Button(topo,textvariable=self.texto_alternar_tema,command=self.alternar_tema,width=15).pack(side='right')
+        ttk.Frame(inicio).pack(fill='both',expand=True)
+        cabecalho = ttk.Frame(inicio)
+        cabecalho.pack(fill='x',pady=(24,24))
+        ttk.Label(cabecalho,text='Gestor de RPV',style='InicioTitulo.TLabel').pack(anchor='w')
+        ttk.Label(cabecalho,text='Registros, recebimentos e documentos. Tudo no seu lugar.',style='Subtitulo.TLabel').pack(anchor='w',pady=(10,0))
+        self.grade_inicio = ttk.Frame(inicio)
+        self.grade_inicio.pack(fill='x')
+        self.cartoes_inicio = []
+        for icone,numero,titulo,descricao,rotulo,acao in (
+            ('entrada','01','Uma nova operação','Cadastre sua próxima aquisição\ne reúna os documentos da entrada.','Nova entrada',self.formulario),
+            ('historico','02','Tudo sob controle','Consulte valores, acompanhe prazos\ne confirme seus recebimentos.','Ver histórico total',self.mostrar_historico),
+            ('contas','03','Contas de recebimento','Mantenha seus dados bancários\norganizados e sempre à mão.','Contas de recebimento',self.mostrar_contas)):
+            cartao = ttk.Frame(self.grade_inicio,style='Cartao.TFrame',padding=(26,24))
+            faixa = ttk.Frame(cartao,style='Superficie.TFrame')
+            faixa.pack(fill='x')
+            Icone(faixa,icone).pack(side='left')
+            ttk.Label(faixa,text=numero,style='CartaoNumero.TLabel').pack(side='right')
+            ttk.Label(cartao,text=titulo,style='CartaoTitulo.TLabel').pack(anchor='w',pady=(14,8))
+            ttk.Label(cartao,text=descricao,style='CartaoTexto.TLabel',justify='left').pack(anchor='w')
+            ttk.Button(cartao,text=rotulo,style='Inicio.Principal.TButton' if icone=='entrada' else 'Inicio.TButton',command=acao).pack(side='bottom',fill='x',pady=(20,8))
+            self.cartoes_inicio.append(cartao)
+        self.colunas_inicio = None
+        self.grade_inicio.bind('<Configure>',self.organizar_inicio)
+        ttk.Frame(inicio).pack(fill='both',expand=True)
+        rodape_inicio = ttk.Frame(inicio)
+        rodape_inicio.pack(fill='x',pady=(22,0))
+        ttk.Button(rodape_inicio,text='Sair',command=janela.destroy,width=12).pack(side='left')
+        ttk.Label(rodape_inicio,text=f'Vitoran Tech · v{VERSAO}',style='Discreto.TLabel').pack(side='right')
+        self.atualizar_alternador_tema()
         centralizar(janela, 1480, 980)
         janela.deiconify()
+
+    def alternar_tema(self):
+        self.modo_tema.set('escuro' if self.modo_tema.get()=='claro' else 'claro')
+        self.configurar_tema()
+
+    def atualizar_alternador_tema(self):
+        if hasattr(self,'texto_alternar_tema'):
+            self.texto_alternar_tema.set('Modo escuro' if self.modo_tema.get()=='claro' else 'Modo claro')
+
+    def organizar_inicio(self,evento):
+        colunas = 3 if evento.width>=1050 else 1
+        if colunas == self.colunas_inicio:
+            return
+        self.colunas_inicio = colunas
+        for i in range(3):
+            self.grade_inicio.columnconfigure(i,weight=1 if i<colunas else 0,
+                                               uniform='inicio' if i<colunas else '')
+            self.grade_inicio.rowconfigure(i,weight=1 if colunas==1 or i==0 else 0)
+        for i,cartao in enumerate(self.cartoes_inicio):
+            faixa,titulo,descricao,botao = cartao.winfo_children()
+            for filho in (faixa,titulo,descricao,botao):
+                filho.pack_forget()
+                filho.grid_forget()
+            cartao.configure(padding=(26,24) if colunas==3 else (18,12))
+            for coluna in range(3):
+                cartao.columnconfigure(coluna,weight=1 if coluna==(0 if colunas==3 else 1) else 0)
+            if colunas==3:
+                faixa.grid(row=0,column=0,sticky='ew')
+                titulo.grid(row=1,column=0,sticky='w',pady=(14,8))
+                descricao.grid(row=2,column=0,sticky='w')
+                botao.grid(row=3,column=0,sticky='ew',pady=(20,8))
+            else:
+                faixa.grid(row=0,column=0,rowspan=2,sticky='w',padx=(0,18))
+                titulo.grid(row=0,column=1,sticky='w')
+                descricao.grid(row=1,column=1,sticky='w',pady=(4,0))
+                botao.grid(row=0,column=2,rowspan=2,sticky='e',padx=(18,0))
+            cartao.grid(row=i//colunas,column=i%colunas,sticky='nsew',padx=(4,4),pady=4)
 
     def mostrar_contas(self):
         if self.janela_contas is not None and self.janela_contas.tela.winfo_exists():
@@ -95,63 +158,78 @@ class Aplicativo:
         estilo.theme_use('clam')
         definir_modo(self.modo_tema.get())
         c = cores()
-        fundo, campo, texto = c['fundo'], c['campo'], c['texto']
-        estilo.configure('.', font=('Verdana', 10), background=fundo,
-                         foreground=texto, bordercolor=c['borda'],
-                         lightcolor=campo, darkcolor=fundo, troughcolor=fundo)
-        estilo.configure('TButton', background=c['botao'], padding=(12, 10))
-        estilo.map('TButton', background=[('pressed', c['selecao']), ('active', c['ativo'])],
-                   foreground=[('disabled', c['desabilitado']), ('!disabled', texto)])
+        fundo,campo,texto = c['fundo'],c['campo'],c['texto']
+        fonte = familia_fonte(self.janela)
+        self.fonte = fonte
+        primario_texto = '#fffdf8' if self.modo_tema.get()=='claro' else '#193623'
+        estilo.configure('.',font=(fonte,10),background=fundo,foreground=texto,
+                         bordercolor=c['borda'],lightcolor=campo,darkcolor=fundo,troughcolor=fundo)
+        aplicar_superficies(self.janela)
+        estilo.configure('TButton',padding=(18,10),background=fundo,foreground=texto,anchor='center',focuscolor=c['floresta'])
+        estilo.map('TButton',background=[('disabled',fundo),('!disabled',fundo)],foreground=[('disabled',c['desabilitado']),('!disabled',texto)])
+        estilo.configure('Inicio.TButton',background=c['superficie'])
+        estilo.map('Inicio.TButton',background=[('disabled',c['superficie']),('!disabled',c['superficie'])])
+        estilo.configure('Inicio.Principal.TButton',background=c['superficie'])
+        estilo.map('Inicio.Principal.TButton',background=[('disabled',c['superficie']),('!disabled',c['superficie'])])
+        for nome in ('Salvar.TButton','Principal.TButton','DiaSelecionado.TButton','Resultado.Calculadora.TButton'):
+            estilo.configure(nome,font=(fonte,10,'bold'),padding=(18,10),foreground=primario_texto,focuscolor=primario_texto)
+            estilo.map(nome,foreground=[('disabled',c['desabilitado']),('!disabled',primario_texto)])
+        estilo.configure('Menu.TButton',font=(fonte,16,'bold'),padding=(22,16))
         for tipo in ('TRadiobutton','TCheckbutton'):
-            estilo.configure(tipo,background=fundo,foreground=texto,
-                             indicatorbackground=campo,indicatorforeground=texto)
-            estilo.map(tipo,
-                       background=[('disabled',fundo),('active',c['ativo']),('!disabled',fundo)],
+            estilo.configure(tipo,background=fundo,foreground=texto,indicatorbackground=campo,indicatorforeground=texto,padding=3)
+            estilo.map(tipo,background=[('disabled',fundo),('active',c['ativo']),('!disabled',fundo)],
                        foreground=[('disabled',c['desabilitado']),('!disabled',texto)],
-                       indicatorbackground=[('disabled',fundo),('selected',c['selecao']),('!disabled',campo)],
-                       indicatorforeground=[('disabled',c['desabilitado']),('!disabled',texto)])
-        estilo.configure('Salvar.TButton', font=('Verdana',10,'bold'), background=c['selecao'])
-        estilo.configure('Resumo.TFrame', background=campo)
-        estilo.configure('ResumoTitulo.TLabel', background=campo, foreground=c['desabilitado'])
-        estilo.configure('ResumoValor.TLabel', background=campo, font=('Verdana',12,'bold'))
-        estilo.configure('ResumoRealizado.TLabel', background=campo, foreground=c['verde'], font=('Verdana',12,'bold'))
-        estilo.configure('DataCalculada.TLabel', background=fundo, font=('Verdana',10,'bold'))
-        estilo.map('DataCalculada.TLabel', background=[('disabled',fundo),('!disabled',fundo)], foreground=[('disabled',c['desabilitado']),('!disabled',texto)])
-        estilo.configure('Dinheiro.TFrame', background=campo)
-        estilo.configure('Dinheiro.TLabel', background=campo)
-        estilo.configure('DiaSelecionado.TButton', background=c['selecao'])
-        estilo.configure('Recebido.TCheckbutton', foreground=c['verde'], font=('Verdana', 10, 'bold'))
-        estilo.map('Recebido.TCheckbutton', foreground=[('!disabled', c['verde'])])
-        estilo.configure('Previsao.TLabel', background=campo, anchor='center')
-        estilo.configure('PrevisaoAdiada.TLabel', background=campo, foreground=c['vermelho'], anchor='center')
-        estilo.configure('Recebido.TLabel', foreground=c['verde'], font=('Verdana', 10, 'bold'))
-        estilo.configure('Restaurar.TButton', foreground=texto, background=c['botao'], font=('Verdana',10,'bold'), padding=(16,10))
-        estilo.map('Restaurar.TButton', foreground=[('!disabled',texto)])
-        estilo.configure('Calculadora.TButton', font=('Verdana', 14, 'bold'), padding=(6, 8))
-        estilo.configure('Menu.TButton', font=('Verdana', 16, 'bold'), padding=(20, 15))
-        for tipo in ('TEntry', 'TCombobox'):
-            estilo.configure(tipo, fieldbackground=campo, foreground=texto,
-                             insertcolor=texto, padding=6)
-            estilo.map(tipo, fieldbackground=[('disabled',fundo),('readonly', campo)],
-                       foreground=[('disabled',c['desabilitado']),('readonly', texto)],
-                       selectbackground=[('!disabled', c['selecao'])],
-                       selectforeground=[('!disabled', c['texto_selecao'])])
-        estilo.configure('Treeview', background=campo, fieldbackground=campo,
-                         foreground=texto, rowheight=34)
-        estilo.map('Treeview', background=[('selected', c['selecao'])],
-                   foreground=[('selected', c['texto_selecao'])])
-        estilo.configure('Treeview.Heading', background=c['botao'],
-                         font=('Verdana', 10, 'bold'), padding=8)
-        estilo.map('Treeview.Heading', background=[('active', c['ativo'])])
-        self.janela.option_add('*TCombobox*Listbox.background', campo)
-        self.janela.option_add('*TCombobox*Listbox.foreground', texto)
-        self.janela.option_add('*TCombobox*Listbox.selectBackground', c['selecao'])
-        self.janela.option_add('*TCombobox*Listbox.selectForeground', c['texto_selecao'])
+                       indicatorbackground=[('disabled',fundo),('selected',c['primario']),('!disabled',campo)],
+                       indicatorforeground=[('disabled',c['desabilitado']),('selected',primario_texto),('!disabled',texto)])
+        for nome,tamanho,peso,cor in (
+            ('Marca.TLabel',12,'bold',c['floresta']),('InicioTitulo.TLabel',36,'bold',c['floresta']),
+            ('Titulo.TLabel',24,'bold',c['floresta']),('Subtitulo.TLabel',11,'normal',c['secundario']),
+            ('Discreto.TLabel',9,'normal',c['secundario'])):
+            estilo.configure(nome,font=(fonte,tamanho,peso),foreground=cor,background=fundo)
+        estilo.configure('Superficie.TFrame',background=c['superficie'])
+        for nome,tamanho,peso,cor in (
+            ('CartaoTitulo.TLabel',16,'bold',texto),('CartaoTexto.TLabel',10,'normal',c['secundario']),
+            ('CartaoNumero.TLabel',11,'normal',c['secundario']),('ResumoTitulo.TLabel',10,'normal',c['secundario']),
+            ('ResumoValor.TLabel',19,'bold',texto),('ResumoRealizado.TLabel',19,'bold',c['verde'])):
+            estilo.configure(nome,background=c['superficie'],font=(fonte,tamanho,peso),foreground=cor)
+        estilo.configure('DataCalculada.TLabel',background=fundo,font=(fonte,10,'bold'))
+        estilo.map('DataCalculada.TLabel',background=[('disabled',fundo),('!disabled',fundo)],foreground=[('disabled',c['desabilitado']),('!disabled',texto)])
+        estilo.configure('Dinheiro.TFrame',background=campo)
+        estilo.configure('Dinheiro.TLabel',background=campo)
+        estilo.configure('DiaSelecionado.TButton',font=(fonte,10,'bold'))
+        estilo.configure('Recebido.TCheckbutton',foreground=c['verde'],font=(fonte,10,'bold'),background=campo)
+        estilo.map('Recebido.TCheckbutton',foreground=[('!disabled',c['verde'])],background=[('active',c['ativo']),('!disabled',campo)])
+        estilo.configure('Previsao.TLabel',background=campo,anchor='center')
+        estilo.configure('PrevisaoAdiada.TLabel',background=campo,foreground=c['vermelho'],anchor='center')
+        estilo.configure('Recebido.TLabel',foreground=c['verde'],font=(fonte,10,'bold'))
+        estilo.configure('Restaurar.TButton',font=(fonte,10,'bold'),padding=(18,10))
+        estilo.configure('Calculadora.TButton',font=(fonte,15),padding=(8,10))
+        estilo.configure('Resultado.Calculadora.TButton',font=(fonte,15,'bold'),padding=(8,10))
+        for tipo in ('TEntry','TCombobox'):
+            estilo.configure(tipo,fieldbackground=campo,foreground=texto,insertcolor=texto,padding=(10,8),borderwidth=1,relief='flat',arrowsize=14)
+            estilo.map(tipo,fieldbackground=[('disabled',fundo),('readonly',campo)],
+                       foreground=[('disabled',c['desabilitado']),('readonly',texto)],
+                       bordercolor=[('focus',c['floresta']),('!focus',c['borda'])],
+                       selectbackground=[('!disabled',c['selecao'])],selectforeground=[('!disabled',c['texto_selecao'])])
+        estilo.configure('Treeview',background=campo,fieldbackground=campo,foreground=texto,rowheight=40,borderwidth=0)
+        estilo.map('Treeview',background=[('selected',c['selecao'])],foreground=[('selected',c['texto_selecao'])])
+        estilo.configure('Treeview.Heading',background=c['sage'],foreground=texto,font=(fonte,10,'bold'),padding=(12,12),relief='flat',borderwidth=0)
+        estilo.map('Treeview.Heading',background=[('active',c['ativo'])],foreground=[('active',texto)])
+        estilo.configure('TScrollbar',background=c['borda'],troughcolor=fundo,borderwidth=0,arrowsize=12)
+        estilo.map('TScrollbar',background=[('active',c['secundario'])])
+        self.janela.option_add('*Menu.font',(fonte,10))
+        self.janela.option_add('*TCombobox*Listbox.background',campo)
+        self.janela.option_add('*TCombobox*Listbox.foreground',texto)
+        self.janela.option_add('*TCombobox*Listbox.selectBackground',c['selecao'])
+        self.janela.option_add('*TCombobox*Listbox.selectForeground',c['texto_selecao'])
         atualizar_widgets(self.janela)
+        self.atualizar_alternador_tema()
         if hasattr(self,'icone_lixeira'):
             self.desenhar_icone_lixeira()
+        if hasattr(self,'tabela') and self.tabela.winfo_exists():
+            self.tabela.tag_configure('alternada',background=c['linha'])
         if self.janela_contas is not None and self.janela_contas.tela.winfo_exists():
-            self.janela_contas.tabela.tag_configure('incompleta', foreground=c['vermelho'])
+            self.janela_contas.tabela.tag_configure('incompleta',foreground=c['vermelho'])
 
     def mostrar_historico(self):
         if self.historico is not None and self.historico.winfo_exists():
@@ -168,6 +246,8 @@ class Aplicativo:
         self.criar_barra_historico()
         corpo = ttk.Frame(self.historico, padding=20)
         corpo.pack(fill='both', expand=True)
+        ttk.Label(corpo,text='Histórico de RPV',style='Titulo.TLabel').pack(anchor='w',pady=(0,4))
+        ttk.Label(corpo,text='Acompanhe cada operação, do cadastro ao recebimento.',style='Subtitulo.TLabel').pack(anchor='w',pady=(0,20))
         barra = ttk.Frame(corpo)
         barra.pack(fill='x', pady=(0, 12))
         ttk.Label(barra, text='Buscar nome ou data:').pack(side='left', padx=(0, 6))
@@ -187,7 +267,8 @@ class Aplicativo:
         self.titulos_colunas = dict(zip(colunas, titulos))
         for coluna, titulo in zip(colunas, titulos):
             self.tabela.heading(coluna, text=titulo, anchor='center', command=lambda c=coluna: self.ordenar_coluna(c))
-            self.tabela.column(coluna, width=170 if coluna == 'nome' else 145, minwidth=100, anchor='center')
+            largura = max(190 if coluna=='nome' else 145,tkfont.Font(font=(self.fonte,10,'bold')).measure(titulo)+32)
+            self.tabela.column(coluna,width=largura,minwidth=100,anchor='center')
         self.acoes_linhas = {}
         self.reposicionar_pendente = False
         vertical = ttk.Scrollbar(quadro, orient='vertical', command=self.tabela.yview)
@@ -212,7 +293,7 @@ class Aplicativo:
         self.tabela.bind('<ButtonRelease-1>', self.clicar_historico)
         self.tabela.bind('<Double-1>', self.duplo_clique_historico)
         rodape = ttk.Frame(corpo)
-        rodape.pack(fill='x',pady=(12,0))
+        rodape.pack(side='bottom',fill='x',pady=(12,0),before=quadro)
         rodape.columnconfigure(0,weight=1)
         self.resumo = ttk.Frame(rodape)
         self.resumo.grid(row=0,column=0,sticky='ew')
@@ -220,10 +301,10 @@ class Aplicativo:
         self.cartoes_resumo = []
         for chave,titulo in (('registros','Registros'),('previsto','Lucro previsto'),
                              ('realizado','Lucro realizado'),('aberto','Capital investido em aberto')):
-            cartao = ttk.Frame(self.resumo,style='Resumo.TFrame',padding=12)
+            cartao = ttk.Frame(self.resumo,style='Resumo.TFrame',padding=(22,20))
             rotulo = ttk.Label(cartao,text=titulo,style='ResumoTitulo.TLabel',anchor='sw')
             cartao.columnconfigure(0,weight=1)
-            cartao.rowconfigure(0,minsize=2*tkfont.Font(font=('Verdana',10)).metrics('linespace'))
+            cartao.rowconfigure(0,minsize=2*tkfont.Font(font=(self.fonte,10)).metrics('linespace'))
             rotulo.grid(row=0,column=0,sticky='sw')
             valor = tk.StringVar()
             ttk.Label(cartao,textvariable=valor,style='ResumoRealizado.TLabel' if chave=='realizado' else 'ResumoValor.TLabel').grid(row=1,column=0,sticky='ew',pady=(6,0))
@@ -274,8 +355,9 @@ class Aplicativo:
                 widget.destroy()
         self.acoes_linhas.clear()
         self.tabela.delete(*self.tabela.get_children())
-        for r in registros:
-            self.tabela.insert('', 'end', iid=str(r['id']), values=(
+        self.tabela.tag_configure('alternada',background=cores()['linha'])
+        for indice,r in enumerate(registros):
+            self.tabela.insert('', 'end', iid=str(r['id']), tags=('alternada',) if indice%2 else (), values=(
                 r['nome'], data_br(r['aquisicao']), 'R$ ' + moeda(r['custo']),
                 'R$ ' + moeda(r['comissao'] or 0),
                 'R$ ' + moeda(r['previsto']), 'R$ ' + moeda(r['previsto'] - r['custo']),
@@ -533,7 +615,7 @@ class Aplicativo:
         if registro['recebimento']:
             ttk.Button(botoes, text='Desmarcar recebimento', command=desmarcar).pack(side='left', padx=(0, 8))
         ttk.Button(botoes, text='Cancelar', command=tela.destroy).pack(side='right')
-        ttk.Button(botoes, text='Salvar recebimento', command=salvar).pack(side='right', padx=8)
+        ttk.Button(botoes, text='Salvar recebimento', style='Salvar.TButton', command=salvar).pack(side='right', padx=8)
         centralizar(tela)
         tela.deiconify()
         tela.grab_set()
@@ -629,7 +711,7 @@ class Aplicativo:
         rodape = ttk.Frame(corpo)
         rodape.pack(fill='x', pady=(15, 0))
         ttk.Button(rodape, text='Cancelar', command=tela.destroy).pack(side='right')
-        ttk.Button(rodape, text='Salvar previsão', command=salvar).pack(side='right', padx=8)
+        ttk.Button(rodape, text='Salvar previsão', style='Salvar.TButton', command=salvar).pack(side='right', padx=8)
         centralizar(tela)
         tela.deiconify()
         tela.grab_set()
@@ -679,8 +761,12 @@ class Aplicativo:
         tela.configure(bg=cores()['fundo'])
         tela.resizable(False, False)
         tela.transient(self.historico if self.historico is not None and self.historico.winfo_exists() else self.janela)
-        quadro = ttk.Frame(tela, padding=20)
-        quadro.pack(fill='both', expand=True)
+        cabecalho = ttk.Frame(tela,padding=(24,16,24,0))
+        cabecalho.pack(fill='x')
+        ttk.Label(cabecalho,text='Editar registro' if registro else 'Nova entrada',style='Titulo.TLabel').pack(anchor='w')
+        area = AreaRolavel(tela)
+        area.pack(fill='both',expand=True)
+        quadro = area.conteudo
         campos = {}
         modo_previsao = tk.StringVar(value='calendario')
         definicoes = [
@@ -808,11 +894,11 @@ class Aplicativo:
         tem_comissao.trace_add('write', exibir_comissao)
         exibir_comissao()
         ttk.Label(quadro, text='Observações').grid(row=10, column=0, sticky='nw', pady=10)
-        observacoes = tk.Text(quadro, height=4, width=32, wrap='word', font=('Verdana', 10),
+        observacoes = tk.Text(quadro, height=4, width=32, wrap='word', font=(self.fonte, 10),
                               bg=cores()['campo'], fg=cores()['texto'], insertbackground=cores()['texto'],
                               selectbackground=cores()['selecao'], selectforeground=cores()['texto_selecao'],
                               relief='flat', padx=6, pady=6)
-        observacoes.grid(row=10, column=1, pady=10)
+        observacoes.grid(row=10, column=1, sticky='ew',pady=10)
 
         def capitalizar_observacoes(_evento=None):
             texto = observacoes.get('1.0', 'end-1c')
@@ -857,9 +943,9 @@ class Aplicativo:
             self.atualizar()
             tela.destroy()
 
-        ttk.Separator(quadro).grid(row=12,column=0,columnspan=2,sticky='ew',pady=(16,0))
-        botoes = ttk.Frame(quadro)
-        botoes.grid(row=13,column=0,columnspan=2,sticky='ew',pady=(12,0))
+        ttk.Separator(tela).pack(fill='x',padx=24)
+        botoes = ttk.Frame(tela,padding=(20,8,20,12))
+        botoes.pack(fill='x')
         for coluna in range(3):
             botoes.columnconfigure(coluna,weight=1,uniform='acoes')
         ttk.Button(botoes,text='Dados de recebimento',width=20,

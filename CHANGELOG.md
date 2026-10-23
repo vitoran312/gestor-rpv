@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## 0.14.0
+
+- Nova identidade visual inspirada na paleta Moss: floresta, sálvia e marfim.
+- Tela inicial com cartões de ações, ícones próprios, tipografia Segoe UI e alternância de tema.
+- Botões arredondados, sombras suaves e destaque nas ações principais, sem dependências extras.
+- Modo escuro em tons verdes, com atualização de todas as janelas abertas.
+- Indicadores financeiros em cartões e tabela com linhas alternadas e cabeçalhos legíveis.
+- Formulários de entrada e contas com rolagem, navegação por foco e ações fixas no rodapé.
+- Ícones de calendário desenhados pelo programa, sem depender de caracteres especiais.
+- Conteúdo e cálculos preservados; nenhuma alteração no esquema do banco.
+
 ## 0.13.1
 
 - Assinatura “Vitoran Tech · v…” no rodapé, usando automaticamente a versão do programa.
