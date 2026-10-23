@@ -3,16 +3,16 @@ import tkinter as tk
 from tkinter import ttk
 
 PALETAS = {
-    'claro': dict(fundo='#e1d4c2', campo='#faf5ed', superficie='#f0e6d9', texto='#291c0e',
-                  secundario='#695447', botao='#e9ddce', borda='#a78d78', ativo='#d6c2ae',
-                  selecao='#d2b8a2', texto_selecao='#291c0e', verde='#305d3c', vermelho='#993c30',
-                  desabilitado='#7a6a5b', primario='#6e473b', primario_texto='#fff8ef', primario_ativo='#59372d',
-                  primario_pressionado='#41281f', floresta='#6e473b', sage='#beb5a9', linha='#f0e8dc'),
-    'escuro': dict(fundo='#21180f', campo='#291c0e', superficie='#33251b', texto='#f2e6d6',
-                   secundario='#c7b6a4', botao='#463227', borda='#806653', ativo='#533c2f',
-                   selecao='#654a3b', texto_selecao='#fff5e7', verde='#acd1a5', vermelho='#f3aaa0',
-                   desabilitado='#ae9985', primario='#c6a68c', primario_texto='#291c0e', primario_ativo='#dfc3a8',
-                   primario_pressionado='#a78d78', floresta='#dfc3a8', sage='#4a3729', linha='#302217'),
+    'claro': dict(fundo='#f0f2f7', campo='#ffffff', superficie='#fafbfe', texto='#191e32',
+                  secundario='#525e76', botao='#e3e8f1', borda='#8b96aa', ativo='#d3dbea',
+                  selecao='#ffd8c7', texto_selecao='#191e32', verde='#286040', vermelho='#b51a2b',
+                  desabilitado='#737e92', primario='#b51a2b', primario_texto='#ffffff', primario_ativo='#951526',
+                  primario_pressionado='#551a2b', floresta='#551a2b', sage='#ffe0d3', linha='#eef1f7'),
+    'escuro': dict(fundo='#191e32', campo='#1c2339', superficie='#242f49', texto='#f3f5fa',
+                   secundario='#b8c2d7', botao='#384358', borda='#6c7a95', ativo='#45516b',
+                   selecao='#4b3550', texto_selecao='#fff3ee', verde='#abd5ba', vermelho='#ffa3a9',
+                   desabilitado='#a0acc3', primario='#ffa586', primario_texto='#191e32', primario_ativo='#ffc0a8',
+                   primario_pressionado='#df8568', floresta='#ffa586', sage='#384358', linha='#252e46'),
 }
 _modo = 'claro'
 

@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## 0.16.3
+
+- Modos claro e escuro renovados com azul profundo, pêssego, vermelho e vinho.
+- Tema claro com fundos suaves e ações em vermelho; tema escuro com superfícies azuis e destaques em pêssego.
+- Paleta aplicada a todas as telas, mantendo o verde de recebimentos e lucros realizados.
+
 ## 0.16.2
 
 - Nova paleta inspirada em areia, caramelo e marrom para os modos claro e escuro.
