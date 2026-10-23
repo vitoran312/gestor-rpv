@@ -601,7 +601,7 @@ class TestInterface(unittest.TestCase):
         self.assertNotIn('Importar dados',botoes)
         pasta = Path(self.pasta.name)/'exportados'
         with patch.object(app.filedialog,'askdirectory',return_value=str(pasta)), patch.object(app.messagebox,'showinfo'):
-            self.programa.menus['Arquivo'].invoke('Backup')
+            self.programa.menus['Arquivo'].invoke('Fazer backup')
         arquivo = next(pasta.glob('*.rpvbackup'))
         self.banco.salvar(dict(dados,nome='Segunda'))
         with patch.object(app.filedialog,'askopenfilename',return_value=str(arquivo)), patch.object(app.messagebox,'askyesno',return_value=False):
@@ -1176,7 +1176,8 @@ class TestInterface(unittest.TestCase):
         self.programa.mostrar_historico()
         self.root.update()
         estilo=app.ttk.Style()
-        self.assertEqual(app.tkfont.Font(font=estilo.lookup('Operacoes.Treeview','font')).actual('size'),18)
+        self.assertEqual(app.tkfont.Font(font=estilo.lookup('Operacoes.Treeview','font')).actual('size'),12)
+        self.assertEqual(app.tkfont.Font(font=estilo.lookup('Operacoes.Treeview.Heading','font')).actual('size'),18)
         ultimo=self.programa.cartoes_resumo[-1][1]
         self.assertEqual(ultimo.cget('text'),'Lucro realizado')
         self.assertIn('ainda não realizado',self.programa.texto_ultimo_backup.get())

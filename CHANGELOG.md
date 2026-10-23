@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## 0.16.1
+
+- Cabeçalhos de Minhas operações mantidos em 18 pontos e linhas ajustadas para 12 pontos.
+- Caixa de Recebido ampliada e centralizada, com cores para os dois temas.
+- Opção do menu Arquivo renomeada para Fazer backup.
+
 ## 0.16.0
 
 - Tela de histórico renomeada para Minhas operações.

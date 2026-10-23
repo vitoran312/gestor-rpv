@@ -56,6 +56,37 @@ def _png_arredondado(cor,sombra=True,raio=15):
     return _codificar_png(96,72,dados)
 
 
+def _png_recebido(c,selecionado):
+    """Indicador de 24 px; a margem separa a caixa da data do recebimento."""
+    fundo=_rgb(c['primario'] if selecionado else c['campo'])
+    borda=_rgb(c['primario'] if selecionado else c['secundario'])
+    marca=_rgb('#fffdf8' if sum(_rgb(c['primario']))<384 else '#193623')
+    def segmento(x,y,a,b):
+        dx,dy=b[0]-a[0],b[1]-a[1]
+        t=max(0,min(1,((x-a[0])*dx+(y-a[1])*dy)/(dx*dx+dy*dy)))
+        return math.hypot(x-a[0]-t*dx,y-a[1]-t*dy)
+    dados=bytearray()
+    for y in range(26):
+        dados.append(0)
+        for x in range(31):
+            amostras=[]
+            for dx,dy in ((.25,.25),(.75,.25),(.25,.75),(.75,.75)):
+                px,py=x+dx,y+dy
+                qx,qy=abs(px-13)-8,abs(py-13)-8
+                d=math.hypot(max(qx,0),max(qy,0))+min(max(qx,qy),0)-4
+                if d>0:
+                    continue
+                cor=borda if d>-1.5 else fundo
+                if selecionado and min(segmento(px,py,(6.5,13),(11,17.5)),segmento(px,py,(11,17.5),(19.5,8.5)))<=1.3:
+                    cor=marca
+                amostras.append(cor)
+            if amostras:
+                dados.extend((*[round(sum(a[i] for a in amostras)/len(amostras)) for i in range(3)],round(255*len(amostras)/4)))
+            else:
+                dados.extend((0,0,0,0))
+    return _codificar_png(31,26,dados)
+
+
 def icone_tema(raiz,modo):
     """Lua para ativar o escuro e sol para ativar o claro, sem depender de uma fonte de símbolos."""
     cache = getattr(raiz,'_icones_modo',{})
@@ -106,6 +137,10 @@ def aplicar_superficies(raiz):
                                   ('disabled',imagens['inativo']),('pressed',imagens[pressionado]),
                                   ('active',imagens[hover]),border=(24,22,24,24),padding=0,width=72,height=48,sticky='nsew')
         estilo.element_create(prefixo+'cartao','image',imagens['cartao'],border=(24,22,24,24),padding=0,width=72,height=48,sticky='nsew')
+        for selecionado in (False,True):
+            imagens['recebido'+str(selecionado)]=tk.PhotoImage(master=raiz,data=_png_recebido(c,selecionado))
+        estilo.element_create(prefixo+'recebido','image',imagens['recebidoFalse'],
+                              ('selected',imagens['recebidoTrue']),sticky='')
         cache[chave] = (prefixo,imagens)
     prefixo,_imagens = cache[chave]
     for nome,elemento in (('TButton','secundario'),('Salvar.TButton','primario'),
@@ -126,6 +161,10 @@ def aplicar_superficies(raiz):
         return resultado
     for nome in ('TRadiobutton','TCheckbutton'):
         estilo.layout(nome,sem_contorno_foco(estilo.layout(nome)))
+    for nome in ('Recebido.TCheckbutton','Operacoes.TCheckbutton'):
+        estilo.layout(nome,[('Checkbutton.padding',{'sticky':'nswe','children':[
+            (prefixo+'recebido',{'side':'left','sticky':''}),
+            ('Checkbutton.label',{'side':'left','sticky':'nswe'})]})])
     for nome in ('Cartao.TFrame','Resumo.TFrame'):
         estilo.layout(nome,[(prefixo+'cartao',{'sticky':'nsew','children':[('Frame.padding',{'sticky':'nsew'})]})])
         estilo.configure(nome,background=c['fundo'],borderwidth=0)

@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.16.0
+# Gestor de RPV — 0.16.1
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -14,7 +14,7 @@ python app.py
 
 Mantenha `app.py`, `dados.py`, `componentes.py`, `contas.py`, `interacao.py`, `tema.py`, `calculadora.py`, `backup.py`, `ordenacao.py`, `selecao.py`, `documentos.py`, `visual.py` e `versao.py` juntos.
 A tela inicial tem os botões **Nova entrada**, **Minhas operações**,
-**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.16.0** aparece no canto inferior direito.
+**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.16.1** aparece no canto inferior direito.
 O número é lido da versão do programa e acompanha cada atualização.
 As janelas abrem centralizadas; o histórico abre maximizado no Windows.
 
@@ -31,7 +31,7 @@ aparência; o menu **Exibir** do histórico oferece as mesmas opções.
   Os botões não mostram retângulo tracejado após o clique; a navegação por
   teclado e a ativação pela barra de espaço continuam disponíveis.
 - Fonte Segoe UI no Windows, com alternativas locais em outros sistemas.
-- Minhas operações com fonte de 18 pontos nas linhas e cabeçalhos (oito pontos maior),
+- Minhas operações com cabeçalhos de 18 pontos e entradas de 12 pontos,
   linhas alternadas e quatro indicadores em cartões alinhados.
   Lucro realizado é o último cartão, à direita, inclusive no layout com duas linhas.
 - Cadastro de entradas e contas com rolagem e botões fixos no rodapé, inclusive em telas menores.
@@ -176,13 +176,13 @@ com altura das linhas e largura da janela ajustadas para a leitura.
 
 ## Backup e importação
 
-No histórico, use **Arquivo → Backup** e **Arquivo → Importar dados**.
+No histórico, use **Arquivo → Fazer backup** e **Arquivo → Importar dados**.
 Essas ações ficam na barra de menus; seus antigos botões foram retirados da tela.
 O ícone de **lixeira** continua sozinho no canto inferior direito.
 No rodapé aparece **Último backup: dd/mm/aaaa**, atualizado após a gravação
 de um arquivo de backup. Antes do primeiro, aparece “ainda não realizado”.
 
-1. Clique em **Arquivo → Backup** e escolha uma pasta do Windows.
+1. Clique em **Arquivo → Fazer backup** e escolha uma pasta do Windows.
 2. O programa salva um arquivo `GestorRPV-data-hora.rpvbackup`.
 3. No outro computador, abra o aplicativo e escolha **Arquivo → Importar dados**.
 4. Selecione esse arquivo, confira as quantidades e confirme.
