@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## 0.13.1
+
+- Assinatura “Vitoran Tech · v…” no rodapé, usando automaticamente a versão do programa.
+- Correção do fundo branco nas opções de previsão ao passar o mouse no tema escuro.
+- Cores dos controles de seleção definidas para os estados normal, ativo, pressionado e desabilitado nos dois temas.
+
 ## 0.13.0
 
 - Previsão inicial por calendário ou dias, com escolha exclusiva e bloqueio da opção inativa.

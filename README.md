@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.13.0
+# Gestor de RPV — 0.13.1
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -14,7 +14,8 @@ python app.py
 
 Mantenha `app.py`, `dados.py`, `componentes.py`, `contas.py`, `interacao.py`, `tema.py`, `calculadora.py`, `backup.py`, `ordenacao.py`, `selecao.py`, `documentos.py` e `versao.py` juntos.
 A tela inicial tem os botões **Nova entrada**, **Ver histórico total**,
-**Contas de recebimento** e **Sair**. A versão aparece no canto inferior direito.
+**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.13.1** aparece no canto inferior direito.
+O número é lido da versão do programa e acompanha cada atualização.
 As janelas abrem centralizadas; o histórico abre maximizado no Windows.
 
 ## Barra de menus do histórico
@@ -76,7 +77,8 @@ A busca continua acima da tabela. Os menus de clique direito permanecem disponí
   **Previsão inicial por calendário** habilita a data e bloqueia o prazo;
   **Previsão inicial de recebimento em [xx] dias. dd/mm/aaaa** habilita apenas
   os dias e mostra a data calculada ao lado, bloqueando a digitação e o botão
-  do calendário. Os botões de seleção permitem alternar entre as opções.
+  do calendário. Os botões de seleção permitem alternar entre as opções, com cores legíveis
+  ao passar o mouse, selecionar e pressionar nos temas claro e escuro.
 - O cálculo continua sendo aquisição + dias corridos: 28/12/2026 com 10 dias
   resulta em 07/01/2027. Zero dias indica a própria data da aquisição.
   Ao escolher dias, informe um número inteiro não negativo; prazo vazio,

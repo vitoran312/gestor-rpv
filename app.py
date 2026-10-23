@@ -44,7 +44,7 @@ class Aplicativo:
                    command=self.mostrar_contas).pack(fill='x', pady=(0, 16))
         ttk.Button(menu, text='Sair', style='Menu.TButton',
                    command=janela.destroy).pack(fill='x')
-        ttk.Label(janela, text=f'Versão {VERSAO}').place(relx=1, rely=1, anchor='se', x=-18, y=-14)
+        ttk.Label(janela, text=f'Vitoran Tech · v{VERSAO}').place(relx=1, rely=1, anchor='se', x=-18, y=-14)
         centralizar(janela, 1480, 980)
         janela.deiconify()
 
@@ -102,13 +102,21 @@ class Aplicativo:
         estilo.configure('TButton', background=c['botao'], padding=(12, 10))
         estilo.map('TButton', background=[('pressed', c['selecao']), ('active', c['ativo'])],
                    foreground=[('disabled', c['desabilitado']), ('!disabled', texto)])
+        for tipo in ('TRadiobutton','TCheckbutton'):
+            estilo.configure(tipo,background=fundo,foreground=texto,
+                             indicatorbackground=campo,indicatorforeground=texto)
+            estilo.map(tipo,
+                       background=[('disabled',fundo),('active',c['ativo']),('!disabled',fundo)],
+                       foreground=[('disabled',c['desabilitado']),('!disabled',texto)],
+                       indicatorbackground=[('disabled',fundo),('selected',c['selecao']),('!disabled',campo)],
+                       indicatorforeground=[('disabled',c['desabilitado']),('!disabled',texto)])
         estilo.configure('Salvar.TButton', font=('Verdana',10,'bold'), background=c['selecao'])
         estilo.configure('Resumo.TFrame', background=campo)
         estilo.configure('ResumoTitulo.TLabel', background=campo, foreground=c['desabilitado'])
         estilo.configure('ResumoValor.TLabel', background=campo, font=('Verdana',12,'bold'))
         estilo.configure('ResumoRealizado.TLabel', background=campo, foreground=c['verde'], font=('Verdana',12,'bold'))
-        estilo.configure('DataCalculada.TLabel', font=('Verdana',10,'bold'))
-        estilo.map('DataCalculada.TLabel', foreground=[('disabled',c['desabilitado']),('!disabled',texto)])
+        estilo.configure('DataCalculada.TLabel', background=fundo, font=('Verdana',10,'bold'))
+        estilo.map('DataCalculada.TLabel', background=[('disabled',fundo),('!disabled',fundo)], foreground=[('disabled',c['desabilitado']),('!disabled',texto)])
         estilo.configure('Dinheiro.TFrame', background=campo)
         estilo.configure('Dinheiro.TLabel', background=campo)
         estilo.configure('DiaSelecionado.TButton', background=c['selecao'])

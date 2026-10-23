@@ -914,6 +914,45 @@ class TestInterface(unittest.TestCase):
         self.root.update()
         self.assertEqual(self.banco.obter(identificador)['previsao'],'2026-11-21')
 
+    def test_previsao_legivel_com_mouse_nos_dois_temas(self):
+        form = self.formulario()
+        opcoes = [w for w in filhos(form) if isinstance(w,app.ttk.Radiobutton)]
+        self.assertEqual(len(opcoes),2)
+        assinatura = [w.cget('text') for w in filhos(self.root) if isinstance(w,app.ttk.Label)]
+        self.assertIn(f'Vitoran Tech · v{app.VERSAO}',assinatura)
+        def luminancia(cor):
+            canais = [n/65535 for n in self.root.winfo_rgb(cor)]
+            canais = [n/12.92 if n<=0.04045 else ((n+0.055)/1.055)**2.4 for n in canais]
+            return sum(a*b for a,b in zip(canais,(0.2126,0.7152,0.0722)))
+        estilo = app.ttk.Style(self.root)
+        for modo in ('escuro','claro'):
+            self.programa.modo_tema.set(modo)
+            self.programa.configurar_tema()
+            self.root.update()
+            self.assertEqual(str(estilo.lookup('DataCalculada.TLabel','background',('disabled',))),form.cget('bg'))
+            for opcao in opcoes:
+                opcao.event_generate('<Motion>',x=5,y=5,warp=True)
+                self.root.update()
+                opcao.event_generate('<Enter>',x=5,y=5)
+                self.root.update()
+                self.assertTrue(opcao.instate(['active']))
+                for pressionado in (False,True):
+                    if pressionado:
+                        opcao.state(['pressed'])
+                        self.root.update()
+                        self.assertTrue(opcao.instate(['pressed']))
+                    estado = opcao.state()
+                    fundo = str(estilo.lookup('TRadiobutton','background',estado))
+                    frente = str(estilo.lookup('TRadiobutton','foreground',estado))
+                    a,b = sorted((luminancia(fundo),luminancia(frente)))
+                    self.assertGreaterEqual((b+0.05)/(a+0.05),4.5)
+                    if modo=='escuro':
+                        self.assertNotEqual(self.root.winfo_rgb(fundo),(65535,65535,65535))
+                opcao.state(['!pressed'])
+                opcao.invoke()
+                opcao.event_generate('<Leave>')
+                self.root.update()
+
 
 if __name__ == '__main__':
     unittest.main()
