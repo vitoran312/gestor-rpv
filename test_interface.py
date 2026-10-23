@@ -23,6 +23,14 @@ def botao(widget, texto):
     return next(w for w in filhos(widget) if isinstance(w, app.ttk.Button) and w.cget('text') == texto)
 
 
+def texto_resumo(programa):
+    linhas = []
+    for cartao,_rotulo in programa.cartoes_resumo:
+        titulo,valor = cartao.winfo_children()
+        linhas.append(f"{titulo.cget('text')}: {programa.janela.getvar(valor.cget('textvariable'))}")
+    return '\n'.join(linhas)
+
+
 @unittest.skipUnless(os.environ.get('GESTOR_RPV_TESTE_UI') == '1', 'Requer sessão gráfica e GESTOR_RPV_TESTE_UI=1')
 class TestInterface(unittest.TestCase):
     def setUp(self):
@@ -524,7 +532,7 @@ class TestInterface(unittest.TestCase):
         self.banco.atualizar_previsao(identificador,'2027-01-20')
         self.programa.mostrar_historico()
         self.root.update()
-        self.assertNotIn('Investido',self.programa.resumo.cget('text'))
+        self.assertNotIn('Investido',texto_resumo(self.programa))
         self.programa.tabela.selection_set(str(identificador))
         with patch.object(app.messagebox,'askyesno',return_value=True):
             self.programa.excluir()
@@ -752,6 +760,15 @@ class TestInterface(unittest.TestCase):
         prazo = next(w for w in filhos(form) if isinstance(w,app.ttk.Entry) and w.winfo_name()=='prazo_dias')
         datas = [w for w in filhos(form) if isinstance(w,CampoData)]
         datas[0].variavel.set('28/02/2028')
+        self.assertTrue(prazo.instate(['disabled']))
+        self.assertFalse(datas[1].botao.instate(['disabled']))
+        modos = {w.cget('value'):w for w in filhos(form) if isinstance(w,app.ttk.Radiobutton)}
+        modos['dias'].invoke()
+        self.assertFalse(prazo.instate(['disabled']))
+        self.assertTrue(datas[1].entrada.instate(['disabled']))
+        self.assertTrue(datas[1].botao.instate(['disabled']))
+        datas[1].abrir()
+        self.assertIsNone(datas[1].calendario)
         prazo.insert(0,'1')
         self.root.update()
         self.assertEqual(datas[1].variavel.get(),'29/02/2028')
@@ -760,6 +777,15 @@ class TestInterface(unittest.TestCase):
         prazo.delete(0,'end')
         prazo.insert(0,'10')
         self.assertEqual(datas[1].variavel.get(),'07/01/2029')
+        resultado = next(w for w in filhos(form) if w.winfo_name()=='data_calculada')
+        self.assertEqual(self.root.getvar(resultado.cget('textvariable')),'07/01/2029')
+        anterior = datas[1].variavel.get()
+        datas[1].entrada.insert(0,'999')
+        self.assertEqual(datas[1].variavel.get(),anterior)
+        modos['calendario'].invoke()
+        self.assertTrue(prazo.instate(['disabled']))
+        prazo.insert(0,'999')
+        self.assertEqual(prazo.get(),'10')
         datas[1].abrir()
         self.root.update()
         datas[1].selecionar(date(2029,1,10))
@@ -769,7 +795,8 @@ class TestInterface(unittest.TestCase):
         moedas = [w for w in filhos(form) if isinstance(w,CampoMoeda)]
         moedas[0].variavel.set('20.000,00')
         moedas[1].variavel.set('12.000,00')
-        for invalido in ('abc','-1','1,5','999999999999999'):
+        modos['dias'].invoke()
+        for invalido in ('','abc','-1','1,5','999999999999999'):
             prazo.delete(0,'end')
             prazo.insert(0,invalido)
             with patch.object(app.messagebox,'showerror') as erro:
@@ -778,6 +805,7 @@ class TestInterface(unittest.TestCase):
             self.assertEqual(self.banco.listar(),[])
         prazo.delete(0,'end')
         prazo.insert(0,'10')
+        modos['calendario'].invoke()
         datas[1].variavel.set('31/02/2029')
         with patch.object(app.messagebox,'showerror') as erro:
             botao(form,'Salvar registro').invoke()
@@ -805,8 +833,8 @@ class TestInterface(unittest.TestCase):
         self.assertEqual(tabela['columns'][2:5],('custo','comissao','previsto'))
         self.assertEqual(tabela.set(str(recebido),'comissao'),'R$ 500,00')
         self.assertEqual(tabela.set(str(aberto),'comissao'),'R$ 0,00')
-        texto = self.programa.resumo.cget('text')
-        self.assertIn('2 registro(s)',texto)
+        texto = texto_resumo(self.programa)
+        self.assertIn('Registros: 2',texto)
         self.assertIn('Lucro previsto: R$ 11.000,00',texto)
         self.assertIn('Lucro realizado: R$ 8.000,00',texto)
         self.assertIn('Capital investido em aberto: R$ 7.000,00',texto)
@@ -816,17 +844,17 @@ class TestInterface(unittest.TestCase):
         self.assertEqual(tabela.get_children(),(str(aberto),str(recebido)))
         self.programa.busca.set('Aberto')
         self.root.update()
-        self.assertIn('Lucro realizado: R$ 0,00',self.programa.resumo.cget('text'))
+        self.assertIn('Lucro realizado: R$ 0,00',texto_resumo(self.programa))
         self.programa.busca.set('')
         self.banco.excluir(aberto)
         self.programa.atualizar()
-        self.assertIn('Capital investido em aberto: R$ 0,00',self.programa.resumo.cget('text'))
+        self.assertIn('Capital investido em aberto: R$ 0,00',texto_resumo(self.programa))
         self.banco.restaurar(aberto)
         self.banco.registrar_recebimento(recebido,None)
         self.programa.atualizar()
         self.root.update()
-        self.assertIn('Capital investido em aberto: R$ 19.000,00',self.programa.resumo.cget('text'))
-        self.assertIn('Lucro realizado: R$ 0,00',self.programa.resumo.cget('text'))
+        self.assertIn('Capital investido em aberto: R$ 19.000,00',texto_resumo(self.programa))
+        self.assertIn('Lucro realizado: R$ 0,00',texto_resumo(self.programa))
         # A coluna adicionada não desloca as ações de calendário/recebimento.
         tabela.xview_moveto(1)
         self.root.update()
@@ -844,6 +872,47 @@ class TestInterface(unittest.TestCase):
         self.assertTrue(self.programa.botao_lixeira.winfo_ismapped())
         self.assertLess(self.programa.botao_lixeira.winfo_rootx()+self.programa.botao_lixeira.winfo_width(),
                         self.programa.historico.winfo_rootx()+self.programa.historico.winfo_width()+1)
+
+    def test_layout_responsivo_indicadores_e_botoes_e_salvamento_por_dias(self):
+        from test_contas import dados_rpv
+        identificador = self.banco.salvar(dados_rpv())
+        self.programa.mostrar_historico()
+        self.root.update()
+        historico = self.programa.historico
+        historico.state('normal')
+        for largura,colunas in ((1600,4),(850,2)):
+            historico.geometry(f'{largura}x650')
+            self.root.update()
+            self.assertEqual(self.programa.colunas_resumo,colunas)
+            cartoes = [c for c,_ in self.programa.cartoes_resumo]
+            self.assertLessEqual(max(c.winfo_width() for c in cartoes)-min(c.winfo_width() for c in cartoes),1)
+            for inicio in range(0,4,colunas):
+                self.assertEqual(len({c.winfo_rooty() for c in cartoes[inicio:inicio+colunas]}),1)
+                valores = [c.winfo_children()[1] for c in cartoes[inicio:inicio+colunas]]
+                self.assertEqual(len({v.winfo_rooty() for v in valores}),1)
+            self.assertGreaterEqual(self.programa.botao_lixeira.winfo_rootx(),
+                                    self.programa.resumo.winfo_rootx()+self.programa.resumo.winfo_width())
+        self.programa.formulario(identificador)
+        self.root.update()
+        form = next(w for w in self.root.winfo_children() if isinstance(w,tk.Toplevel) and w.title()=='Editar registro')
+        botoes = [botao(form,t) for t in ('Dados de recebimento','Cancelar','Salvar registro')]
+        self.assertEqual(len({b.winfo_rooty() for b in botoes}),1)
+        self.assertEqual(len({b.winfo_height() for b in botoes}),1)
+        self.assertLessEqual(max(b.winfo_width() for b in botoes)-min(b.winfo_width() for b in botoes),1)
+        modos = {w.cget('value'):w for w in filhos(form) if isinstance(w,app.ttk.Radiobutton)}
+        modos['dias'].invoke()
+        prazo = next(w for w in filhos(form) if w.winfo_name()=='prazo_dias')
+        prazo.delete(0,'end')
+        prazo.insert(0,'30')
+        datas = [w for w in filhos(form) if isinstance(w,CampoData)]
+        self.assertTrue(datas[1].entrada.instate(['disabled']))
+        self.programa.menus['Exibir'].invoke('Tema claro')
+        self.root.update()
+        self.assertTrue(datas[1].entrada.instate(['disabled']))
+        self.assertEqual(str(app.ttk.Style().lookup('ResumoRealizado.TLabel','foreground')),'#147a38')
+        botao(form,'Salvar registro').invoke()
+        self.root.update()
+        self.assertEqual(self.banco.obter(identificador)['previsao'],'2026-11-21')
 
 
 if __name__ == '__main__':

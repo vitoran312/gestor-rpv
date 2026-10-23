@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## 0.13.0
+
+- Previsão inicial por calendário ou dias, com escolha exclusiva e bloqueio da opção inativa.
+- Prazo apresentado como “Previsão inicial de recebimento em [xx] dias.”, seguido da data calculada.
+- Validação conforme a opção escolhida, mantendo aquisição como base dos dias corridos.
+- Botões finais do formulário com dimensões iguais, espaçamentos regulares e destaque para Salvar.
+- Indicadores do histórico separados em blocos alinhados e adaptados à largura da janela.
+- Lucro realizado em verde; lixeira preservada no canto inferior direito.
+
 ## 0.12.0
 
 - Prazo em dias corridos após a aquisição calcula a previsão inicial de recebimento.

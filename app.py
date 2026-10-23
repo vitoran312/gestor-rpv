@@ -3,7 +3,7 @@ import sqlite3
 import json
 import tkinter as tk
 from datetime import date, datetime
-from tkinter import messagebox, ttk, filedialog
+from tkinter import messagebox, ttk, filedialog, font as tkfont
 
 from dados import Banco, centavos, moeda, data_iso, data_br, nome_formatado, previsao_por_prazo
 from componentes import CampoMoeda, CampoData, centralizar, maximizar
@@ -102,6 +102,13 @@ class Aplicativo:
         estilo.configure('TButton', background=c['botao'], padding=(12, 10))
         estilo.map('TButton', background=[('pressed', c['selecao']), ('active', c['ativo'])],
                    foreground=[('disabled', c['desabilitado']), ('!disabled', texto)])
+        estilo.configure('Salvar.TButton', font=('Verdana',10,'bold'), background=c['selecao'])
+        estilo.configure('Resumo.TFrame', background=campo)
+        estilo.configure('ResumoTitulo.TLabel', background=campo, foreground=c['desabilitado'])
+        estilo.configure('ResumoValor.TLabel', background=campo, font=('Verdana',12,'bold'))
+        estilo.configure('ResumoRealizado.TLabel', background=campo, foreground=c['verde'], font=('Verdana',12,'bold'))
+        estilo.configure('DataCalculada.TLabel', font=('Verdana',10,'bold'))
+        estilo.map('DataCalculada.TLabel', foreground=[('disabled',c['desabilitado']),('!disabled',texto)])
         estilo.configure('Dinheiro.TFrame', background=campo)
         estilo.configure('Dinheiro.TLabel', background=campo)
         estilo.configure('DiaSelecionado.TButton', background=c['selecao'])
@@ -117,8 +124,8 @@ class Aplicativo:
         for tipo in ('TEntry', 'TCombobox'):
             estilo.configure(tipo, fieldbackground=campo, foreground=texto,
                              insertcolor=texto, padding=6)
-            estilo.map(tipo, fieldbackground=[('readonly', campo)],
-                       foreground=[('readonly', texto)],
+            estilo.map(tipo, fieldbackground=[('disabled',fundo),('readonly', campo)],
+                       foreground=[('disabled',c['desabilitado']),('readonly', texto)],
                        selectbackground=[('!disabled', c['selecao'])],
                        selectforeground=[('!disabled', c['texto_selecao'])])
         estilo.configure('Treeview', background=campo, fieldbackground=campo,
@@ -198,13 +205,28 @@ class Aplicativo:
         self.tabela.bind('<Double-1>', self.duplo_clique_historico)
         rodape = ttk.Frame(corpo)
         rodape.pack(fill='x',pady=(12,0))
-        self.resumo = ttk.Label(rodape)
-        self.resumo.pack(side='left', fill='x', expand=True)
-        rodape.bind('<Configure>', lambda e: self.resumo.configure(wraplength=max(200,e.width-90)))
+        rodape.columnconfigure(0,weight=1)
+        self.resumo = ttk.Frame(rodape)
+        self.resumo.grid(row=0,column=0,sticky='ew')
+        self.indicadores_resumo = {}
+        self.cartoes_resumo = []
+        for chave,titulo in (('registros','Registros'),('previsto','Lucro previsto'),
+                             ('realizado','Lucro realizado'),('aberto','Capital investido em aberto')):
+            cartao = ttk.Frame(self.resumo,style='Resumo.TFrame',padding=12)
+            rotulo = ttk.Label(cartao,text=titulo,style='ResumoTitulo.TLabel',anchor='sw')
+            cartao.columnconfigure(0,weight=1)
+            cartao.rowconfigure(0,minsize=2*tkfont.Font(font=('Verdana',10)).metrics('linespace'))
+            rotulo.grid(row=0,column=0,sticky='sw')
+            valor = tk.StringVar()
+            ttk.Label(cartao,textvariable=valor,style='ResumoRealizado.TLabel' if chave=='realizado' else 'ResumoValor.TLabel').grid(row=1,column=0,sticky='ew',pady=(6,0))
+            self.indicadores_resumo[chave] = valor
+            self.cartoes_resumo.append((cartao,rotulo))
+        self.colunas_resumo = None
+        self.resumo.bind('<Configure>',self.organizar_resumo)
         self.desenhar_icone_lixeira()
         self.botao_lixeira = ttk.Button(rodape, text='Lixeira', image=self.icone_lixeira, compound='image',
                                        width=3, command=self.mostrar_lixeira)
-        self.botao_lixeira.pack(side='right')
+        self.botao_lixeira.grid(row=0,column=1,sticky='se',padx=(16,0))
         self.historico.bind('<Control-f>',lambda _: entrada_busca.focus_set())
         self.historico.bind('<Control-n>',lambda _: self.formulario())
         self.historico.bind('<F5>',lambda _: self.atualizar())
@@ -212,6 +234,23 @@ class Aplicativo:
         centralizar(self.historico, 1100, 650)
         self.historico.deiconify()
         maximizar(self.historico)
+
+    def organizar_resumo(self, evento):
+        colunas = 4 if evento.width >= 1100 else 2
+        if colunas != self.colunas_resumo:
+            self.colunas_resumo = colunas
+            for coluna in range(4):
+                self.resumo.columnconfigure(coluna,weight=1 if coluna<colunas else 0,
+                                            uniform='indicadores' if coluna<colunas else '')
+            for indice,(cartao,_rotulo) in enumerate(self.cartoes_resumo):
+                cartao.grid(row=indice//colunas,column=indice%colunas,sticky='nsew',
+                            padx=(4,4),
+                            pady=(0,8) if indice//colunas==0 and colunas==2 else 0)
+        largura = max(100,evento.width//colunas-36)
+        for cartao,rotulo in self.cartoes_resumo:
+            rotulo.configure(wraplength=largura)
+            for valor in cartao.winfo_children()[1:]:
+                valor.configure(wraplength=largura)
 
     def atualizar(self):
         if self.historico is None or not self.historico.winfo_exists():
@@ -239,10 +278,10 @@ class Aplicativo:
         if foco in disponiveis:
             self.tabela.focus(foco)
         self.agendar_acoes()
-        self.resumo.config(text=f'{len(registros)} registro(s) • '
-            f"Lucro previsto: R$ {moeda(sum(r['previsto'] - r['custo'] for r in registros))}\n"
-            f"Lucro realizado: R$ {moeda(sum(r['previsto'] - r['custo'] for r in registros if r['recebimento']))} • "
-            f"Capital investido em aberto: R$ {moeda(sum(r['custo'] for r in registros if not r['recebimento']))}")
+        self.indicadores_resumo['registros'].set(str(len(registros)))
+        self.indicadores_resumo['previsto'].set('R$ '+moeda(sum(r['previsto']-r['custo'] for r in registros)))
+        self.indicadores_resumo['realizado'].set('R$ '+moeda(sum(r['previsto']-r['custo'] for r in registros if r['recebimento'])))
+        self.indicadores_resumo['aberto'].set('R$ '+moeda(sum(r['custo'] for r in registros if not r['recebimento'])))
 
     def ordenar_coluna(self, coluna):
         primeira = 'asc' if coluna in ('nome', 'conta') else 'desc'
@@ -635,6 +674,7 @@ class Aplicativo:
         quadro = ttk.Frame(tela, padding=20)
         quadro.pack(fill='both', expand=True)
         campos = {}
+        modo_previsao = tk.StringVar(value='calendario')
         definicoes = [
             ('nome', 'Nome completo do titular original', ''),
             ('aquisicao', 'Data da aquisição (DD/MM/AAAA)', date.today().strftime('%d/%m/%Y')),
@@ -644,7 +684,10 @@ class Aplicativo:
             ('previsao', 'Previsão inicial de recebimento (DD/MM/AAAA)', ''),
         ]
         for linha, (chave, titulo, padrao) in enumerate(definicoes):
-            ttk.Label(quadro, text=titulo).grid(row=linha, column=0, sticky='w', pady=6, padx=(0, 16))
+            if chave == 'previsao':
+                ttk.Radiobutton(quadro,text='Previsão inicial por calendário',variable=modo_previsao,value='calendario').grid(row=linha,column=0,sticky='w',pady=6,padx=(0,16))
+            else:
+                ttk.Label(quadro, text=titulo).grid(row=linha, column=0, sticky='w', pady=6, padx=(0, 16))
             valor = conta_inicial if chave == 'conta' else (registro[chave] if registro else padrao)
             if registro and chave in ('aquisicao', 'previsao'):
                 valor = data_br(valor)
@@ -660,49 +703,68 @@ class Aplicativo:
             else:
                 entrada = ttk.Entry(quadro, textvariable=campos[chave], width=32)
             entrada.grid(row=linha, column=1, sticky='ew', pady=6)
+            if chave == 'previsao':
+                campo_previsao = entrada
             if chave == 'nome':
                 entrada.focus_set()
                 aplicar_formato(entrada, campos['nome'], str.title)
 
-        ttk.Label(quadro, text='Prazo após a aquisição (dias corridos)').grid(row=6,column=0,sticky='w',pady=6,padx=(0,16))
+        ttk.Radiobutton(quadro,text='Previsão inicial de recebimento em',variable=modo_previsao,value='dias').grid(row=6,column=0,sticky='w',pady=6,padx=(0,16))
+        linha_prazo = ttk.Frame(quadro)
+        linha_prazo.grid(row=6,column=1,sticky='ew',pady=6)
         prazo = tk.StringVar()
-        entrada_prazo = ttk.Entry(quadro,textvariable=prazo,width=32,name='prazo_dias')
-        entrada_prazo.grid(row=6,column=1,sticky='ew',pady=6)
+        entrada_prazo = ttk.Entry(linha_prazo,textvariable=prazo,width=6,justify='center',name='prazo_dias')
+        entrada_prazo.pack(side='left')
+        ttk.Label(linha_prazo,text='dias.').pack(side='left',padx=(8,12))
+        data_calculada = tk.StringVar(value='dd/mm/aaaa')
+        resultado_prazo = ttk.Label(linha_prazo,textvariable=data_calculada,style='DataCalculada.TLabel',name='data_calculada')
+        resultado_prazo.pack(side='left')
         sincronizando_prazo = False
 
         def calcular_data(*_):
             nonlocal sincronizando_prazo
-            if sincronizando_prazo or not prazo.get().strip():
+            if sincronizando_prazo or modo_previsao.get() != 'dias':
                 return
             try:
                 prevista = previsao_por_prazo(campos['aquisicao'].get(),prazo.get())
             except ValueError:
-                return  # Validação definitiva ocorre ao salvar, sem interromper a digitação.
+                data_calculada.set('dd/mm/aaaa')
+                return
             sincronizando_prazo = True
             try:
                 campos['previsao'].set(prevista)
+                data_calculada.set(prevista)
             finally:
                 sincronizando_prazo = False
 
         def calcular_dias(*_):
             nonlocal sincronizando_prazo
-            if sincronizando_prazo:
-                return
-            try:
-                dias = (date.fromisoformat(data_iso(campos['previsao'].get())) -
-                        date.fromisoformat(data_iso(campos['aquisicao'].get()))).days
-            except ValueError:
+            if sincronizando_prazo or modo_previsao.get() != 'calendario':
                 return
             sincronizando_prazo = True
             try:
+                dias = (date.fromisoformat(data_iso(campos['previsao'].get())) -
+                        date.fromisoformat(data_iso(campos['aquisicao'].get()))).days
                 prazo.set(str(dias) if dias >= 0 else '')
+                data_calculada.set(campos['previsao'].get() if dias >= 0 else 'dd/mm/aaaa')
+            except ValueError:
+                prazo.set('')
+                data_calculada.set('dd/mm/aaaa')
             finally:
                 sincronizando_prazo = False
 
+        def escolher_modo(*_):
+            por_dias = modo_previsao.get() == 'dias'
+            campo_previsao.habilitar(not por_dias)
+            entrada_prazo.state(['!disabled' if por_dias else 'disabled'])
+            resultado_prazo.state(['!disabled' if por_dias else 'disabled'])
+            calcular_data() if por_dias else calcular_dias()
+
         prazo.trace_add('write',calcular_data)
-        campos['aquisicao'].trace_add('write',calcular_data)
+        campos['aquisicao'].trace_add('write',lambda *_: calcular_data() if modo_previsao.get()=='dias' else calcular_dias())
         campos['previsao'].trace_add('write',calcular_dias)
-        calcular_dias()
+        modo_previsao.trace_add('write',escolher_modo)
+        escolher_modo()
 
         lucro = tk.StringVar()
         ttk.Label(quadro, text='Lucro previsto').grid(row=7, column=0, sticky='w', pady=6)
@@ -766,8 +828,8 @@ class Aplicativo:
                 dados = {chave: variavel.get().strip() for chave, variavel in campos.items()}
                 if not dados['nome']:
                     raise ValueError('Informe o nome completo do titular original.')
-                if prazo.get().strip():
-                    previsao_por_prazo(dados['aquisicao'],prazo.get())
+                if modo_previsao.get() == 'dias':
+                    dados['previsao'] = previsao_por_prazo(dados['aquisicao'],prazo.get())
                 for chave in ('aquisicao', 'previsao'):
                     dados[chave] = data_iso(dados[chave])
                 if dados['previsao'] < dados['aquisicao']:
@@ -787,12 +849,15 @@ class Aplicativo:
             self.atualizar()
             tela.destroy()
 
+        ttk.Separator(quadro).grid(row=12,column=0,columnspan=2,sticky='ew',pady=(16,0))
         botoes = ttk.Frame(quadro)
-        botoes.grid(row=12, column=0, columnspan=2, sticky='e', pady=(10, 0))
-        ttk.Button(botoes, text='Dados de recebimento',
-                   command=lambda: self.ver_dados_recebimento(tela, registro, mapa_contas.get(campos['conta'].get()))).pack(side='left', padx=8)
-        ttk.Button(botoes, text='Cancelar', command=tela.destroy).pack(side='left', padx=8)
-        ttk.Button(botoes, text='Salvar registro', command=salvar).pack(side='left')
+        botoes.grid(row=13,column=0,columnspan=2,sticky='ew',pady=(12,0))
+        for coluna in range(3):
+            botoes.columnconfigure(coluna,weight=1,uniform='acoes')
+        ttk.Button(botoes,text='Dados de recebimento',width=20,
+                   command=lambda: self.ver_dados_recebimento(tela,registro,mapa_contas.get(campos['conta'].get()))).grid(row=0,column=0,sticky='ew',padx=(0,8))
+        ttk.Button(botoes,text='Cancelar',width=20,command=tela.destroy).grid(row=0,column=1,sticky='ew',padx=(4,4))
+        ttk.Button(botoes,text='Salvar registro',width=20,style='Salvar.TButton',command=salvar).grid(row=0,column=2,sticky='ew',padx=(8,0))
         tela.bind('<Escape>', lambda _: tela.destroy())
         centralizar(tela)
         tela.deiconify()

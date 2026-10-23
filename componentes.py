@@ -145,10 +145,21 @@ class CampoData(ttk.Frame):
         super().__init__(pai)
         self.variavel = variavel
         self.calendario = None
-        ttk.Entry(self, textvariable=variavel, width=25).pack(side='left', fill='x', expand=True)
-        ttk.Button(self, text='▦', width=3, command=self.abrir).pack(side='left', padx=(5, 0))
+        self.entrada = ttk.Entry(self, textvariable=variavel, width=25)
+        self.entrada.pack(side='left', fill='x', expand=True)
+        self.botao = ttk.Button(self, text='▦', width=3, command=self.abrir)
+        self.botao.pack(side='left', padx=(5, 0))
+
+    def habilitar(self, ativo):
+        estado = '!disabled' if ativo else 'disabled'
+        self.entrada.state([estado])
+        self.botao.state([estado])
+        if not ativo and self.calendario is not None and self.calendario.winfo_exists():
+            self.fechar()
 
     def abrir(self):
+        if self.botao.instate(['disabled']):
+            return
         if self.calendario is not None and self.calendario.winfo_exists():
             self.calendario.lift()
             return

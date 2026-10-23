@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.12.0
+# Gestor de RPV — 0.13.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -72,13 +72,22 @@ A busca continua acima da tabela. Os menus de clique direito permanecem disponí
   e permite ordenar pelo valor com os mesmos três cliques dos outros cabeçalhos.
 - Os valores são guardados em centavos, sem ponto flutuante.
 - As datas têm calendários com navegação por mês e ano.
-- Abaixo da previsão inicial, **Prazo após a aquisição (dias corridos)** calcula
-  a data automaticamente: aquisição + quantidade de dias. Exemplo: 28/12/2026
-  com 10 dias resulta em 07/01/2027. Zero dias indica a própria data de aquisição.
-  O prazo aceita apenas números inteiros não negativos e é opcional.
-- Selecionar a previsão pelo calendário atualiza o prazo em dias. Alterar a data
-  de aquisição com um prazo preenchido recalcula a previsão. Na edição, o prazo
-  é derivado das datas já salvas, sem modificar a previsão atual de recebimento.
+- A previsão inicial oferece duas opções exclusivas:
+  **Previsão inicial por calendário** habilita a data e bloqueia o prazo;
+  **Previsão inicial de recebimento em [xx] dias. dd/mm/aaaa** habilita apenas
+  os dias e mostra a data calculada ao lado, bloqueando a digitação e o botão
+  do calendário. Os botões de seleção permitem alternar entre as opções.
+- O cálculo continua sendo aquisição + dias corridos: 28/12/2026 com 10 dias
+  resulta em 07/01/2027. Zero dias indica a própria data da aquisição.
+  Ao escolher dias, informe um número inteiro não negativo; prazo vazio,
+  inválido ou que exceda o intervalo de datas impede salvar.
+- Selecionar uma data pelo calendário atualiza o prazo equivalente, que permanece
+  bloqueado até você escolher a opção por dias. Alterar a aquisição recalcula a
+  previsão somente no modo por dias. No modo calendário, a data escolhida é mantida.
+- A edição abre na opção de calendário com a previsão já salva; mudar entre opções
+  preserva os valores válidos. A previsão atual de recebimento é independente.
+- Os botões **Dados de recebimento**, **Cancelar** e **Salvar registro** têm
+  tamanhos e espaçamentos uniformes, separados do formulário por uma linha.
 - O histórico permite buscar por nome/data, editar e enviar para a lixeira com confirmação.
 - Clique nos cabeçalhos para ordenar: valores e datas começam do maior/mais recente
   para o menor; nomes e contas começam em ordem alfabética. O segundo clique inverte
@@ -88,6 +97,9 @@ A busca continua acima da tabela. Os menus de clique direito permanecem disponí
   **Capital investido em aberto**. O lucro previsto soma Valor Total RPV menos
   aquisição de todas as linhas exibidas; o realizado considera apenas as marcadas
   como recebidas; o capital em aberto soma a aquisição das ainda não recebidas.
+  Os quatro indicadores aparecem em blocos alinhados, com título acima do valor.
+  Em janelas amplas ficam lado a lado; em janelas menores ficam em duas linhas
+  de dois blocos. O lucro realizado tem destaque verde e a lixeira mantém seu canto.
   Comissão não interfere nesses totais. A busca limita os totais às linhas exibidas;
   entradas na lixeira ficam fora deles. Marcar/desmarcar recebimento e restaurar ou
   excluir uma entrada atualiza os totais.
