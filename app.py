@@ -69,6 +69,9 @@ class Aplicativo:
         arquivo.add_command(label='Nova entrada', command=self.formulario)
         arquivo.add_command(label='Contas de recebimento', command=self.mostrar_contas)
         arquivo.add_separator()
+        arquivo.add_command(label='Backup', command=self.exportar_backup)
+        arquivo.add_command(label='Importar dados', command=self.importar_dados)
+        arquivo.add_separator()
         arquivo.add_command(label='Fechar histórico', command=self.historico.destroy)
         editar = novo_menu(barra)
         editar.add_command(label='Editar registro', command=self.abrir)
@@ -152,10 +155,6 @@ class Aplicativo:
         corpo.pack(fill='both', expand=True)
         barra = ttk.Frame(corpo)
         barra.pack(fill='x', pady=(0, 12))
-        protecao = ttk.Frame(barra)
-        protecao.pack(side='right', padx=(24, 0))
-        ttk.Button(protecao, text='Backup', command=self.exportar_backup).pack(side='left', padx=4)
-        ttk.Button(protecao, text='Importar dados', command=self.importar_dados).pack(side='left', padx=4)
         ttk.Label(barra, text='Buscar nome ou data:').pack(side='left', padx=(0, 6))
         self.busca = tk.StringVar()
         entrada_busca = ttk.Entry(barra, textvariable=self.busca)
@@ -449,14 +448,18 @@ class Aplicativo:
         ttk.Label(corpo, text='Data do recebimento', style='Recebido.TLabel').pack(anchor='w', pady=(15, 6))
         valor = tk.StringVar(value=data_br(registro['recebimento']) if registro['recebimento'] else date.today().strftime('%d/%m/%Y'))
         CampoData(corpo, valor).pack(fill='x')
+        ttk.Label(corpo, text='Comprovantes de recebimento').pack(anchor='w', pady=(15,6))
+        painel_documentos = ttk.Frame(corpo)
+        painel_documentos.pack(fill='x')
+        anexos_pendentes = self.criar_painel_documentos(painel_documentos, tela, identificador, tipo='recebimento')
 
         def salvar():
             try:
-                self.banco.registrar_recebimento(identificador, data_iso(valor.get()))
+                self.banco.registrar_recebimento(identificador, data_iso(valor.get()), anexos=anexos_pendentes)
             except ValueError as erro:
                 messagebox.showerror('Confira o recebimento', str(erro), parent=tela)
                 return
-            except sqlite3.Error:
+            except (sqlite3.Error,OSError):
                 messagebox.showerror('Recebimento', 'Não foi possível salvar.', parent=tela)
                 return
             self.atualizar()
@@ -710,13 +713,51 @@ class Aplicativo:
         if registro:
             observacoes.insert('1.0', registro['observacoes'])
 
-        anexos_pendentes = []
         painel_documentos = ttk.Frame(quadro)
         painel_documentos.grid(row=10,column=0,columnspan=2,sticky='ew',pady=(8,0))
+        anexos_pendentes = self.criar_painel_documentos(painel_documentos, tela, identificador)
+
+        def salvar():
+            try:
+                dados = {chave: variavel.get().strip() for chave, variavel in campos.items()}
+                if not dados['nome']:
+                    raise ValueError('Informe o nome completo do titular original.')
+                for chave in ('aquisicao', 'previsao'):
+                    dados[chave] = data_iso(dados[chave])
+                if dados['previsao'] < dados['aquisicao']:
+                    raise ValueError('A previsão não pode ser anterior à aquisição.')
+                for chave in ('previsto', 'custo'):
+                    dados[chave] = centavos(dados[chave])
+                dados['conta_id'] = mapa_contas.get(dados['conta'])
+                dados['comissao'] = centavos(valor_comissao.get()) if tem_comissao.get() == 'Sim' else None
+                dados['observacoes'] = observacoes.get('1.0', 'end-1c').strip()
+                self.banco.salvar(dados, identificador, anexos=anexos_pendentes)
+            except ValueError as erro:
+                messagebox.showerror('Confira o cadastro', str(erro), parent=tela)
+                return
+            except (sqlite3.Error,OSError):
+                messagebox.showerror('Não foi possível salvar', 'Confira o acesso à pasta de dados e tente novamente.', parent=tela)
+                return
+            self.atualizar()
+            tela.destroy()
+
+        botoes = ttk.Frame(quadro)
+        botoes.grid(row=11, column=0, columnspan=2, sticky='e', pady=(10, 0))
+        ttk.Button(botoes, text='Dados de recebimento',
+                   command=lambda: self.ver_dados_recebimento(tela, registro, mapa_contas.get(campos['conta'].get()))).pack(side='left', padx=8)
+        ttk.Button(botoes, text='Cancelar', command=tela.destroy).pack(side='left', padx=8)
+        ttk.Button(botoes, text='Salvar registro', command=salvar).pack(side='left')
+        tela.bind('<Escape>', lambda _: tela.destroy())
+        centralizar(tela)
+        tela.deiconify()
+        tela.grab_set()
+
+    def criar_painel_documentos(self, painel_documentos, tela, identificador=None, tipo='entrada'):
+        anexos_pendentes = []
         texto_documentos = tk.StringVar()
 
         def atualizar_contagem():
-            total = len(anexos_pendentes) + (len(self.banco.documentos(identificador)) if identificador else 0)
+            total = len(anexos_pendentes) + (len(self.banco.documentos(identificador, tipo=tipo)) if identificador else 0)
             texto_documentos.set(f'Documentos ({total})')
 
         def anexar():
@@ -735,7 +776,7 @@ class Aplicativo:
         def ver_documentos():
             janela = tk.Toplevel(tela)
             janela.withdraw()
-            janela.title('Documentos da entrada')
+            janela.title('Comprovantes de recebimento' if tipo == 'recebimento' else 'Documentos da entrada')
             janela.configure(bg=cores()['fundo'])
             janela.transient(tela)
             corpo = ttk.Frame(janela,padding=15)
@@ -752,13 +793,13 @@ class Aplicativo:
                 lista.delete(*lista.get_children())
                 caminhos.clear()
                 if identificador:
-                    for documento in self.banco.documentos(identificador):
+                    for documento in self.banco.documentos(identificador, tipo=tipo):
                         iid = 'salvo:' + str(documento['id'])
                         lista.insert('','end',iid=iid,values=(documento['nome'],'Salvo'))
                         caminhos[iid] = ('salvo',documento['id'])
                 for indice,arquivo in enumerate(anexos_pendentes):
                     iid = 'novo:' + str(indice)
-                    lista.insert('','end',iid=iid,values=(arquivo.name,'Salvar com a entrada'))
+                    lista.insert('','end',iid=iid,values=(arquivo.name,'Salvar com o recebimento' if tipo == 'recebimento' else 'Salvar com a entrada'))
                     caminhos[iid] = ('novo',arquivo)
 
             def abrir_documento():
@@ -806,40 +847,7 @@ class Aplicativo:
         ttk.Button(painel_documentos,textvariable=texto_documentos,command=ver_documentos).pack(side='left',padx=8)
         atualizar_contagem()
 
-        def salvar():
-            try:
-                dados = {chave: variavel.get().strip() for chave, variavel in campos.items()}
-                if not dados['nome']:
-                    raise ValueError('Informe o nome completo do titular original.')
-                for chave in ('aquisicao', 'previsao'):
-                    dados[chave] = data_iso(dados[chave])
-                if dados['previsao'] < dados['aquisicao']:
-                    raise ValueError('A previsão não pode ser anterior à aquisição.')
-                for chave in ('previsto', 'custo'):
-                    dados[chave] = centavos(dados[chave])
-                dados['conta_id'] = mapa_contas.get(dados['conta'])
-                dados['comissao'] = centavos(valor_comissao.get()) if tem_comissao.get() == 'Sim' else None
-                dados['observacoes'] = observacoes.get('1.0', 'end-1c').strip()
-                self.banco.salvar(dados, identificador, anexos=anexos_pendentes)
-            except ValueError as erro:
-                messagebox.showerror('Confira o cadastro', str(erro), parent=tela)
-                return
-            except (sqlite3.Error,OSError):
-                messagebox.showerror('Não foi possível salvar', 'Confira o acesso à pasta de dados e tente novamente.', parent=tela)
-                return
-            self.atualizar()
-            tela.destroy()
-
-        botoes = ttk.Frame(quadro)
-        botoes.grid(row=11, column=0, columnspan=2, sticky='e', pady=(10, 0))
-        ttk.Button(botoes, text='Dados de recebimento',
-                   command=lambda: self.ver_dados_recebimento(tela, registro, mapa_contas.get(campos['conta'].get()))).pack(side='left', padx=8)
-        ttk.Button(botoes, text='Cancelar', command=tela.destroy).pack(side='left', padx=8)
-        ttk.Button(botoes, text='Salvar registro', command=salvar).pack(side='left')
-        tela.bind('<Escape>', lambda _: tela.destroy())
-        centralizar(tela)
-        tela.deiconify()
-        tela.grab_set()
+        return anexos_pendentes
 
     def ver_dados_recebimento(self, pai, registro, conta_id):
         if registro and registro['conta_id'] == conta_id:

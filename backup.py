@@ -36,7 +36,7 @@ def validar_banco(caminho):
             if con.execute('PRAGMA integrity_check').fetchall() != [('ok',)]:
                 raise ValueError('O banco do backup está danificado.')
             versao_banco = con.execute('PRAGMA user_version').fetchone()[0]
-            if versao_banco not in (4,5):
+            if versao_banco not in (4,5,6):
                 raise ValueError('Este backup exige outra versão do Gestor de RPV.')
             requisitos = {
                 'rpvs': {'id','nome','aquisicao','previsto','custo','conta','previsao','comissao',
@@ -46,8 +46,10 @@ def validar_banco(caminho):
                 'historico_alteracoes': {'id','rpv_id','quando','acao','alteracoes'},
                 'prorrogacoes': {'id','rpv_id','data','criada_em'},
             }
-            if versao_banco == 5:
+            if versao_banco >= 5:
                 requisitos['documentos'] = {'id','rpv_id','nome','caminho'}
+            if versao_banco >= 6:
+                requisitos['documentos'].add('tipo')
             for tabela, campos in requisitos.items():
                 presentes = {r[1] for r in con.execute(f'PRAGMA table_info({tabela})')}
                 if not campos.issubset(presentes):

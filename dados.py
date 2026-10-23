@@ -104,15 +104,16 @@ class Banco:
             colunas_contas = {r['name'] for r in con.execute('PRAGMA table_info(contas)')}
             cpf_unico = self.cpf_unico(con)
             tem_documentos = con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='documentos'").fetchone() is not None
+            colunas_documentos = {r['name'] for r in con.execute('PRAGMA table_info(documentos)')}
         migrar = ('previsao_atual_definida' not in colunas or 'recebimento' not in colunas or
                   not {'numero_endereco', 'cidade', 'estado'}.issubset(colunas_contas) or
-                  'lixeira_em' not in colunas or cpf_unico or not tem_documentos)
+                  'lixeira_em' not in colunas or cpf_unico or not tem_documentos or 'tipo' not in colunas_documentos)
         if colunas and migrar:
             versao_backup = ('0.4.0' if 'conta_id' not in colunas else
                              '0.6.0' if 'recebimento' not in colunas else
                              '0.7.0' if 'previsao_atual_definida' not in colunas or
                              not {'numero_endereco', 'cidade', 'estado'}.issubset(colunas_contas) else
-                             '0.9.0' if 'lixeira_em' not in colunas or cpf_unico else '0.10.0')
+                             '0.9.0' if 'lixeira_em' not in colunas or cpf_unico else '0.10.0' if not tem_documentos else '0.11.0')
             backup = self.caminho.with_name(f'backup-antes-{versao_backup}-' +
                 datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.sqlite3')
             with self.conectar() as origem:
@@ -185,7 +186,9 @@ class Banco:
             con.execute('''CREATE TABLE IF NOT EXISTS documentos (
                 id INTEGER PRIMARY KEY, rpv_id INTEGER NOT NULL REFERENCES rpvs(id) ON DELETE CASCADE,
                 nome TEXT NOT NULL, caminho TEXT NOT NULL UNIQUE)''')
-            con.execute('PRAGMA user_version=5')
+            if 'tipo' not in colunas_documentos:
+                con.execute("ALTER TABLE documentos ADD COLUMN tipo TEXT NOT NULL DEFAULT 'entrada' CHECK(tipo IN ('entrada','recebimento'))")
+            con.execute('PRAGMA user_version=6')
 
     @staticmethod
     def cpf_unico(con):
@@ -402,7 +405,16 @@ class Banco:
                 raise ValueError('A nova previsão deve ser posterior à previsão atual e à aquisição.')
             con.execute('INSERT INTO prorrogacoes (rpv_id, data) VALUES (?,?)', (identificador, nova_data))
 
-    def registrar_recebimento(self, identificador, data):
+    def registrar_recebimento(self, identificador, data, anexos=()):
+        criados = []
+        try:
+            self._registrar_recebimento(identificador, data, anexos, criados)
+        except Exception:
+            for arquivo in criados:
+                arquivo.unlink(missing_ok=True)
+            raise
+
+    def _registrar_recebimento(self, identificador, data, anexos, criados):
         if data is not None:
             data = data_iso(data_br(data))
         with self.conectar() as con:
@@ -415,7 +427,10 @@ class Banco:
                     raise ValueError('O recebimento não pode ser anterior à aquisição.')
                 if data > date.today().isoformat():
                     raise ValueError('O recebimento não pode estar no futuro.')
+            if data is None and anexos:
+                raise ValueError('Informe a data do recebimento para anexar comprovantes.')
             con.execute('UPDATE rpvs SET recebimento=? WHERE id=?', (data, identificador))
+            self.copiar_anexos(con, identificador, anexos, criados, tipo='recebimento')
 
     def atualizar_previsao(self, identificador, nova_data):
         nova_data = data_iso(data_br(nova_data))
@@ -428,20 +443,24 @@ class Banco:
                 raise ValueError('A previsão atual não pode ser anterior à aquisição.')
             con.execute('UPDATE rpvs SET previsao_atual_definida=? WHERE id=?', (nova_data, identificador))
 
-    def copiar_anexos(self, con, identificador, anexos, criados):
+    def copiar_anexos(self, con, identificador, anexos, criados, tipo='entrada'):
+        if tipo not in ('entrada','recebimento'):
+            raise ValueError('Tipo de documento inválido.')
         for origem in anexos:
             origem = validar_anexo(origem)
             relativo = f'{identificador}/{uuid.uuid4().hex}{origem.suffix.lower()}'
+            if tipo == 'recebimento':
+                relativo = 'recebimentos/' + relativo
             destino = self.caminho.parent / 'documentos' / relativo
             destino.parent.mkdir(parents=True, exist_ok=True)
             criados.append(destino)
             shutil.copyfile(origem, destino)
-            con.execute('INSERT INTO documentos (rpv_id,nome,caminho) VALUES (?,?,?)',
-                        (identificador,origem.name,relativo))
+            con.execute('INSERT INTO documentos (rpv_id,nome,caminho,tipo) VALUES (?,?,?,?)',
+                        (identificador,origem.name,relativo,tipo))
 
-    def documentos(self, identificador):
+    def documentos(self, identificador, tipo='entrada'):
         with self.conectar() as con:
-            return con.execute('SELECT * FROM documentos WHERE rpv_id=? ORDER BY id',(identificador,)).fetchall()
+            return con.execute('SELECT * FROM documentos WHERE rpv_id=? AND tipo=? ORDER BY id',(identificador,tipo)).fetchall()
 
     def caminho_documento(self, identificador):
         with self.conectar() as con:

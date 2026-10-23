@@ -586,16 +586,19 @@ class TestInterface(unittest.TestCase):
         self.assertNotIn('Lixeira',botoes_iniciais)
         self.programa.mostrar_historico()
         self.root.update()
+        botoes = [w.cget('text') for w in filhos(self.programa.historico) if isinstance(w,app.ttk.Button)]
+        self.assertNotIn('Backup',botoes)
+        self.assertNotIn('Importar dados',botoes)
         pasta = Path(self.pasta.name)/'exportados'
         with patch.object(app.filedialog,'askdirectory',return_value=str(pasta)), patch.object(app.messagebox,'showinfo'):
-            botao(self.programa.historico,'Backup').invoke()
+            self.programa.menus['Arquivo'].invoke('Backup')
         arquivo = next(pasta.glob('*.rpvbackup'))
         self.banco.salvar(dict(dados,nome='Segunda'))
         with patch.object(app.filedialog,'askopenfilename',return_value=str(arquivo)), patch.object(app.messagebox,'askyesno',return_value=False):
-            botao(self.programa.historico,'Importar dados').invoke()
+            self.programa.menus['Arquivo'].invoke('Importar dados')
         self.assertEqual(len(self.banco.listar()),2)
         with patch.object(app.filedialog,'askopenfilename',return_value=str(arquivo)), patch.object(app.messagebox,'askyesno',return_value=True), patch.object(app.messagebox,'showinfo'):
-            botao(self.programa.historico,'Importar dados').invoke()
+            self.programa.menus['Arquivo'].invoke('Importar dados')
         self.root.update()
         self.assertEqual(len(self.banco.listar()),1)
         self.assertEqual(self.banco.listar()[0]['nome'],'Primeira')
@@ -695,6 +698,54 @@ class TestInterface(unittest.TestCase):
         documento = self.banco.documentos(identificador)[0]
         self.assertTrue(self.banco.caminho_documento(documento['id']).exists())
         botao(form,'Cancelar').invoke()
+
+    def test_comprovantes_recebimento_salvar_cancelar_e_reabrir(self):
+        from test_contas import dados_rpv
+        identificador = self.banco.salvar(dados_rpv())
+        entrada = Path(self.pasta.name)/'contrato.pdf'
+        entrada.write_bytes(b'%PDF contrato')
+        self.banco.salvar(dados_rpv(),identificador,anexos=[entrada])
+        recibo = Path(self.pasta.name)/'recibo.pdf'
+        recibo.write_bytes(b'%PDF recibo')
+        self.programa.mostrar_historico()
+        self.root.update()
+        def abrir():
+            self.programa.abrir_recebimento(identificador)
+            self.root.update()
+            return next(w for w in self.programa.historico.winfo_children()
+                        if isinstance(w,tk.Toplevel) and w.title()=='Recebimento')
+        tela = abrir()
+        with patch.object(app.filedialog,'askopenfilenames',return_value=(str(recibo),)):
+            botao(tela,'Anexar documentos').invoke()
+        botao(tela,'Cancelar').invoke()
+        self.assertEqual(self.banco.documentos(identificador,tipo='recebimento'),[])
+        tela = abrir()
+        with patch.object(app.filedialog,'askopenfilenames',return_value=(str(recibo),)):
+            botao(tela,'Anexar documentos').invoke()
+        botao(tela,'Salvar recebimento').invoke()
+        self.root.update()
+        self.assertEqual(len(self.banco.documentos(identificador)),1)
+        recibos = self.banco.documentos(identificador,tipo='recebimento')
+        self.assertEqual(len(recibos),1)
+        recibo.unlink()
+        tela = abrir()
+        documentos = next(w for w in filhos(tela) if isinstance(w,app.ttk.Button)
+                          and w.cget('textvariable') and self.root.getvar(w.cget('textvariable'))=='Documentos (1)')
+        documentos.invoke()
+        self.root.update()
+        janela = next(w for w in tela.winfo_children() if isinstance(w,tk.Toplevel))
+        lista = next(w for w in filhos(janela) if isinstance(w,app.ttk.Treeview))
+        self.assertEqual([lista.item(i,'values')[0] for i in lista.get_children()],['recibo.pdf'])
+        lista.selection_set(lista.get_children()[0])
+        with patch.object(app,'abrir_arquivo') as abrir_arquivo:
+            botao(janela,'Abrir documento').invoke()
+            abrir_arquivo.assert_called_once_with(self.banco.caminho_documento(recibos[0]['id']))
+        botao(janela,'Fechar').invoke()
+        with patch.object(app.messagebox,'askyesno',return_value=True):
+            botao(tela,'Desmarcar recebimento').invoke()
+        self.root.update()
+        self.assertIsNone(self.banco.obter(identificador)['recebimento'])
+        self.assertTrue(self.banco.caminho_documento(recibos[0]['id']).exists())
 
 
 if __name__ == '__main__':

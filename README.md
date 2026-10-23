@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.10.0
+# Gestor de RPV — 0.11.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -105,12 +105,13 @@ A busca continua acima da tabela. Os menus de clique direito permanecem disponí
 
 ## Backup e importação
 
-Os botões **Backup** e **Importar dados** aparecem somente no histórico, à direita
-da busca. O ícone de **lixeira** fica sozinho no canto inferior direito.
+No histórico, use **Arquivo → Backup** e **Arquivo → Importar dados**.
+Essas ações ficam na barra de menus; seus antigos botões foram retirados da tela.
+O ícone de **lixeira** continua sozinho no canto inferior direito.
 
-1. Clique em **Backup** e escolha uma pasta do Windows.
+1. Clique em **Arquivo → Backup** e escolha uma pasta do Windows.
 2. O programa salva um arquivo `GestorRPV-data-hora.rpvbackup`.
-3. No outro computador, abra o aplicativo e escolha **Importar dados**.
+3. No outro computador, abra o aplicativo e escolha **Arquivo → Importar dados**.
 4. Selecione esse arquivo, confira as quantidades e confirme.
 
 **Importar substitui os dados locais; não junta dois históricos.** Antes da troca,
@@ -136,6 +137,19 @@ durante a troca, os documentos anteriores são recuperados e a cópia de seguran
   ser movidos sem afetar a cópia do aplicativo.
 - Os anexos acompanham a entrada na lixeira, na restauração e no backup portátil.
 
+## Comprovantes de recebimento
+
+- Ao marcar **Recebido**, a janela da data também oferece **Anexar documentos**.
+  Aceita os mesmos PDFs e imagens dos anexos da entrada.
+- **Documentos (N)** mostra apenas os comprovantes daquele recebimento.
+  Os anexos do cadastro são consultados pela edição da entrada.
+- Os comprovantes são copiados ao **Salvar recebimento**, para a pasta separada
+  `%LOCALAPPDATA%\GestorRPV\documentos\recebimentos\<id-da-entrada>`.
+  Os anexos antigos da entrada permanecem na pasta original, sem mudanças.
+- Cancelar não adiciona arquivos. Desmarcar o recebimento preserva os comprovantes
+  já salvos, que continuam acessíveis ao abrir novamente a janela de recebimento.
+- Backup, importação, lixeira e restauração preservam as duas categorias de anexos.
+
 ## Seleção, teclado e lixeira
 
 - Arraste sobre as linhas para selecionar um intervalo; use **Ctrl+clique** para
@@ -158,8 +172,9 @@ durante a troca, os documentos anteriores são recuperados e a cópia de seguran
 
 O banco fica em `%LOCALAPPDATA%\GestorRPV\gestor.sqlite3`, fora da pasta do código.
 Atualizar os arquivos preserva esse banco. A adaptação da estrutura cria uma cópia
-`backup-antes-versao-*.sqlite3` na mesma pasta. A versão 0.10.0 acrescenta o cadastro de anexos e preserva contas, IDs,
-snapshots e vínculos. Backups da versão 0.9.0 continuam podendo ser importados.
+`backup-antes-versao-*.sqlite3` na mesma pasta. A versão 0.11.0 separa os comprovantes dos documentos da entrada, preservando
+contas, IDs, snapshots e vínculos. Backups das versões 0.9.0 e 0.10.0 continuam
+podendo ser importados; anexos antigos são classificados como documentos da entrada.
 
 O banco e os backups não são criptografados. Não envie dados pessoais ao GitHub.
 

@@ -76,7 +76,43 @@ class TestDocumentos(unittest.TestCase):
         self.assertEqual(len(destino.historico(identificador)),1)
         self.assertEqual(destino.documentos(identificador),[])
         with destino.conectar() as con:
-            self.assertEqual(con.execute('PRAGMA user_version').fetchone()[0],5)
+            self.assertEqual(con.execute('PRAGMA user_version').fetchone()[0],6)
+
+    def test_recebimento_separado_com_backup_e_rollback(self):
+        identificador = self.banco.salvar(dados_rpv(),anexos=[self.pdf])
+        with self.assertRaises(ValueError):
+            self.banco.registrar_recebimento(identificador,'2026-10-22',anexos=[self.imagem,self.pasta/'ausente.pdf'])
+        self.assertIsNone(self.banco.obter(identificador)['recebimento'])
+        self.assertEqual(self.banco.documentos(identificador,tipo='recebimento'),[])
+        self.assertEqual(list((self.banco.caminho.parent/'documentos'/'recebimentos').rglob('*.png')),[])
+        self.banco.registrar_recebimento(identificador,'2026-10-22',anexos=[self.imagem])
+        entrada = self.banco.documentos(identificador)[0]
+        recibo = self.banco.documentos(identificador,tipo='recebimento')[0]
+        self.assertNotEqual(self.banco.caminho_documento(entrada['id']).parent,self.banco.caminho_documento(recibo['id']).parent)
+        self.assertTrue(recibo['caminho'].startswith('recebimentos/'))
+        self.imagem.unlink()
+        pacote = criar_backup(self.banco,self.pasta/'exportados')
+        destino = Banco(self.pasta/'destino'/'gestor.sqlite3')
+        with BackupPreparado(pacote) as preparado:
+            preparado.restaurar(destino)
+        self.assertEqual(destino.caminho_documento(recibo['id']).read_bytes(),b'PNG-protocolo')
+        self.assertEqual(len(destino.documentos(identificador)),1)
+        self.assertEqual(len(destino.documentos(identificador,tipo='recebimento')),1)
+
+    def test_migracao_0100_preserva_anexos_como_documentos_de_entrada(self):
+        identificador = self.banco.salvar(dados_rpv(),anexos=[self.pdf])
+        with self.banco.conectar() as con:
+            con.execute('ALTER TABLE documentos DROP COLUMN tipo')
+            con.execute('PRAGMA user_version=5')
+        pacote = criar_backup(self.banco,self.pasta/'exportados')
+        destino = Banco(self.pasta/'destino'/'gestor.sqlite3')
+        with BackupPreparado(pacote) as preparado:
+            preparado.restaurar(destino)
+        self.assertEqual(len(destino.documentos(identificador)),1)
+        self.assertEqual(destino.documentos(identificador,tipo='recebimento'),[])
+        antigo = Banco(self.banco.caminho)
+        self.assertEqual(len(antigo.documentos(identificador)),1)
+        self.assertTrue(list(antigo.caminho.parent.glob('backup-antes-0.11.0-*.sqlite3')))
 
 
 if __name__ == '__main__':

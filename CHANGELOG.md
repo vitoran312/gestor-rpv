@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## 0.11.0
+
+- Anexar PDFs e imagens na janela de recebimento, com consulta e abertura dos comprovantes.
+- Comprovantes em pasta separada, sem mistura com os documentos da entrada.
+- Gravação conjunta da data e dos anexos; falhas de cópia não deixam recebimento parcial.
+- Backup e importação preservam as duas categorias e aceitam arquivos das versões 0.9.0 e 0.10.0.
+- Backup e Importar dados movidos para o menu Arquivo, retirando os botões da tela.
+- Migração com cópia de segurança e preservação dos documentos existentes.
+
 ## 0.10.0
 
 - Seleção de várias linhas por arrasto, Ctrl+clique, Shift+clique e Ctrl+A.
