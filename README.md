@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.16.1
+# Gestor de RPV — 0.16.2
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -14,20 +14,22 @@ python app.py
 
 Mantenha `app.py`, `dados.py`, `componentes.py`, `contas.py`, `interacao.py`, `tema.py`, `calculadora.py`, `backup.py`, `ordenacao.py`, `selecao.py`, `documentos.py`, `visual.py` e `versao.py` juntos.
 A tela inicial tem os botões **Nova entrada**, **Minhas operações**,
-**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.16.1** aparece no canto inferior direito.
+**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.16.2** aparece no canto inferior direito.
 O número é lido da versão do programa e acompanha cada atualização.
 As janelas abrem centralizadas; o histórico abre maximizado no Windows.
 
-## Identidade visual Moss
+## Identidade visual
 
-Visual inspirado em verde floresta, sálvia e marfim, com uma versão escura em tons
-verdes profundos. O botão **Modo escuro / Modo claro**, com ícones de lua e sol, alterna a
+Visual inspirado na paleta areia (`#E1D4C2`), bege (`#BEB5A9`), caramelo (`#A78D78`),
+marrom (`#6E473B`) e café (`#291C0E`). O modo claro usa superfícies suaves e o escuro
+usa fundos em café com detalhes em caramelo. Recebimentos e lucro realizado continuam
+em verde. O botão **Modo escuro / Modo claro**, com ícones de lua e sol, alterna a
 aparência; o menu **Exibir** do histórico oferece as mesmas opções.
 
 - Tela inicial com três cartões de ações e ícones desenhados em Python, sem numeração.
   A assinatura Vitoran Tech fica somente no rodapé.
 - Temas e fontes reutilizados, com renderização das sombras otimizada para agilizar a alternância.
-- Cantos arredondados, sombras discretas e verde nas ações principais.
+- Cantos arredondados, sombras discretas e tons de marrom e caramelo nas ações principais.
   Os botões não mostram retângulo tracejado após o clique; a navegação por
   teclado e a ativação pela barra de espaço continuam disponíveis.
 - Fonte Segoe UI no Windows, com alternativas locais em outros sistemas.
@@ -42,6 +44,8 @@ aparência; o menu **Exibir** do histórico oferece as mesmas opções.
 
 ![Tela inicial](docs/tela-inicial.png)
 
+[Ver a tela inicial no modo escuro](docs/tela-inicial-escura.png)
+
 ![Histórico com dados demonstrativos](docs/historico.png)
 
 [Ver a prévia do modo escuro](docs/historico-escuro.png)
@@ -53,7 +57,7 @@ aparência; o menu **Exibir** do histórico oferece as mesmas opções.
 - **Editar → Editar registro / Excluir registro**: edita uma linha ou envia as selecionadas à lixeira.
 - **Exibir → Tema claro / Tema escuro**: muda o tema de todas as janelas,
   inclusive formulários, calendários, menus de contexto e calculadora.
-  A escolha vale durante a execução; o aplicativo inicia no tema claro inspirado na paleta Moss.
+  A escolha vale durante a execução; o aplicativo inicia no tema claro em tons de areia.
 - **Calculadora**: abre uma calculadora independente, sem modificar o cadastro.
   Faz soma, subtração, multiplicação, divisão, porcentagem, troca de sinal e
   apagamento. Aceita vírgula, teclado, Enter para calcular e Esc para limpar.

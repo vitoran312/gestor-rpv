@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## 0.16.2
+
+- Nova paleta inspirada em areia, caramelo e marrom para os modos claro e escuro.
+- Cores aplicadas em todas as janelas, campos, tabelas, calendários, ícones e menus.
+- Contraste dos botões e caixas de seleção adaptado a cada tema, preservando o verde de recebimentos e lucros realizados.
+
 ## 0.16.1
 
 - Cabeçalhos de Minhas operações mantidos em 18 pontos e linhas ajustadas para 12 pontos.

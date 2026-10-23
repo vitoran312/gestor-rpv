@@ -60,7 +60,7 @@ def _png_recebido(c,selecionado):
     """Indicador de 24 px; a margem separa a caixa da data do recebimento."""
     fundo=_rgb(c['primario'] if selecionado else c['campo'])
     borda=_rgb(c['primario'] if selecionado else c['secundario'])
-    marca=_rgb('#fffdf8' if sum(_rgb(c['primario']))<384 else '#193623')
+    marca=_rgb(c['primario_texto'])
     def segmento(x,y,a,b):
         dx,dy=b[0]-a[0],b[1]-a[1]
         t=max(0,min(1,((x-a[0])*dx+(y-a[1])*dy)/(dx*dx+dy*dy)))

@@ -165,7 +165,7 @@ class Aplicativo:
             estilo.theme_use(nome_tema)
             c = cores()
             fundo,campo,texto = c['fundo'],c['campo'],c['texto']
-            primario_texto = '#fffdf8' if self.modo_tema.get()=='claro' else '#193623'
+            primario_texto = c['primario_texto']
             estilo.configure('.',font=(fonte,10),background=fundo,foreground=texto,
                              bordercolor=c['borda'],lightcolor=campo,darkcolor=fundo,troughcolor=fundo)
             aplicar_superficies(self.janela)
