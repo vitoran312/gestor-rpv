@@ -87,3 +87,7 @@ class Banco:
     def obter(self, identificador):
         with self.conectar() as con:
             return con.execute('SELECT * FROM rpvs WHERE id=?', (identificador,)).fetchone()
+
+    def excluir(self, identificador):
+        with self.conectar() as con:
+            con.execute('DELETE FROM rpvs WHERE id=?', (identificador,))

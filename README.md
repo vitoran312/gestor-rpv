@@ -5,9 +5,13 @@ Cada computador mantém seus próprios dados, sem servidor ou sincronização.
 
 ## Primeira versão
 
-A abertura é um menu escuro de tamanho fixo, sem campos de entrada, com os botões
+A abertura é um menu escuro de tamanho fixo (até 1100 × 850, adaptado à tela),
+sem campos de entrada, com os botões
 **Nova entrada**, **Ver histórico total** e **Sair**. O cadastro abre em uma janela
-separada. O histórico reúne todos os registros e permite buscar e editar.
+separada. O histórico reúne todos os registros e permite buscar, editar e excluir.
+Para editar ou excluir, selecione uma linha e use o botão correspondente.
+Excluir pede confirmação pelo nome e data e remove permanentemente somente
+o registro selecionado. Os totais da lista são atualizados automaticamente.
 
 - Cadastro e edição de compras de RPVs, com nome do titular e data de aquisição.
 - Valores de aquisição e recebimento previsto; lucro previsto calculado automaticamente.

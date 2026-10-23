@@ -39,6 +39,21 @@ class TestDados(unittest.TestCase):
             self.assertEqual(len(reaberto.listar('22/10/2026')), 2)
             self.assertEqual(reaberto.obter(segundo)['nome'], 'Pessoa de teste')
 
+    def test_exclusao_persistente_preserva_outro_registro_igual(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            caminho = Path(pasta) / 'teste.sqlite3'
+            banco = Banco(caminho)
+            dados = dict(nome='Mesmo nome', aquisicao='2026-10-22',
+                         previsto=2000000, custo=1200000, conta='Vitor',
+                         previsao='2026-12-20', comissao=None, observacoes='')
+            primeiro = banco.salvar(dados)
+            segundo = banco.salvar(dados)
+            banco.excluir(primeiro)
+            reaberto = Banco(caminho)
+            self.assertIsNone(reaberto.obter(primeiro))
+            self.assertEqual([r['id'] for r in reaberto.listar()], [segundo])
+            self.assertEqual(reaberto.obter(segundo)['custo'], 1200000)
+
 
 if __name__ == '__main__':
     unittest.main()

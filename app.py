@@ -12,14 +12,16 @@ class Aplicativo:
         self.janela = janela
         self.banco = Banco()
         janela.title('Gestor de RPV')
-        janela.geometry('440x340')
+        largura = min(1100, max(360, janela.winfo_screenwidth() - 100))
+        altura = min(850, max(340, janela.winfo_screenheight() - 100))
+        janela.geometry(f'{largura}x{altura}')
         janela.resizable(False, False)
         janela.configure(bg='#181a1f')
         self.historico = None
         self.configurar_tema()
 
         menu = ttk.Frame(janela, padding=40)
-        menu.pack(fill='both', expand=True)
+        menu.place(relx=0.5, rely=0.5, anchor='center', width=440)
         ttk.Button(menu, text='Nova entrada', style='Menu.TButton',
                    command=self.formulario).pack(fill='x', pady=(12, 16))
         ttk.Button(menu, text='Ver histórico total', style='Menu.TButton',
@@ -72,7 +74,8 @@ class Aplicativo:
         barra = ttk.Frame(corpo)
         barra.pack(fill='x', pady=(0, 12))
         ttk.Button(barra, text='Nova entrada', command=self.formulario).pack(side='left')
-        ttk.Button(barra, text='Abrir registro', command=self.abrir).pack(side='left', padx=8)
+        ttk.Button(barra, text='Editar', command=self.abrir).pack(side='left', padx=8)
+        ttk.Button(barra, text='Excluir', command=self.excluir).pack(side='left')
         ttk.Label(barra, text='Buscar nome ou data:').pack(side='left', padx=(20, 6))
         self.busca = tk.StringVar()
         ttk.Entry(barra, textvariable=self.busca).pack(side='left', fill='x', expand=True)
@@ -121,6 +124,34 @@ class Aplicativo:
             messagebox.showinfo('Abrir registro', 'Selecione uma RPV na lista.')
             return
         self.formulario(int(selecao[0]))
+
+    def excluir(self):
+        selecao = self.tabela.selection()
+        if not selecao:
+            messagebox.showinfo('Excluir registro', 'Selecione uma RPV na lista.',
+                                parent=self.historico)
+            return
+        identificador = int(selecao[0])
+        registro = self.banco.obter(identificador)
+        if registro is None:
+            self.atualizar()
+            return
+        confirmar = messagebox.askyesno(
+            'Excluir registro',
+            f"Excluir o registro de {registro['nome']}\n"
+            f"adquirido em {data_br(registro['aquisicao'])}?\n\n"
+            'Esta exclusão é permanente e não pode ser desfeita.',
+            parent=self.historico, icon='warning', default='no')
+        if not confirmar:
+            return
+        try:
+            self.banco.excluir(identificador)
+        except sqlite3.Error:
+            messagebox.showerror('Não foi possível excluir',
+                                 'O registro não foi excluído. Tente novamente.',
+                                 parent=self.historico)
+            return
+        self.atualizar()
 
     def formulario(self, identificador=None):
         registro = self.banco.obter(identificador) if identificador else None
