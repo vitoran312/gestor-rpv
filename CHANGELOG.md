@@ -1,5 +1,9 @@
 # Histórico de versões
 
+## 0.19.1
+
+- Emblema Vitoran Tech maior e centralizado no espaço livre acima do título da tela inicial.
+
 ## 0.19.0
 
 - Exportação para Excel em Minhas operações (Arquivo → Exportar para Excel), com valores em R$,

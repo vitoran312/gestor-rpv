@@ -40,23 +40,27 @@ class Aplicativo(OperacoesMixin, RegistroMixin, ArquivosMixin):
         inicio = ttk.Frame(janela,padding=(40,24))
         inicio.pack(fill='both',expand=True)
         topo = ttk.Frame(inicio)
-        topo.pack(fill='x')
+        topo.grid(row=0,column=0,sticky='ew')
         self.texto_alternar_tema = tk.StringVar()
         self.botao_alternar_tema=ttk.Button(topo,textvariable=self.texto_alternar_tema,command=self.alternar_tema,width=15,compound='left')
         self.botao_alternar_tema.pack(side='right')
         ttk.Button(topo,text='Sobre',command=self.mostrar_sobre).pack(side='right',padx=(0,10))
-        ttk.Frame(inicio).pack(fill='both',expand=True)
+        # O emblema fica centralizado no espaço livre entre o topo e o título, que recebe
+        # a maior parte da sobra vertical. Por usar place, ele não aumenta a janela; em telas
+        # baixas é ocultado para não empurrar o rodapé.
+        inicio.columnconfigure(0,weight=1)
+        inicio.rowconfigure(1,weight=3)
+        inicio.rowconfigure(4,weight=1)
+        espaco_emblema = ttk.Frame(inicio)
+        espaco_emblema.grid(row=1,column=0,sticky='nsew')
+        self.emblema_inicio = ttk.Label(espaco_emblema,image=janela._marca_cabecalho)
+        espaco_emblema.bind('<Configure>',self.posicionar_emblema)
         cabecalho = ttk.Frame(inicio)
-        cabecalho.pack(fill='x',pady=(24,24))
-        # O emblema espelha o bloco de título: mesma margem externa e centro vertical alinhado.
-        self.emblema_inicio = ttk.Label(cabecalho,image=janela._marca_cabecalho)
-        self.emblema_inicio.pack(side='right',padx=(24,0))
-        titulos = ttk.Frame(cabecalho)
-        titulos.pack(side='left',fill='y',anchor='center')
-        ttk.Label(titulos,text='Gestor de RPV',style='InicioTitulo.TLabel').pack(anchor='w')
-        ttk.Label(titulos,text='Registros, recebimentos e documentos. Tudo no seu lugar.',style='Subtitulo.TLabel').pack(anchor='w',pady=(10,0))
+        cabecalho.grid(row=2,column=0,sticky='ew',pady=(24,24))
+        ttk.Label(cabecalho,text='Gestor de RPV',style='InicioTitulo.TLabel').pack(anchor='w')
+        ttk.Label(cabecalho,text='Registros, recebimentos e documentos. Tudo no seu lugar.',style='Subtitulo.TLabel').pack(anchor='w',pady=(10,0))
         self.grade_inicio = ttk.Frame(inicio)
-        self.grade_inicio.pack(fill='x')
+        self.grade_inicio.grid(row=3,column=0,sticky='ew')
         self.cartoes_inicio = []
         for icone,titulo,descricao,rotulo,acao in (
             ('entrada','Uma nova operação','Cadastre sua próxima aquisição\ne reúna os documentos da entrada.','Nova entrada',self.formulario),
@@ -72,14 +76,14 @@ class Aplicativo(OperacoesMixin, RegistroMixin, ArquivosMixin):
             self.cartoes_inicio.append(cartao)
         self.colunas_inicio = None
         self.grade_inicio.bind('<Configure>',self.organizar_inicio)
-        ttk.Frame(inicio).pack(fill='both',expand=True)
+        ttk.Frame(inicio).grid(row=4,column=0,sticky='nsew')
         self.texto_aviso_backup = tk.StringVar()
         self.aviso_backup_inicio = ttk.Label(inicio,textvariable=self.texto_aviso_backup,
             style='BackupAviso.TLabel',cursor='hand2',wraplength=760)
-        self.aviso_backup_inicio.pack(anchor='w',pady=(10,0))
+        self.aviso_backup_inicio.grid(row=5,column=0,sticky='w',pady=(10,0))
         self.aviso_backup_inicio.bind('<Button-1>',lambda _: self.exportar_backup())
         rodape_inicio = ttk.Frame(inicio)
-        rodape_inicio.pack(fill='x',pady=(22,0))
+        rodape_inicio.grid(row=6,column=0,sticky='ew',pady=(22,0))
         ttk.Button(rodape_inicio,text='Sair',command=janela.destroy,width=12).pack(side='left')
         self.assinatura_inicio = ttk.Label(rodape_inicio,text=f'Vitoran Tech · v{VERSAO}',image=janela._marca_rodape,
                                            compound='left',style='Discreto.TLabel')
@@ -89,6 +93,12 @@ class Aplicativo(OperacoesMixin, RegistroMixin, ArquivosMixin):
         janela.bind('<FocusIn>',self.atualizar_backup_ao_ativar,add='+')
         centralizar(janela, 1480, 980)
         janela.deiconify()
+
+    def posicionar_emblema(self,evento):
+        if evento.height >= self.emblema_inicio.winfo_reqheight():
+            self.emblema_inicio.place(relx=0.5,rely=0.5,anchor='center')
+        else:
+            self.emblema_inicio.place_forget()
 
     def alternar_tema(self):
         self.modo_tema.set('escuro' if self.modo_tema.get()=='claro' else 'claro')

@@ -6,6 +6,7 @@ from tkinter import filedialog, messagebox, ttk, font as tkfont
 import unittest
 from datetime import date
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import app
@@ -1282,7 +1283,15 @@ class TestInterface(unittest.TestCase):
 
     def test_emblema_no_inicio_e_assinatura_com_icone(self):
         self.assertEqual([str(i) for i in self.programa.emblema_inicio.cget('image')], [str(self.root._marca_cabecalho)])
-        self.assertEqual(self.programa.emblema_inicio.pack_info()['side'], 'right')
+        self.root.update()
+        emblema = self.programa.emblema_inicio
+        centro_emblema = emblema.winfo_rootx() + emblema.winfo_width() / 2
+        centro_janela = self.root.winfo_rootx() + self.root.winfo_width() / 2
+        self.assertLessEqual(abs(centro_emblema - centro_janela), 2)
+        self.programa.posicionar_emblema(SimpleNamespace(height=emblema.winfo_reqheight() - 1))
+        self.assertFalse(emblema.winfo_manager())
+        self.programa.posicionar_emblema(SimpleNamespace(height=emblema.winfo_reqheight()))
+        self.assertEqual(emblema.winfo_manager(), 'place')
         assinatura = self.programa.assinatura_inicio
         self.assertEqual(assinatura.cget('text'), f'Vitoran Tech · v{app.VERSAO}')
         self.assertEqual([str(i) for i in assinatura.cget('image')], [str(self.root._marca_rodape)])
