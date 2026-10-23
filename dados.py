@@ -24,9 +24,23 @@ CONSULTA_RPVS = '''SELECT r.*,
     FROM rpvs r'''
 
 
+MANTER_BACKUPS = 10
+
+
 def pasta_dados():
     base = Path(os.environ.get('LOCALAPPDATA', Path.home() / '.local' / 'share'))
     return base / 'GestorRPV'
+
+
+def limitar_backups(pasta, padrao, manter=MANTER_BACKUPS):
+    """Mantém somente as cópias automáticas mais recentes que seguem o padrão."""
+    arquivos = sorted((a for a in Path(pasta).glob(padrao) if a.is_file() and not a.is_symlink()),
+                      key=lambda a: (a.stat().st_mtime, a.name), reverse=True)
+    for antigo in arquivos[manter:]:
+        try:
+            antigo.unlink()
+        except OSError:
+            pass
 
 
 def centavos(texto):
@@ -136,6 +150,7 @@ class Banco:
                     origem.backup(destino)
                 finally:
                     destino.close()
+            limitar_backups(self.caminho.parent, 'backup-antes-*.sqlite3')
         with self.conectar() as con:
             # Recriação de contas preserva os IDs referenciados por RPVs.
             con.execute('PRAGMA foreign_keys=OFF')
@@ -165,10 +180,11 @@ class Banco:
                 con.execute(f'INSERT INTO contas_nova ({campos}) SELECT {campos} FROM contas')
                 con.execute('DROP TABLE contas')
                 con.execute('ALTER TABLE contas_nova RENAME TO contas')
-            for nome in (('Vitor', 'Lilian') if not colunas or 'conta_id' not in colunas else ()):
-                con.execute('''INSERT OR IGNORE INTO contas (identificacao, identificacao_chave)
-                               VALUES (?, ?)''', (nome, normalizar(nome)))
             if colunas and 'conta_id' not in colunas:
+                # Bancos anteriores à 0.4.0 guardavam só o nome da conta; cada nome vira uma conta a completar.
+                for (nome,) in con.execute('SELECT DISTINCT conta FROM rpvs').fetchall():
+                    con.execute('''INSERT OR IGNORE INTO contas (identificacao, identificacao_chave)
+                                   VALUES (?, ?)''', (nome, normalizar(nome)))
                 self.criar_rpvs(con, 'rpvs_nova')
                 for r in con.execute('SELECT * FROM rpvs').fetchall():
                     conta = con.execute('SELECT * FROM contas WHERE identificacao=?', (r['conta'],)).fetchone()
@@ -508,14 +524,20 @@ class Banco:
         with self.conectar() as con:
             return con.execute('SELECT * FROM previsoes_historico WHERE rpv_id=? ORDER BY id DESC',(identificador,)).fetchall()
 
-    def ultimo_backup(self):
+    def configuracao(self, chave, padrao=None):
         with self.conectar() as con:
-            linha=con.execute("SELECT valor FROM configuracoes WHERE chave='ultimo_backup'").fetchone()
-        return linha['valor'] if linha else None
+            linha = con.execute('SELECT valor FROM configuracoes WHERE chave=?', (chave,)).fetchone()
+        return linha['valor'] if linha else padrao
 
-    def registrar_backup(self,quando):
+    def salvar_configuracao(self, chave, valor):
         with self.conectar() as con:
-            con.execute("INSERT OR REPLACE INTO configuracoes (chave,valor) VALUES ('ultimo_backup',?)",(quando,))
+            con.execute('INSERT OR REPLACE INTO configuracoes (chave,valor) VALUES (?,?)', (chave, valor))
+
+    def ultimo_backup(self):
+        return self.configuracao('ultimo_backup')
+
+    def registrar_backup(self, quando):
+        self.salvar_configuracao('ultimo_backup', quando)
 
     @contextmanager
     def arquivos_para_excluir(self):

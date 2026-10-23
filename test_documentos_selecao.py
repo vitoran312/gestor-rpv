@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from dados import Banco
 from backup import criar_backup, BackupPreparado
-from test_contas import dados_rpv
+from test_contas import banco_com_contas, dados_rpv
 
 
 class TestDocumentos(unittest.TestCase):
@@ -13,7 +13,7 @@ class TestDocumentos(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.pasta = Path(self.temp.name)
-        self.banco = Banco(self.pasta/'app'/'gestor.sqlite3')
+        self.banco = banco_com_contas(self.pasta/'app'/'gestor.sqlite3')
         self.pdf = self.pasta/'contrato.pdf'
         self.pdf.write_bytes(b'%PDF-contrato')
         self.imagem = self.pasta/'protocolo.png'

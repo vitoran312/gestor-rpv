@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.18.0
+# Gestor de RPV — 0.19.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -14,7 +14,8 @@ python app.py
 
 Mantenha todos os arquivos `.py` e a pasta `recursos` juntos. Essa pasta contém o ícone da Vitoran Tech.
 A tela inicial tem os botões **Nova entrada**, **Minhas operações**,
-**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.18.0** aparece no canto inferior direito.
+**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.19.0**, acompanhada do emblema com 50% de opacidade,
+aparece no canto inferior direito.
 O número é lido da versão do programa e acompanha cada atualização.
 As janelas abrem centralizadas; o histórico abre maximizado no Windows.
 
@@ -27,7 +28,8 @@ em verde. O botão **Modo escuro / Modo claro**, com ícones de lua e sol, alter
 aparência; o menu **Exibir** do histórico oferece as mesmas opções.
 
 - Tela inicial com três cartões de ações e ícones desenhados em Python, sem numeração.
-  A assinatura Vitoran Tech fica somente no rodapé.
+  O emblema Vitoran Tech ocupa o lado direito do cabeçalho, espelhando o título à esquerda,
+  e uma versão discreta, com 50% de opacidade, acompanha a assinatura no rodapé.
 - Emblema Vitoran Tech com V em pêssego sobre vinho, aplicado às janelas e ao executável.
 - **Sobre**, na tela inicial, e **Ajuda → Sobre o Gestor de RPV**, em Minhas operações,
   mostram a marca, o autor e a versão atual. O número acompanha automaticamente `versao.py`.
@@ -60,10 +62,13 @@ aparência; o menu **Exibir** do histórico oferece as mesmas opções.
 
 - **Arquivo → Nova entrada**: abre o cadastro de uma RPV.
 - **Arquivo → Contas de recebimento**: administra os dados bancários.
+- **Arquivo → Exportar para Excel**: gera uma planilha `.xlsx` com todas as operações
+  ativas (sem as da lixeira), na ordem exibida na tabela. Valores em R$, datas reconhecidas
+  pelo Excel, cabeçalho fixo e filtro em cada coluna. Não exige o Excel nem pacotes extras.
 - **Editar → Editar registro / Excluir registro**: edita uma linha ou envia as selecionadas à lixeira.
 - **Exibir → Tema claro / Tema escuro**: muda o tema de todas as janelas,
   inclusive formulários, calendários, menus de contexto e calculadora.
-  A escolha vale durante a execução; o aplicativo inicia no tema claro.
+  A escolha é lembrada e o aplicativo volta a abrir no último tema usado.
 - **Calculadora**: abre uma calculadora independente, sem modificar o cadastro.
   Faz soma, subtração, multiplicação, divisão, porcentagem, troca de sinal e
   apagamento. Aceita vírgula, teclado, Enter para calcular e Esc para limpar.
@@ -77,8 +82,8 @@ A busca continua acima da tabela. Os menus de clique direito permanecem disponí
 A lista usa fonte de 12 pontos, dois pontos maior que o padrão da interface,
 com altura das linhas e largura da janela ajustadas para a leitura.
 
-- Vitor e Lilian aparecem inicialmente sem dados bancários inventados. Use
-  **Ver / Editar** para completar os cadastros.
+- Uma instalação nova começa sem contas. Cadastre a primeira conta antes de criar
+  uma entrada.
 - **Cadastrar nova conta** permite informar identificação, nome completo, endereço,
   número, cidade, estado, banco, agência, conta e chave Pix.
   O estado é selecionado pela sigla em uma lista com as 27 UFs, incluindo DF. O CPF é obrigatório e deve ser válido. O mesmo CPF pode ser usado em várias contas bancárias distintas. Cadastros antigos sem CPF aparecem como **⚠ Completar cadastro**,
@@ -98,8 +103,8 @@ com altura das linhas e largura da janela ajustadas para a leitura.
   não reescreve essa cópia nas operações antigas. O botão **Dados de recebimento**
   do registro permite consultar os dados preservados. Para copiá-los, clique
   com o botão direito sobre os dados e escolha **Copiar**.
-- A migração só conhece os dados existentes na versão antiga (Vitor ou Lilian).
-  Não preenche retroativamente os dados bancários desconhecidos dos registros antigos.
+- Na migração de bancos anteriores à 0.4.0, cada nome de conta usado nos registros antigos
+  vira uma conta a completar. Os dados bancários desconhecidos não são preenchidos retroativamente.
 
 ## Cadastro e histórico
 
@@ -206,7 +211,7 @@ O prazo é recalculado ao abrir ou voltar às janelas principais, sem interrompe
 **Importar substitui os dados locais; não junta dois históricos.** Antes da troca,
 é criado um backup dos dados atuais em
 `%LOCALAPPDATA%\GestorRPV\backups_automaticos`. Esse arquivo também pode ser importado
-para voltar ao estado anterior.
+para voltar ao estado anterior. A pasta guarda somente os 10 backups automáticos mais recentes.
 
 O formato `.rpvbackup` é um ZIP com um snapshot consistente do SQLite, os arquivos
 da pasta `documentos` e um manifesto com hashes SHA-256. Inclui contas, RPVs ativas,
@@ -277,7 +282,7 @@ durante a troca, os documentos anteriores são recuperados e a cópia de seguran
 
 O banco fica em `%LOCALAPPDATA%\GestorRPV\gestor.sqlite3`, fora da pasta do código.
 Atualizar os arquivos preserva esse banco. A adaptação da estrutura cria uma cópia
-`backup-antes-versao-*.sqlite3` na mesma pasta. A versão 0.16.0 permite remover contas preservando suas operações e acrescenta
+`backup-antes-versao-*.sqlite3` na mesma pasta; somente as 10 cópias mais recentes são mantidas. A versão 0.16.0 permite remover contas preservando suas operações e acrescenta
 o histórico específico de previsão. Contas, IDs, cópias dos dados bancários e anexos
 são preservados na migração. Backups das versões 0.9.0 a 0.15.1 continuam podendo
 ser importados; anexos antigos mantêm sua categoria.

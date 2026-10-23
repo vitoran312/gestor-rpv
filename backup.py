@@ -12,6 +12,7 @@ from datetime import date, datetime
 from zipfile import ZipFile, ZIP_DEFLATED, BadZipFile
 
 from versao import VERSAO
+from dados import Banco, limitar_backups
 
 
 FORMATO = 'gestor-rpv-backup'
@@ -205,7 +206,6 @@ class BackupPreparado:
                     if digest.hexdigest() != esperado:
                         raise ValueError('Um arquivo do backup está danificado ou foi alterado.')
                 validar_banco(self.pasta / 'banco.sqlite3')
-                from dados import Banco
                 banco_preparado = Banco(self.pasta / 'banco.sqlite3')
                 with banco_preparado.conectar() as con:
                     for documento in con.execute('SELECT caminho FROM documentos'):
@@ -226,6 +226,7 @@ class BackupPreparado:
     def restaurar(self, banco):
         # Esta cópia permanece disponível mesmo se uma falha interromper a importação.
         seguranca = criar_backup(banco, banco.caminho.parent / 'backups_automaticos')
+        limitar_backups(seguranca.parent, 'GestorRPV-*.rpvbackup')
         with tempfile.TemporaryDirectory(prefix='.restaurar-rpv-', dir=banco.caminho.parent) as temporaria:
             trabalho = Path(temporaria)
             novos = trabalho / 'documentos_novos'

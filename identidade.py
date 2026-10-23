@@ -19,6 +19,9 @@ def aplicar_icone(raiz):
                for lado in (256,64,32)]
     raiz._icones_vitoran = imagens
     raiz._marca_vitoran = tk.PhotoImage(master=raiz,file=str(RECURSOS/'vitoran-128.png'))
+    raiz._marca_cabecalho = tk.PhotoImage(master=raiz,file=str(RECURSOS/'vitoran-cabecalho.png'))
+    # Versão com 50% de opacidade já gravada no PNG para acompanhar a assinatura.
+    raiz._marca_rodape = tk.PhotoImage(master=raiz,file=str(RECURSOS/'vitoran-rodape.png'))
     raiz.iconphoto(True,*imagens)
     if sys.platform == 'win32':
         raiz.iconbitmap(default=str(RECURSOS/'vitoran-tech.ico'))

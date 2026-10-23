@@ -10,7 +10,7 @@ import hashlib
 
 from dados import Banco
 from backup import criar_backup, BackupPreparado, FORMATO
-from test_contas import dados_conta, dados_rpv
+from test_contas import banco_com_contas, dados_conta, dados_rpv
 
 
 class TestOperacoes016(unittest.TestCase):
@@ -18,7 +18,7 @@ class TestOperacoes016(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.pasta=Path(self.temp.name)
-        self.banco=Banco(self.pasta/'dados'/'banco.sqlite3')
+        self.banco=banco_com_contas(self.pasta/'dados'/'banco.sqlite3')
         self.pdf=self.pasta/'contrato.pdf'
         self.pdf.write_bytes(b'%PDF original')
 

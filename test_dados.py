@@ -2,6 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from dados import Banco, centavos, moeda, data_iso, previsao_por_prazo
+from test_contas import banco_com_contas
 
 
 class TestDados(unittest.TestCase):
@@ -33,7 +34,7 @@ class TestDados(unittest.TestCase):
     def test_persistencia_edicao_comissao_e_registros_distintos(self):
         with tempfile.TemporaryDirectory() as pasta:
             caminho = Path(pasta) / 'teste.sqlite3'
-            banco = Banco(caminho)
+            banco = banco_com_contas(caminho)
             dados = dict(nome='Pessoa de teste', aquisicao='2026-10-22',
                          previsto=2000000, custo=1200000, conta='Vitor',
                          previsao='2026-12-20', comissao=50000, observacoes='Teste')
@@ -56,7 +57,7 @@ class TestDados(unittest.TestCase):
     def test_exclusao_persistente_preserva_outro_registro_igual(self):
         with tempfile.TemporaryDirectory() as pasta:
             caminho = Path(pasta) / 'teste.sqlite3'
-            banco = Banco(caminho)
+            banco = banco_com_contas(caminho)
             dados = dict(nome='Mesmo nome', aquisicao='2026-10-22',
                          previsto=2000000, custo=1200000, conta='Vitor',
                          previsao='2026-12-20', comissao=None, observacoes='')

@@ -14,6 +14,16 @@ def dados_rpv(**valores):
     return dados
 
 
+def banco_com_contas(caminho):
+    """Banco novo com as contas usadas nos dados de exemplo dos testes."""
+    banco = Banco(caminho)
+    with banco.conectar() as con:
+        for nome in ('Vitor', 'Lilian'):
+            con.execute('INSERT OR IGNORE INTO contas (identificacao, identificacao_chave) VALUES (?, ?)',
+                        (nome, nome.casefold()))
+    return banco
+
+
 def dados_conta(**valores):
     dados = dict(identificacao='Conta teste', nome='titular DE teste', cpf='52998224725', endereco='Endereço compartilhado', numero_endereco='12', cidade='Cidade Teste', estado='SP',
                  banco='Banco Teste', agencia='0001', numero='12345-6', pix='teste@example.com')
@@ -26,7 +36,7 @@ class TestContas(unittest.TestCase):
         self.pasta = tempfile.TemporaryDirectory()
         self.addCleanup(self.pasta.cleanup)
         self.caminho = Path(self.pasta.name) / 'banco.sqlite3'
-        self.banco = Banco(self.caminho)
+        self.banco = banco_com_contas(self.caminho)
 
     def test_duplicidades_endereco_compartilhado_e_edicao(self):
         primeiro = self.banco.salvar_conta(dados_conta())
@@ -104,12 +114,15 @@ class TestContas(unittest.TestCase):
         nova = migrado.salvar_conta(dados_conta())
         migrado.salvar(dados_rpv(conta_id=nova))
 
-    def test_renomear_conta_inicial_nao_recria_conta_ao_reabrir(self):
+    def test_instalacao_nova_comeca_sem_contas_e_nao_recria_ao_reabrir(self):
+        novo = Path(self.pasta.name) / 'novo.sqlite3'
+        self.assertEqual(Banco(novo).contas(), [])
         vitor = next(c for c in self.banco.contas() if c['identificacao'] == 'Vitor')
         self.banco.salvar_conta(dados_conta(identificacao='Vitor Banco Teste'), vitor['id'])
         reaberto = Banco(self.caminho)
         self.assertEqual(len(reaberto.contas()), 2)
         self.assertNotIn('Vitor', [c['identificacao'] for c in reaberto.contas()])
+        self.assertEqual(Banco(novo).contas(), [])
 
     def test_remocao_conta_preserva_operacoes_e_snapshot(self):
         conta = self.banco.salvar_conta(dados_conta(endereco='rua das flores'))
