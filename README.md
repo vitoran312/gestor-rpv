@@ -5,13 +5,18 @@ Cada computador mantém seus próprios dados, sem servidor ou sincronização.
 
 ## Primeira versão
 
-A abertura é um menu escuro de tamanho fixo (até 1100 × 850, adaptado à tela),
+A abertura é um menu escuro de tamanho fixo (até 1480 × 980, adaptado à tela),
 sem campos de entrada, com os botões
 **Nova entrada**, **Ver histórico total** e **Sair**. O cadastro abre em uma janela
 separada. O histórico reúne todos os registros e permite buscar, editar e excluir.
 Para editar ou excluir, selecione uma linha e use o botão correspondente.
 Excluir pede confirmação pelo nome e data e remove permanentemente somente
 o registro selecionado. Os totais da lista são atualizados automaticamente.
+As janelas abrem centralizadas e o histórico abre maximizado no Windows.
+Os campos de data têm um botão de calendário com navegação por mês e ano.
+Os valores têm prefixo R$ fixo e máscara automática em centavos: digitar
+`1056050` mostra `R$ 10.560,50`. Também é possível colar `R$ 10.560,50`.
+A máscara se aplica à comissão, que continua sem afetar o lucro.
 
 - Cadastro e edição de compras de RPVs, com nome do titular e data de aquisição.
 - Valores de aquisição e recebimento previsto; lucro previsto calculado automaticamente.
@@ -29,7 +34,7 @@ extraia a pasta e abra um Prompt de Comando nela:
 python app.py
 ```
 
-Mantenha `app.py` e `dados.py` na mesma pasta. Não são necessários pacotes externos.
+Mantenha `app.py`, `dados.py` e `componentes.py` na mesma pasta. Não são necessários pacotes externos.
 No primeiro uso o aplicativo cria automaticamente o banco em
 `%LOCALAPPDATA%\GestorRPV\gestor.sqlite3`, fora da pasta do código.
 Feche o aplicativo antes de copiar esse arquivo para fazer um backup manual.

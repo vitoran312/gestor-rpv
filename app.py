@@ -5,16 +5,15 @@ from datetime import date
 from tkinter import messagebox, ttk
 
 from dados import Banco, centavos, moeda, data_iso, data_br
+from componentes import CampoMoeda, CampoData, centralizar, maximizar
 
 
 class Aplicativo:
     def __init__(self, janela):
         self.janela = janela
         self.banco = Banco()
+        janela.withdraw()
         janela.title('Gestor de RPV')
-        largura = min(1100, max(360, janela.winfo_screenwidth() - 100))
-        altura = min(850, max(340, janela.winfo_screenheight() - 100))
-        janela.geometry(f'{largura}x{altura}')
         janela.resizable(False, False)
         janela.configure(bg='#181a1f')
         self.historico = None
@@ -28,6 +27,8 @@ class Aplicativo:
                    command=self.mostrar_historico).pack(fill='x', pady=(0, 16))
         ttk.Button(menu, text='Sair', style='Menu.TButton',
                    command=janela.destroy).pack(fill='x')
+        centralizar(janela, 1480, 980)
+        janela.deiconify()
 
     def configurar_tema(self):
         estilo = ttk.Style()
@@ -39,6 +40,9 @@ class Aplicativo:
         estilo.configure('TButton', background='#303745', padding=(12, 10))
         estilo.map('TButton', background=[('pressed', '#234f78'), ('active', '#3c526b')],
                    foreground=[('disabled', '#8b929e'), ('!disabled', texto)])
+        estilo.configure('Dinheiro.TFrame', background=campo)
+        estilo.configure('Dinheiro.TLabel', background=campo)
+        estilo.configure('DiaSelecionado.TButton', background='#345777')
         estilo.configure('Menu.TButton', font=('Verdana', 16, 'bold'), padding=(20, 15))
         for tipo in ('TEntry', 'TCombobox'):
             estilo.configure(tipo, fieldbackground=campo, foreground=texto,
@@ -61,10 +65,12 @@ class Aplicativo:
 
     def mostrar_historico(self):
         if self.historico is not None and self.historico.winfo_exists():
+            maximizar(self.historico)
             self.historico.lift()
             self.historico.focus_set()
             return
         self.historico = tk.Toplevel(self.janela)
+        self.historico.withdraw()
         self.historico.title('Histórico total — Gestor de RPV')
         self.historico.geometry('1100x650')
         self.historico.minsize(850, 500)
@@ -103,6 +109,9 @@ class Aplicativo:
         self.resumo.pack(anchor='w', pady=(12, 4))
         ttk.Label(corpo, text='Dados salvos neste computador • Comissão apenas informativa').pack(anchor='w')
         self.atualizar()
+        centralizar(self.historico, 1100, 650)
+        self.historico.deiconify()
+        maximizar(self.historico)
 
     def atualizar(self):
         if self.historico is None or not self.historico.winfo_exists():
@@ -121,7 +130,7 @@ class Aplicativo:
     def abrir(self):
         selecao = self.tabela.selection()
         if not selecao:
-            messagebox.showinfo('Abrir registro', 'Selecione uma RPV na lista.')
+            messagebox.showinfo('Editar registro', 'Selecione uma RPV na lista.', parent=self.historico)
             return
         self.formulario(int(selecao[0]))
 
@@ -156,11 +165,11 @@ class Aplicativo:
     def formulario(self, identificador=None):
         registro = self.banco.obter(identificador) if identificador else None
         tela = tk.Toplevel(self.janela)
+        tela.withdraw()
         tela.title('Editar registro' if registro else 'Nova entrada')
         tela.configure(bg='#181a1f')
         tela.resizable(False, False)
         tela.transient(self.historico if self.historico is not None and self.historico.winfo_exists() else self.janela)
-        tela.grab_set()
         quadro = ttk.Frame(tela, padding=20)
         quadro.pack(fill='both', expand=True)
         campos = {}
@@ -180,7 +189,11 @@ class Aplicativo:
             if registro and chave in ('previsto', 'custo'):
                 valor = moeda(valor)
             campos[chave] = tk.StringVar(value=valor)
-            if chave == 'conta':
+            if chave in ('previsto', 'custo'):
+                entrada = CampoMoeda(quadro, campos[chave])
+            elif chave in ('aquisicao', 'previsao'):
+                entrada = CampoData(quadro, campos[chave])
+            elif chave == 'conta':
                 entrada = ttk.Combobox(quadro, textvariable=campos[chave], values=('Vitor', 'Lilian'), state='readonly', width=29)
             else:
                 entrada = ttk.Entry(quadro, textvariable=campos[chave], width=32)
@@ -199,7 +212,7 @@ class Aplicativo:
                 lucro.set('Preencha os dois valores')
 
         for chave in ('previsto', 'custo'):
-            campos[chave].trace_add('write', atualizar_lucro)
+            campos[chave].trace_add('write', lambda *_: tela.after_idle(atualizar_lucro))
         atualizar_lucro()
         ttk.Label(quadro, text='Há comissão?').grid(row=7, column=0, sticky='w', pady=6)
         tem_comissao = tk.StringVar(value='Sim' if registro and registro['comissao'] is not None else 'Não')
@@ -207,7 +220,7 @@ class Aplicativo:
         escolha.grid(row=7, column=1, sticky='ew')
         valor_comissao = tk.StringVar(value=moeda(registro['comissao']) if registro and registro['comissao'] is not None else '')
         rotulo_comissao = ttk.Label(quadro, text='Valor da comissão (só registro)')
-        entrada_comissao = ttk.Entry(quadro, textvariable=valor_comissao)
+        entrada_comissao = CampoMoeda(quadro, valor_comissao)
         rotulo_comissao.grid(row=8, column=0, sticky='w', pady=6)
         entrada_comissao.grid(row=8, column=1, sticky='ew')
 
@@ -217,6 +230,7 @@ class Aplicativo:
                     widget.grid()
                 else:
                     widget.grid_remove()
+            tela.after_idle(lambda: centralizar(tela))
 
         tem_comissao.trace_add('write', exibir_comissao)
         exibir_comissao()
@@ -257,6 +271,9 @@ class Aplicativo:
         ttk.Button(botoes, text='Cancelar', command=tela.destroy).pack(side='left', padx=8)
         ttk.Button(botoes, text='Salvar registro', command=salvar).pack(side='left')
         tela.bind('<Escape>', lambda _: tela.destroy())
+        centralizar(tela)
+        tela.deiconify()
+        tela.grab_set()
 
 
 if __name__ == '__main__':
