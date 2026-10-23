@@ -36,7 +36,7 @@ def validar_banco(caminho):
             if con.execute('PRAGMA integrity_check').fetchall() != [('ok',)]:
                 raise ValueError('O banco do backup está danificado.')
             versao_banco = con.execute('PRAGMA user_version').fetchone()[0]
-            if versao_banco not in (4,5,6):
+            if versao_banco not in (4,5,6,7):
                 raise ValueError('Este backup exige outra versão do Gestor de RPV.')
             requisitos = {
                 'rpvs': {'id','nome','aquisicao','previsto','custo','conta','previsao','comissao',
@@ -50,6 +50,9 @@ def validar_banco(caminho):
                 requisitos['documentos'] = {'id','rpv_id','nome','caminho'}
             if versao_banco >= 6:
                 requisitos['documentos'].add('tipo')
+            if versao_banco>=7:
+                requisitos['previsoes_historico']={'id','rpv_id','anterior','nova','alterada_em'}
+                requisitos['configuracoes']={'chave','valor'}
             for tabela, campos in requisitos.items():
                 presentes = {r[1] for r in con.execute(f'PRAGMA table_info({tabela})')}
                 if not campos.issubset(presentes):
@@ -68,6 +71,7 @@ def validar_banco(caminho):
 def criar_backup(banco, pasta):
     pasta = Path(pasta)
     pasta.mkdir(parents=True, exist_ok=True)
+    quando=datetime.now().astimezone().isoformat(timespec='seconds')
     nome = 'GestorRPV-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.rpvbackup'
     destino = pasta / nome
     with tempfile.TemporaryDirectory(prefix='.backup-rpv-', dir=pasta) as temporaria:
@@ -78,6 +82,9 @@ def criar_backup(banco, pasta):
             with banco.conectar() as origem:
                 origem.backup(con)
             con.execute('PRAGMA journal_mode=DELETE')
+            if con.execute('PRAGMA user_version').fetchone()[0]>=7:
+                con.execute("INSERT OR REPLACE INTO configuracoes (chave,valor) VALUES ('ultimo_backup',?)",(quando,))
+                con.commit()
         finally:
             con.close()
         validar_banco(copia)
@@ -108,6 +115,7 @@ def criar_backup(banco, pasta):
                          'arquivos': arquivos}
             pacote.writestr('manifesto.json', json.dumps(manifesto, ensure_ascii=False, indent=2))
         os.replace(zip_temporario, destino)
+    banco.registrar_backup(quando)
     return destino
 
 

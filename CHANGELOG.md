@@ -1,5 +1,18 @@
 # Histórico de versões
 
+## 0.16.0
+
+- Tela de histórico renomeada para Minhas operações.
+- Fontes das linhas e cabeçalhos da tabela aumentadas de 10 para 18 pontos.
+- Lucro realizado como último cartão e data do último backup no rodapé.
+- Exclusão permanente na lixeira, com confirmação e remoção dos anexos vinculados.
+- Exclusão de anexos já salvos na entrada e no recebimento, com confirmação.
+- Remoção real de contas bancárias, preservando operações e dados históricos de recebimento.
+- Somente a célula Situação de contas incompletas fica vermelha e em negrito.
+- Caixa Recebido sem texto quando desmarcada.
+- Mini-histórico de datas anteriores e novas na edição de previsão atual, incluindo antecipações.
+- Migração com backup e compatibilidade com os arquivos de backup anteriores.
+
 ## 0.15.1
 
 - Remoção do retângulo tracejado de foco nos botões e controles de seleção, nos dois temas.

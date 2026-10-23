@@ -1,6 +1,7 @@
 """Persistência local. Valores monetários são armazenados em centavos."""
 import os
 import shutil
+import tempfile
 import uuid
 from documentos import validar_anexo
 import json
@@ -117,15 +118,16 @@ class Banco:
             cpf_unico = self.cpf_unico(con)
             tem_documentos = con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='documentos'").fetchone() is not None
             colunas_documentos = {r['name'] for r in con.execute('PRAGMA table_info(documentos)')}
+            versao_atual=con.execute('PRAGMA user_version').fetchone()[0]
         migrar = ('previsao_atual_definida' not in colunas or 'recebimento' not in colunas or
                   not {'numero_endereco', 'cidade', 'estado'}.issubset(colunas_contas) or
-                  'lixeira_em' not in colunas or cpf_unico or not tem_documentos or 'tipo' not in colunas_documentos)
+                  'lixeira_em' not in colunas or cpf_unico or not tem_documentos or 'tipo' not in colunas_documentos or versao_atual<7)
         if colunas and migrar:
             versao_backup = ('0.4.0' if 'conta_id' not in colunas else
                              '0.6.0' if 'recebimento' not in colunas else
                              '0.7.0' if 'previsao_atual_definida' not in colunas or
                              not {'numero_endereco', 'cidade', 'estado'}.issubset(colunas_contas) else
-                             '0.9.0' if 'lixeira_em' not in colunas or cpf_unico else '0.10.0' if not tem_documentos else '0.11.0')
+                             '0.9.0' if 'lixeira_em' not in colunas or cpf_unico else '0.10.0' if not tem_documentos else '0.11.0' if 'tipo' not in colunas_documentos else '0.16.0')
             backup = self.caminho.with_name(f'backup-antes-{versao_backup}-' +
                 datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.sqlite3')
             with self.conectar() as origem:
@@ -200,7 +202,19 @@ class Banco:
                 nome TEXT NOT NULL, caminho TEXT NOT NULL UNIQUE)''')
             if 'tipo' not in colunas_documentos:
                 con.execute("ALTER TABLE documentos ADD COLUMN tipo TEXT NOT NULL DEFAULT 'entrada' CHECK(tipo IN ('entrada','recebimento'))")
-            con.execute('PRAGMA user_version=6')
+            if any(r['name']=='conta_id' and r['notnull'] for r in con.execute('PRAGMA table_info(rpvs)')):
+                self.criar_rpvs(con,'rpvs_nova')
+                campos=','.join(r['name'] for r in con.execute('PRAGMA table_info(rpvs)'))
+                con.execute(f'INSERT INTO rpvs_nova ({campos}) SELECT {campos} FROM rpvs')
+                con.execute('DROP TABLE rpvs')
+                con.execute('ALTER TABLE rpvs_nova RENAME TO rpvs')
+            con.execute('''CREATE TABLE IF NOT EXISTS previsoes_historico (
+                id INTEGER PRIMARY KEY, rpv_id INTEGER NOT NULL REFERENCES rpvs(id) ON DELETE CASCADE,
+                anterior TEXT NOT NULL, nova TEXT NOT NULL, alterada_em TEXT NOT NULL)''')
+            con.execute('CREATE TABLE IF NOT EXISTS configuracoes (chave TEXT PRIMARY KEY,valor TEXT NOT NULL)')
+            if con.execute('PRAGMA foreign_key_check').fetchall():
+                raise ValueError('Não foi possível migrar o banco: vínculos inconsistentes.')
+            con.execute('PRAGMA user_version=7')
 
     @staticmethod
     def cpf_unico(con):
@@ -221,7 +235,7 @@ class Banco:
             custo INTEGER NOT NULL CHECK(custo >= 0), conta TEXT NOT NULL,
             previsao TEXT NOT NULL, comissao INTEGER CHECK(comissao >= 0),
             observacoes TEXT NOT NULL DEFAULT '',
-            conta_id INTEGER NOT NULL REFERENCES contas(id), conta_snapshot TEXT NOT NULL, recebimento TEXT, previsao_atual_definida TEXT, lixeira_em TEXT)''')
+            conta_id INTEGER REFERENCES contas(id) ON DELETE SET NULL, conta_snapshot TEXT NOT NULL, recebimento TEXT, previsao_atual_definida TEXT, lixeira_em TEXT)''')
 
     @contextmanager
     def conectar(self):
@@ -298,9 +312,7 @@ class Banco:
         ids = list(dict.fromkeys(int(i) for i in identificadores))
         with self.conectar() as con:
             con.execute('BEGIN IMMEDIATE')
-            for identificador in ids:
-                if con.execute('SELECT 1 FROM rpvs WHERE conta_id=? LIMIT 1',(identificador,)).fetchone():
-                    raise ValueError('Uma conta selecionada está vinculada a uma RPV. Use Desativar para preservar o histórico.')
+            con.executemany('UPDATE rpvs SET conta_id=NULL WHERE conta_id=?',[(i,) for i in ids])
             con.executemany('DELETE FROM contas WHERE id=?',[(i,) for i in ids])
 
     def salvar(self, dados, identificador=None, anexos=()):
@@ -331,14 +343,16 @@ class Banco:
                 conta = con.execute('SELECT * FROM contas WHERE id=?', (dados['conta_id'],)).fetchone()
             else:
                 conta = con.execute('SELECT * FROM contas WHERE identificacao=?', (dados['conta'],)).fetchone()
-            if conta is None:
+            removida_preservada=(anterior is not None and anterior['conta_id'] is None and conta is None and
+                                (dados.get('conta_id','ausente') is None or dados.get('conta')==anterior['conta']))
+            if conta is None and not removida_preservada:
                 raise ValueError('Selecione uma conta cadastrada.')
-            mesma_conta = anterior is not None and anterior['conta_id'] == conta['id']
-            if not conta['ativa'] and not mesma_conta:
+            mesma_conta=removida_preservada or (anterior is not None and anterior['conta_id']==conta['id'])
+            if conta is not None and not conta['ativa'] and not mesma_conta:
                 raise ValueError('A conta foi desativada. Selecione uma conta ativa.')
-            dados['conta_id'] = conta['id']
-            dados['conta'] = anterior['conta'] if mesma_conta else conta['identificacao']
-            dados['conta_snapshot'] = anterior['conta_snapshot'] if mesma_conta else self.snapshot(conta)
+            dados['conta_id']=None if removida_preservada else conta['id']
+            dados['conta']=anterior['conta'] if mesma_conta else conta['identificacao']
+            dados['conta_snapshot']=anterior['conta_snapshot'] if mesma_conta else self.snapshot(conta)
             campos = ('nome','aquisicao','previsto','custo','conta','previsao','comissao','observacoes','conta_id','conta_snapshot')
             if anterior:
                 if anterior['recebimento'] and dados['aquisicao'] > anterior['recebimento']:
@@ -453,6 +467,10 @@ class Banco:
                 raise ValueError('Registro não encontrado na lista ativa.')
             if nova_data < registro['aquisicao']:
                 raise ValueError('A previsão atual não pode ser anterior à aquisição.')
+            atual=con.execute(CONSULTA_RPVS+' WHERE r.id=?',(identificador,)).fetchone()['previsao_atual']
+            if atual != nova_data:
+                con.execute('INSERT INTO previsoes_historico (rpv_id,anterior,nova,alterada_em) VALUES (?,?,?,?)',
+                            (identificador,atual,nova_data,datetime.now().astimezone().isoformat(timespec='seconds')))
             con.execute('UPDATE rpvs SET previsao_atual_definida=? WHERE id=?', (nova_data, identificador))
 
     def copiar_anexos(self, con, identificador, anexos, criados, tipo='entrada'):
@@ -484,3 +502,61 @@ class Banco:
         if not caminho.is_relative_to(raiz) or not caminho.is_file():
             raise ValueError('O arquivo deste documento não está disponível.')
         return caminho
+
+
+    def historico_previsoes(self,identificador):
+        with self.conectar() as con:
+            return con.execute('SELECT * FROM previsoes_historico WHERE rpv_id=? ORDER BY id DESC',(identificador,)).fetchall()
+
+    def ultimo_backup(self):
+        with self.conectar() as con:
+            linha=con.execute("SELECT valor FROM configuracoes WHERE chave='ultimo_backup'").fetchone()
+        return linha['valor'] if linha else None
+
+    def registrar_backup(self,quando):
+        with self.conectar() as con:
+            con.execute("INSERT OR REPLACE INTO configuracoes (chave,valor) VALUES ('ultimo_backup',?)",(quando,))
+
+    @contextmanager
+    def arquivos_para_excluir(self):
+        movidos=[]
+        with tempfile.TemporaryDirectory(prefix='.excluir-rpv-',dir=self.caminho.parent) as pasta:
+            def preparar(documentos):
+                raiz=(self.caminho.parent/'documentos').resolve()
+                for documento in documentos:
+                    arquivo=(raiz/documento['caminho']).resolve()
+                    if not arquivo.is_relative_to(raiz):
+                        raise ValueError('Caminho de documento inválido.')
+                    if arquivo.is_file():
+                        destino=Path(pasta)/str(len(movidos))
+                        os.replace(arquivo,destino)
+                        movidos.append((arquivo,destino))
+            try:
+                yield preparar
+            except Exception:
+                for arquivo,destino in reversed(movidos):
+                    os.replace(destino,arquivo)
+                raise
+
+    def remover_documento(self,identificador):
+        with self.arquivos_para_excluir() as preparar:
+            with self.conectar() as con:
+                con.execute('BEGIN IMMEDIATE')
+                documento=con.execute('SELECT * FROM documentos WHERE id=?',(identificador,)).fetchone()
+                if documento is None:
+                    raise ValueError('Documento não encontrado.')
+                preparar([documento])
+                con.execute('DELETE FROM documentos WHERE id=?',(identificador,))
+
+    def excluir_permanentemente(self,identificadores):
+        ids=list(dict.fromkeys(int(i) for i in identificadores))
+        with self.arquivos_para_excluir() as preparar:
+            with self.conectar() as con:
+                con.execute('BEGIN IMMEDIATE')
+                for identificador in ids:
+                    registro=con.execute('SELECT lixeira_em FROM rpvs WHERE id=?',(identificador,)).fetchone()
+                    if registro is None or not registro['lixeira_em']:
+                        raise ValueError('Somente entradas na lixeira podem ser excluídas permanentemente.')
+                for identificador in ids:
+                    preparar(con.execute('SELECT * FROM documentos WHERE rpv_id=?',(identificador,)).fetchall())
+                con.executemany('DELETE FROM rpvs WHERE id=?',[(i,) for i in ids])

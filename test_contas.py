@@ -111,16 +111,15 @@ class TestContas(unittest.TestCase):
         self.assertEqual(len(reaberto.contas()), 2)
         self.assertNotIn('Vitor', [c['identificacao'] for c in reaberto.contas()])
 
-    def test_remocao_conta_sem_vinculo_e_bloqueio_com_historico(self):
+    def test_remocao_conta_preserva_operacoes_e_snapshot(self):
         conta = self.banco.salvar_conta(dados_conta(endereco='rua das flores'))
         self.assertEqual(self.banco.obter_conta(conta)['endereco'], 'Rua Das Flores')
         rpv = self.banco.salvar(dados_rpv(conta_id=conta))
         snapshot = self.banco.obter(rpv)['conta_snapshot']
-        with self.assertRaises(ValueError):
-            self.banco.remover_conta(conta)
+        self.banco.remover_conta(conta)
         self.assertEqual(self.banco.obter(rpv)['conta_snapshot'], snapshot)
-        self.banco.ativar_conta(conta, False)
-        self.assertIsNotNone(self.banco.obter_conta(conta))
+        self.assertIsNone(self.banco.obter(rpv)['conta_id'])
+        self.assertIsNone(self.banco.obter_conta(conta))
         outra = self.banco.salvar_conta(dados_conta(identificacao='Outra', cpf='11144477735', numero='999', pix='outra@example.com'))
         self.banco.remover_conta(outra)
         self.assertIsNone(self.banco.obter_conta(outra))

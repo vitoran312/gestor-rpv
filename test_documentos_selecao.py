@@ -76,7 +76,7 @@ class TestDocumentos(unittest.TestCase):
         self.assertEqual(len(destino.historico(identificador)),1)
         self.assertEqual(destino.documentos(identificador),[])
         with destino.conectar() as con:
-            self.assertEqual(con.execute('PRAGMA user_version').fetchone()[0],6)
+            self.assertEqual(con.execute('PRAGMA user_version').fetchone()[0],7)
 
     def test_recebimento_separado_com_backup_e_rollback(self):
         identificador = self.banco.salvar(dados_rpv(),anexos=[self.pdf])

@@ -213,7 +213,8 @@ class TestInterface(unittest.TestCase):
         for linha in janela.tabela.get_children():
             self.assertIn('Completar cadastro', janela.tabela.item(linha, 'values')[-1])
             self.assertIn('incompleta', janela.tabela.item(linha, 'tags'))
-        self.assertEqual(str(janela.tabela.tag_configure('incompleta', 'foreground')), cores()['vermelho'])
+        self.assertEqual(str(app.ttk.Style().lookup('ContaIncompleta.TLabel','foreground')),cores()['vermelho'])
+        self.assertEqual(str(janela.tabela.tag_configure('incompleta','foreground')),'')
         janela.formulario()
         self.root.update()
         tela = next(w for w in janela.tela.winfo_children() if isinstance(w, tk.Toplevel))
@@ -516,7 +517,7 @@ class TestInterface(unittest.TestCase):
         self.root.update()
         caixa = self.programa.acoes_linhas[str(identificador)][1]
         self.assertFalse(caixa.estado.get())
-        self.assertEqual(caixa.cget('text'), 'Marcar')
+        self.assertEqual(caixa.cget('text'), '')
         self.assertEqual(self.programa.tabela.set(str(identificador), 'recebido'), '')
         self.programa.copiar_linha(str(identificador))
         self.assertIn('Não recebido', self.programa.tabela.clipboard_get())
@@ -617,6 +618,7 @@ class TestInterface(unittest.TestCase):
         from test_contas import dados_rpv
         ids = [str(self.banco.salvar(dados_rpv(nome=f'Pessoa {n}'))) for n in range(4)]
         self.programa.mostrar_historico()
+        self.programa.historico.geometry('1100x900')
         self.root.update()
         tabela = self.programa.tabela
         linhas = list(tabela.get_children())
@@ -961,7 +963,7 @@ class TestInterface(unittest.TestCase):
             self.root.geometry(f'{largura}x668')
             self.root.update()
             self.assertEqual(self.programa.colunas_inicio,colunas)
-            for texto in ('Nova entrada','Ver histórico total','Contas de recebimento','Sair'):
+            for texto in ('Nova entrada','Minhas operações','Contas de recebimento','Sair'):
                 b=botao(self.root,texto)
                 self.assertTrue(b.winfo_ismapped())
                 self.assertGreaterEqual(b.winfo_rooty(),self.root.winfo_rooty())
@@ -1084,6 +1086,110 @@ class TestInterface(unittest.TestCase):
         fonte=app.tkfont.Font(font=estilo.lookup(tabela.cget('style'),'font'))
         self.assertEqual(fonte.actual('size'),12)
         self.assertGreaterEqual(int(estilo.lookup(tabela.cget('style'),'rowheight')),40)
+
+    def test_lixeira_exclui_permanentemente_apos_confirmacao(self):
+        from test_contas import dados_rpv
+        arquivo=Path(self.pasta.name)/'contrato.pdf'
+        arquivo.write_bytes(b'%PDF exemplo')
+        identificador=self.banco.salvar(dados_rpv(),anexos=[arquivo])
+        caminho=self.banco.caminho_documento(self.banco.documentos(identificador)[0]['id'])
+        self.banco.excluir(identificador)
+        self.programa.mostrar_historico()
+        self.programa.mostrar_lixeira()
+        self.root.update()
+        tela=next(w for w in self.programa.historico.winfo_children() if isinstance(w,tk.Toplevel))
+        tabela=next(w for w in filhos(tela) if isinstance(w,app.ttk.Treeview))
+        tabela.selection_set(str(identificador))
+        with patch.object(app.messagebox,'askyesno',return_value=False):
+            botao(tela,'Excluir permanentemente').invoke()
+        self.assertIsNotNone(self.banco.obter(identificador))
+        with patch.object(app.messagebox,'askyesno',return_value=True):
+            botao(tela,'Excluir permanentemente').invoke()
+        self.root.update()
+        self.assertIsNone(self.banco.obter(identificador))
+        self.assertFalse(caminho.exists())
+        self.assertTrue(arquivo.exists())
+
+    def test_remover_anexos_salvos_de_entrada_e_recebimento(self):
+        from test_contas import dados_rpv
+        arquivo=Path(self.pasta.name)/'comprovante.pdf'
+        arquivo.write_bytes(b'%PDF exemplo')
+        identificador=self.banco.salvar(dados_rpv(),anexos=[arquivo])
+        self.banco.registrar_recebimento(identificador,'2026-10-22',anexos=[arquivo])
+        self.programa.mostrar_historico()
+        for tipo in ('entrada','recebimento'):
+            if tipo=='entrada':self.programa.formulario(identificador)
+            else:self.programa.abrir_recebimento(identificador)
+            self.root.update()
+            dono=self.root if tipo=='entrada' else self.programa.historico
+            tela=next(w for w in dono.winfo_children() if isinstance(w,tk.Toplevel) and w.title() in ('Editar registro','Recebimento'))
+            abrir=next(w for w in filhos(tela) if isinstance(w,app.ttk.Button) and w.cget('textvariable') and self.root.getvar(w.cget('textvariable'))=='Documentos (1)')
+            abrir.invoke()
+            self.root.update()
+            documentos=next(w for w in tela.winfo_children() if isinstance(w,tk.Toplevel))
+            lista=next(w for w in filhos(documentos) if isinstance(w,app.ttk.Treeview))
+            lista.selection_set(lista.get_children()[0])
+            with patch.object(app.messagebox,'askyesno',return_value=False):botao(documentos,'Remover documento').invoke()
+            self.assertEqual(len(self.banco.documentos(identificador,tipo)),1)
+            with patch.object(app.messagebox,'askyesno',return_value=True):botao(documentos,'Remover documento').invoke()
+            self.root.update()
+            self.assertEqual(self.banco.documentos(identificador,tipo),[])
+            self.assertEqual(lista.get_children(),())
+            botao(documentos,'Fechar').invoke()
+            botao(tela,'Cancelar').invoke()
+        self.assertTrue(arquivo.exists())
+
+    def test_conta_removida_edita_rpv_e_so_situacao_e_vermelha(self):
+        from test_contas import dados_rpv
+        conta=self.banco.contas()[0]
+        identificador=self.banco.salvar(dados_rpv(conta_id=conta['id']))
+        copia=self.banco.obter(identificador)['conta_snapshot']
+        self.programa.mostrar_contas()
+        self.root.update()
+        janela=self.programa.janela_contas
+        linha=str(conta['id'])
+        rotulo=janela.situacoes_labels[linha]
+        self.assertEqual(str(rotulo.cget('style')),'ContaIncompleta.TLabel')
+        self.assertIn('bold',str(app.ttk.Style().lookup('ContaIncompleta.TLabel','font')))
+        self.assertEqual(str(janela.tabela.tag_configure('incompleta','foreground')),'')
+        janela.tabela.selection_set(linha)
+        with patch.object(app.messagebox,'askyesno',return_value=True):botao(janela.tela,'Remover').invoke()
+        self.root.update()
+        self.assertIsNone(self.banco.obter_conta(conta['id']))
+        self.assertEqual(self.banco.obter(identificador)['conta_snapshot'],copia)
+        self.banco.remover_contas([c['id'] for c in self.banco.contas()])
+        self.programa.formulario(identificador)
+        self.root.update()
+        tela=next(w for w in self.root.winfo_children() if isinstance(w,tk.Toplevel) and w.title()=='Editar registro')
+        escolha=next(w for w in filhos(tela) if isinstance(w,app.ttk.Combobox))
+        self.assertIn('conta removida',escolha.get())
+        botao(tela,'Salvar registro').invoke()
+        self.root.update()
+        self.assertIsNone(self.banco.obter(identificador)['conta_id'])
+        self.assertEqual(self.banco.obter(identificador)['conta_snapshot'],copia)
+
+    def test_fontes_indicadores_previsao_e_ultimo_backup_na_interface(self):
+        from test_contas import dados_rpv
+        identificador=self.banco.salvar(dados_rpv())
+        self.banco.atualizar_previsao(identificador,'2027-01-20')
+        self.banco.atualizar_previsao(identificador,'2026-11-20')
+        self.programa.mostrar_historico()
+        self.root.update()
+        estilo=app.ttk.Style()
+        self.assertEqual(app.tkfont.Font(font=estilo.lookup('Operacoes.Treeview','font')).actual('size'),18)
+        ultimo=self.programa.cartoes_resumo[-1][1]
+        self.assertEqual(ultimo.cget('text'),'Lucro realizado')
+        self.assertIn('ainda não realizado',self.programa.texto_ultimo_backup.get())
+        destino=str(Path(self.pasta.name)/'exportados')
+        with patch.object(app.filedialog,'askdirectory',return_value=destino),patch.object(app.messagebox,'showinfo'):
+            self.programa.exportar_backup()
+        self.assertRegex(self.programa.texto_ultimo_backup.get(),r'Último backup: \d{2}/\d{2}/\d{4}')
+        self.programa.editar_previsao(identificador)
+        self.root.update()
+        tela=next(w for w in self.programa.historico.winfo_children() if isinstance(w,tk.Toplevel))
+        historico=next(w for w in filhos(tela) if isinstance(w,app.ttk.Treeview))
+        self.assertEqual(len(historico.get_children()),2)
+        self.assertEqual(historico.item(historico.get_children()[0],'values')[:2],('20/01/2027','20/11/2026'))
 
 
 if __name__ == '__main__':

@@ -69,7 +69,8 @@ def habilitar_selecao(tabela, abrir=None, excluir=None, copiar=None):
             return 'break'
         foco = tabela.focus()
         indice = linhas.index(foco) if foco in linhas else 0
-        pagina = max(1,tabela.winfo_height()//34-1)
+        altura=int(tabela.tk.call('ttk::style','lookup',tabela.cget('style') or 'Treeview','-rowheight') or 34)
+        pagina = max(1,tabela.winfo_height()//altura-1)
         destino = {'Up':indice-1,'Down':indice+1,'Home':0,'End':len(linhas)-1,
                    'Prior':indice-pagina,'Next':indice+pagina}[evento.keysym]
         destino = max(0,min(len(linhas)-1,destino))

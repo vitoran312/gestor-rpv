@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.15.1
+# Gestor de RPV — 0.16.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -13,8 +13,8 @@ python app.py
 ```
 
 Mantenha `app.py`, `dados.py`, `componentes.py`, `contas.py`, `interacao.py`, `tema.py`, `calculadora.py`, `backup.py`, `ordenacao.py`, `selecao.py`, `documentos.py`, `visual.py` e `versao.py` juntos.
-A tela inicial tem os botões **Nova entrada**, **Ver histórico total**,
-**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.15.1** aparece no canto inferior direito.
+A tela inicial tem os botões **Nova entrada**, **Minhas operações**,
+**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.16.0** aparece no canto inferior direito.
 O número é lido da versão do programa e acompanha cada atualização.
 As janelas abrem centralizadas; o histórico abre maximizado no Windows.
 
@@ -31,7 +31,9 @@ aparência; o menu **Exibir** do histórico oferece as mesmas opções.
   Os botões não mostram retângulo tracejado após o clique; a navegação por
   teclado e a ativação pela barra de espaço continuam disponíveis.
 - Fonte Segoe UI no Windows, com alternativas locais em outros sistemas.
-- Histórico com linhas alternadas e quatro indicadores em cartões alinhados.
+- Minhas operações com fonte de 18 pontos nas linhas e cabeçalhos (oito pontos maior),
+  linhas alternadas e quatro indicadores em cartões alinhados.
+  Lucro realizado é o último cartão, à direita, inclusive no layout com duas linhas.
 - Cadastro de entradas e contas com rolagem e botões fixos no rodapé, inclusive em telas menores.
   A roda do mouse rola os campos; navegar pelo teclado revela o campo em foco.
 - Calendários, anexos, contas, calculadora e menus acompanham os dois temas.
@@ -74,8 +76,12 @@ com altura das linhas e largura da janela ajustadas para a leitura.
 - Identificação, chave Pix e combinação banco/agência/conta não podem se repetir,
   inclusive entre contas desativadas. Endereços podem ser iguais.
   Use o mesmo nome de banco nos cadastros para uma comparação consistente.
-- **Remover** pede confirmação e exclui definitivamente contas sem RPVs vinculadas.
-  Contas já usadas em operações devem ser desativadas para preservar o histórico.
+- **Remover** pede confirmação e apaga o cadastro bancário, mesmo quando já usado
+  em operações. As entradas continuam existentes e preservam o nome e a cópia
+  dos dados bancários guardados na aquisição. A edição oferece a conta removida
+  como referência histórica e também permite selecionar uma conta ativa.
+- Somente a célula **Situação** de uma conta incompleta fica vermelha e em negrito;
+  nome e banco mantêm a cor normal.
 - **Desativar / Reativar** preserva os registros antigos. Contas desativadas não
   aparecem em novas entradas; continuam disponíveis na edição da RPV que já as usa.
 - Cada nova operação guarda uma cópia dos dados de recebimento. Alterar uma conta
@@ -141,6 +147,9 @@ com altura das linhas e largura da janela ajustadas para a leitura.
 - O histórico mostra somente **Previsão inicial** e **Previsão atual**, sem a
   coluna Prorrogação. Clique na data atual ou use o menu de contexto
   **Editar previsão atual** para alterá-la pelo calendário.
+- A janela **Previsão atual** também lista cada alteração com data anterior,
+  nova data e data/hora da alteração. Adiamentos e antecipações são registrados;
+  salvar a mesma data não cria uma repetição.
 - A previsão atual fica vermelha quando posterior à inicial. É possível corrigir
   a data, inclusive antecipá-la; datas anteriores à aquisição não são aceitas.
 - As prorrogações cadastradas em versões anteriores permanecem no banco. Sua
@@ -150,6 +159,7 @@ com altura das linhas e largura da janela ajustadas para a leitura.
   calendário e salve: a confirmação e a data ficam centralizadas, em verde e negrito.
   A data não pode ser anterior à aquisição nem estar no futuro. Ao clicar de novo,
   é possível corrigir a data ou desmarcar o recebimento com confirmação.
+  Quando não recebido, aparece somente a caixa, sem o texto “Marcar”.
   A célula não desenha texto por trás da caixa, inclusive depois de desmarcar.
 - A frase explicativa de centavos foi retirada do formulário; a máscara permanece.
 
@@ -169,6 +179,8 @@ com altura das linhas e largura da janela ajustadas para a leitura.
 No histórico, use **Arquivo → Backup** e **Arquivo → Importar dados**.
 Essas ações ficam na barra de menus; seus antigos botões foram retirados da tela.
 O ícone de **lixeira** continua sozinho no canto inferior direito.
+No rodapé aparece **Último backup: dd/mm/aaaa**, atualizado após a gravação
+de um arquivo de backup. Antes do primeiro, aparece “ainda não realizado”.
 
 1. Clique em **Arquivo → Backup** e escolha uma pasta do Windows.
 2. O programa salva um arquivo `GestorRPV-data-hora.rpvbackup`.
@@ -195,6 +207,10 @@ durante a troca, os documentos anteriores são recuperados e a cópia de seguran
   recebe PDFs e imagens como contratos e protocolos.
 - **Documentos (N)** lista os anexos e permite abrir com o programa padrão do Windows.
   Antes de salvar, é possível retirar arquivos da seleção.
+- **Remover documento** também exclui anexos já salvos, com confirmação, tanto
+  da entrada quanto do recebimento. A remoção é aplicada imediatamente à cópia
+  do programa, mesmo que o formulário depois seja cancelado. O arquivo original
+  fora do aplicativo é preservado. Arquivos já removidos não entram em novos backups.
 - Os arquivos são copiados para a pasta de dados somente ao **Salvar registro**.
   Cancelar o formulário não adiciona arquivos. Depois de salvar, os originais podem
   ser movidos sem afetar a cópia do aplicativo.
@@ -229,17 +245,22 @@ durante a troca, os documentos anteriores são recuperados e a cópia de seguran
 - No histórico, **Ctrl+F** foca a busca, **Ctrl+N** abre nova entrada e **F5** atualiza.
 - Abra o ícone de lixeira, selecione uma ou mais entradas e use **Restaurar entradas**
   ou **Enter**. O botão fica no rodapé, com texto visível nos dois temas.
-- Não há exclusão definitiva de RPVs por esta interface.
-- O histórico de alterações foi retirado; novas ações não geram auditoria.
+- Na lixeira, **Excluir permanentemente** remove as entradas selecionadas, suas
+  datas e seus anexos das duas categorias, após confirmação. Somente entradas
+  que já estão na lixeira podem ser apagadas dessa forma. Elas não poderão ser
+  restauradas pela lixeira; backups feitos anteriormente mantêm seu conteúdo.
+- O histórico geral de alterações foi retirado. O mini-histórico de previsão
+  registra apenas as mudanças de data feitas pela janela Previsão atual.
   Dados antigos já gravados são preservados internamente por compatibilidade.
 
 ## Dados e atualização
 
 O banco fica em `%LOCALAPPDATA%\GestorRPV\gestor.sqlite3`, fora da pasta do código.
 Atualizar os arquivos preserva esse banco. A adaptação da estrutura cria uma cópia
-`backup-antes-versao-*.sqlite3` na mesma pasta. A versão 0.11.0 separa os comprovantes dos documentos da entrada, preservando
-contas, IDs, snapshots e vínculos. Backups das versões 0.9.0 e 0.10.0 continuam
-podendo ser importados; anexos antigos são classificados como documentos da entrada.
+`backup-antes-versao-*.sqlite3` na mesma pasta. A versão 0.16.0 permite remover contas preservando suas operações e acrescenta
+o histórico específico de previsão. Contas, IDs, cópias dos dados bancários e anexos
+são preservados na migração. Backups das versões 0.9.0 a 0.15.1 continuam podendo
+ser importados; anexos antigos mantêm sua categoria.
 
 O banco e os backups não são criptografados. Não envie dados pessoais ao GitHub.
 
