@@ -50,7 +50,7 @@ class TestDados(unittest.TestCase):
             segundo = banco.salvar(dados)
             banco.excluir(primeiro)
             reaberto = Banco(caminho)
-            self.assertIsNone(reaberto.obter(primeiro))
+            self.assertIsNotNone(reaberto.obter(primeiro)['lixeira_em'])
             self.assertEqual([r['id'] for r in reaberto.listar()], [segundo])
             self.assertEqual(reaberto.obter(segundo)['custo'], 1200000)
 

@@ -99,11 +99,15 @@ class Banco:
         with self.conectar() as con:
             colunas = {r['name'] for r in con.execute('PRAGMA table_info(rpvs)')}
             colunas_contas = {r['name'] for r in con.execute('PRAGMA table_info(contas)')}
+            cpf_unico = self.cpf_unico(con)
         migrar = ('previsao_atual_definida' not in colunas or 'recebimento' not in colunas or
-                  not {'numero_endereco', 'cidade', 'estado'}.issubset(colunas_contas))
+                  not {'numero_endereco', 'cidade', 'estado'}.issubset(colunas_contas) or
+                  'lixeira_em' not in colunas or cpf_unico)
         if colunas and migrar:
             versao_backup = ('0.4.0' if 'conta_id' not in colunas else
-                             '0.6.0' if 'recebimento' not in colunas else '0.7.0')
+                             '0.6.0' if 'recebimento' not in colunas else
+                             '0.7.0' if 'previsao_atual_definida' not in colunas or
+                             not {'numero_endereco', 'cidade', 'estado'}.issubset(colunas_contas) else '0.9.0')
             backup = self.caminho.with_name(f'backup-antes-{versao_backup}-' +
                 datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.sqlite3')
             with self.conectar() as origem:
@@ -113,11 +117,13 @@ class Banco:
                 finally:
                     destino.close()
         with self.conectar() as con:
+            # Recriação de contas preserva os IDs referenciados por RPVs.
+            con.execute('PRAGMA foreign_keys=OFF')
             con.execute('BEGIN IMMEDIATE')
             con.execute('''CREATE TABLE IF NOT EXISTS contas (
                 id INTEGER PRIMARY KEY, identificacao TEXT NOT NULL,
                 identificacao_chave TEXT NOT NULL UNIQUE,
-                nome TEXT NOT NULL DEFAULT '', cpf TEXT UNIQUE,
+                nome TEXT NOT NULL DEFAULT '', cpf TEXT,
                 endereco TEXT NOT NULL DEFAULT '', numero_endereco TEXT NOT NULL DEFAULT '',
                 cidade TEXT NOT NULL DEFAULT '', estado TEXT NOT NULL DEFAULT '', banco TEXT NOT NULL DEFAULT '',
                 agencia TEXT NOT NULL DEFAULT '', numero TEXT NOT NULL DEFAULT '',
@@ -128,6 +134,17 @@ class Banco:
             for campo in ('numero_endereco', 'cidade', 'estado'):
                 if campo not in existentes:
                     con.execute(f"ALTER TABLE contas ADD COLUMN {campo} TEXT NOT NULL DEFAULT ''")
+            if cpf_unico:
+                esquema = con.execute("SELECT sql FROM sqlite_master WHERE name='contas'").fetchone()[0]
+                # O esquema legado é interno ao aplicativo; só removemos a unicidade do CPF.
+                esquema = re.sub(r'^CREATE TABLE\s+(?:IF NOT EXISTS\s+)?[\"`\[]?contas[\"`\]]?',
+                                 'CREATE TABLE contas_nova', esquema, count=1, flags=re.IGNORECASE)
+                esquema = re.sub(r'\bcpf\s+TEXT\s+UNIQUE\b', 'cpf TEXT', esquema, flags=re.IGNORECASE)
+                con.execute(esquema)
+                campos = ','.join(r['name'] for r in con.execute('PRAGMA table_info(contas)'))
+                con.execute(f'INSERT INTO contas_nova ({campos}) SELECT {campos} FROM contas')
+                con.execute('DROP TABLE contas')
+                con.execute('ALTER TABLE contas_nova RENAME TO contas')
             for nome in (('Vitor', 'Lilian') if not colunas or 'conta_id' not in colunas else ()):
                 con.execute('''INSERT OR IGNORE INTO contas (identificacao, identificacao_chave)
                                VALUES (?, ?)''', (nome, normalizar(nome)))
@@ -153,7 +170,36 @@ class Banco:
                 con.execute('ALTER TABLE rpvs ADD COLUMN recebimento TEXT')
             if 'previsao_atual_definida' not in atuais:
                 con.execute('ALTER TABLE rpvs ADD COLUMN previsao_atual_definida TEXT')
-            con.execute('PRAGMA user_version=3')
+            if 'lixeira_em' not in atuais:
+                con.execute('ALTER TABLE rpvs ADD COLUMN lixeira_em TEXT')
+            con.execute('''CREATE TABLE IF NOT EXISTS historico_alteracoes (
+                id INTEGER PRIMARY KEY, rpv_id INTEGER NOT NULL REFERENCES rpvs(id) ON DELETE CASCADE,
+                quando TEXT NOT NULL, acao TEXT NOT NULL, alteracoes TEXT NOT NULL)''')
+            for registro in con.execute('SELECT * FROM rpvs WHERE id NOT IN (SELECT rpv_id FROM historico_alteracoes)').fetchall():
+                self.auditar(con, registro['id'], 'Registro anterior à versão 0.9.0', {}, dict(registro))
+            if con.execute('PRAGMA foreign_key_check').fetchall():
+                raise ValueError('Não foi possível migrar o banco: vínculos inconsistentes.')
+            con.execute('PRAGMA user_version=4')
+
+    @staticmethod
+    def cpf_unico(con):
+        for indice in con.execute('PRAGMA index_list(contas)').fetchall():
+            if indice['unique']:
+                nome = indice['name'].replace('"', '""')
+                campos = [r['name'] for r in con.execute(f'PRAGMA index_info("{nome}")')]
+                if campos == ['cpf']:
+                    return True
+        return False
+
+    @staticmethod
+    def auditar(con, identificador, acao, antes, depois):
+        diferencas = {k: {'antes': antes.get(k), 'depois': depois.get(k)}
+                      for k in sorted(set(antes) | set(depois))
+                      if antes.get(k) != depois.get(k)}
+        if diferencas:
+            con.execute('INSERT INTO historico_alteracoes (rpv_id,quando,acao,alteracoes) VALUES (?,?,?,?)',
+                        (identificador, datetime.now().astimezone().isoformat(timespec='seconds'), acao,
+                         json.dumps(diferencas, ensure_ascii=False)))
 
     @staticmethod
     def criar_rpvs(con, tabela):
@@ -164,7 +210,7 @@ class Banco:
             custo INTEGER NOT NULL CHECK(custo >= 0), conta TEXT NOT NULL,
             previsao TEXT NOT NULL, comissao INTEGER CHECK(comissao >= 0),
             observacoes TEXT NOT NULL DEFAULT '',
-            conta_id INTEGER NOT NULL REFERENCES contas(id), conta_snapshot TEXT NOT NULL, recebimento TEXT, previsao_atual_definida TEXT)''')
+            conta_id INTEGER NOT NULL REFERENCES contas(id), conta_snapshot TEXT NOT NULL, recebimento TEXT, previsao_atual_definida TEXT, lixeira_em TEXT)''')
 
     @contextmanager
     def conectar(self):
@@ -217,8 +263,6 @@ class Banco:
             for conta in con.execute('SELECT * FROM contas WHERE id != ?', (identificador or -1,)):
                 if conta['identificacao_chave'] == dados['identificacao_chave']:
                     raise ValueError('Já existe uma conta com essa identificação, inclusive entre as desativadas.')
-                if dados['cpf'] and conta['cpf'] == dados['cpf']:
-                    raise ValueError('Esse CPF já está cadastrado em outra conta.')
                 if (conta['banco_chave'] == dados['banco_chave'] and conta['numero_chave'] == dados['numero_chave']
                     and (not conta['agencia_chave'] or not dados['agencia_chave'] or conta['agencia_chave'] == dados['agencia_chave'])):
                     raise ValueError('Essa conta bancária já está cadastrada.')
@@ -254,7 +298,10 @@ class Banco:
         if dados['custo'] > dados['previsto']:
             raise ValueError('O valor de aquisição não pode superar o Valor Total RPV.')
         with self.conectar() as con:
+            con.execute('BEGIN IMMEDIATE')
             anterior = con.execute('SELECT * FROM rpvs WHERE id=?', (identificador,)).fetchone() if identificador else None
+            if identificador is not None and (anterior is None or anterior['lixeira_em']):
+                raise ValueError('Este registro não está disponível. Confira a lixeira.')
             if 'conta_id' in dados:
                 conta = con.execute('SELECT * FROM contas WHERE id=?', (dados['conta_id'],)).fetchone()
             else:
@@ -275,15 +322,19 @@ class Banco:
                 if (atual['previsao_atual_definida'] or atual['total_prorrogacoes']) and dados['aquisicao'] > atual['previsao_atual']:
                     raise ValueError('A aquisição não pode ser posterior à previsão atual.')
             if identificador is None:
-                return con.execute('INSERT INTO rpvs (' + ','.join(campos) + ') VALUES (' +
+                novo = con.execute('INSERT INTO rpvs (' + ','.join(campos) + ') VALUES (' +
                                    ','.join(':' + k for k in campos) + ')', dados).lastrowid
+                self.auditar(con, novo, 'Cadastro', {}, dict(con.execute('SELECT * FROM rpvs WHERE id=?', (novo,)).fetchone()))
+                return novo
             con.execute('UPDATE rpvs SET ' + ','.join(k + '=:' + k for k in campos) + ' WHERE id=:id',
                         dict(dados, id=identificador))
+            depois = dict(con.execute('SELECT * FROM rpvs WHERE id=?', (identificador,)).fetchone())
+            self.auditar(con, identificador, 'Edição', dict(anterior), depois)
             return identificador
 
     def listar(self, busca=''):
         with self.conectar() as con:
-            registros = con.execute(CONSULTA_RPVS + ' ORDER BY aquisicao DESC, id DESC').fetchall()
+            registros = con.execute(CONSULTA_RPVS + ' WHERE r.lixeira_em IS NULL ORDER BY aquisicao DESC, id DESC').fetchall()
         return [r for r in registros if busca.casefold() in r['nome'].casefold() or busca in data_br(r['aquisicao'])]
 
     def obter(self, identificador):
@@ -292,7 +343,30 @@ class Banco:
 
     def excluir(self, identificador):
         with self.conectar() as con:
-            con.execute('DELETE FROM rpvs WHERE id=?', (identificador,))
+            con.execute('BEGIN IMMEDIATE')
+            registro = con.execute('SELECT * FROM rpvs WHERE id=?', (identificador,)).fetchone()
+            if registro is None or registro['lixeira_em']:
+                raise ValueError('Registro não encontrado na lista ativa.')
+            agora = datetime.now().astimezone().isoformat(timespec='seconds')
+            con.execute('UPDATE rpvs SET lixeira_em=? WHERE id=?', (agora, identificador))
+            self.auditar(con, identificador, 'Enviado para lixeira', {'lixeira_em': None}, {'lixeira_em': agora})
+
+    def listar_lixeira(self):
+        with self.conectar() as con:
+            return con.execute(CONSULTA_RPVS + ' WHERE r.lixeira_em IS NOT NULL ORDER BY lixeira_em DESC,id DESC').fetchall()
+
+    def restaurar(self, identificador):
+        with self.conectar() as con:
+            con.execute('BEGIN IMMEDIATE')
+            registro = con.execute('SELECT * FROM rpvs WHERE id=?', (identificador,)).fetchone()
+            if registro is None or not registro['lixeira_em']:
+                raise ValueError('Registro não encontrado na lixeira.')
+            con.execute('UPDATE rpvs SET lixeira_em=NULL WHERE id=?', (identificador,))
+            self.auditar(con, identificador, 'Restaurado da lixeira', {'lixeira_em': registro['lixeira_em']}, {'lixeira_em': None})
+
+    def historico(self, identificador):
+        with self.conectar() as con:
+            return con.execute('SELECT * FROM historico_alteracoes WHERE rpv_id=? ORDER BY id DESC', (identificador,)).fetchall()
 
     def prorrogacoes(self, identificador):
         with self.conectar() as con:
@@ -315,22 +389,27 @@ class Banco:
         if data is not None:
             data = data_iso(data_br(data))
         with self.conectar() as con:
+            con.execute('BEGIN IMMEDIATE')
             registro = con.execute('SELECT * FROM rpvs WHERE id=?', (identificador,)).fetchone()
-            if registro is None:
-                raise ValueError('Registro não encontrado.')
+            if registro is None or registro['lixeira_em']:
+                raise ValueError('Registro não encontrado na lista ativa.')
             if data is not None:
                 if data < registro['aquisicao']:
                     raise ValueError('O recebimento não pode ser anterior à aquisição.')
                 if data > date.today().isoformat():
                     raise ValueError('O recebimento não pode estar no futuro.')
             con.execute('UPDATE rpvs SET recebimento=? WHERE id=?', (data, identificador))
+            self.auditar(con, identificador, 'Recebimento', {'recebimento': registro['recebimento']}, {'recebimento': data})
 
     def atualizar_previsao(self, identificador, nova_data):
         nova_data = data_iso(data_br(nova_data))
         with self.conectar() as con:
+            con.execute('BEGIN IMMEDIATE')
             registro = con.execute('SELECT * FROM rpvs WHERE id=?', (identificador,)).fetchone()
-            if registro is None:
-                raise ValueError('Registro não encontrado.')
+            if registro is None or registro['lixeira_em']:
+                raise ValueError('Registro não encontrado na lista ativa.')
             if nova_data < registro['aquisicao']:
                 raise ValueError('A previsão atual não pode ser anterior à aquisição.')
+            antes = con.execute(CONSULTA_RPVS + ' WHERE r.id=?', (identificador,)).fetchone()['previsao_atual']
             con.execute('UPDATE rpvs SET previsao_atual_definida=? WHERE id=?', (nova_data, identificador))
+            self.auditar(con, identificador, 'Previsão atual', {'previsao_atual': antes}, {'previsao_atual': nova_data})

@@ -515,6 +515,97 @@ class TestInterface(unittest.TestCase):
         self.root.update()
         self.assertEqual(self.programa.tabela.set(str(identificador), 'recebido'), '')
 
+    def test_lixeira_restauracao_e_historico_pela_interface(self):
+        dados = dict(nome='Teste', aquisicao='2026-10-01', previsto=2000000,
+            custo=1200000, conta='Vitor', previsao='2026-12-20', comissao=None, observacoes='')
+        identificador = self.banco.salvar(dados)
+        self.banco.atualizar_previsao(identificador,'2027-01-20')
+        self.programa.mostrar_historico()
+        self.root.update()
+        self.assertNotIn('Investido',self.programa.resumo.cget('text'))
+        self.programa.tabela.selection_set(str(identificador))
+        with patch.object(app.messagebox,'askyesno',return_value=True):
+            self.programa.excluir()
+        self.root.update()
+        self.assertEqual(self.programa.tabela.get_children(),())
+        botao(self.programa.historico,'Lixeira').invoke()
+        self.root.update()
+        tela = next(w for w in self.programa.historico.winfo_children() if isinstance(w,tk.Toplevel) and w.title()=='Lixeira')
+        tabela = next(w for w in filhos(tela) if isinstance(w,app.ttk.Treeview))
+        tabela.selection_set(str(identificador))
+        botao(tela,'Restaurar entrada').invoke()
+        self.root.update()
+        self.assertEqual(self.programa.tabela.get_children(),(str(identificador),))
+        self.assertEqual(self.banco.obter(identificador)['previsao_atual'],'2027-01-20')
+        self.programa.tabela.selection_set(str(identificador))
+        self.programa.menus['Editar'].invoke('Histórico de alterações')
+        self.root.update()
+        auditoria = next(w for w in self.programa.historico.winfo_children() if isinstance(w,tk.Toplevel) and 'Histórico de alterações' in w.title())
+        registros = next(w for w in filhos(auditoria) if isinstance(w,app.ttk.Treeview))
+        valores = [registros.item(linha,'values') for linha in registros.get_children()]
+        self.assertTrue(any(v[1]=='Restaurado da lixeira' for v in valores))
+        self.assertTrue(any(v[2]=='Previsão atual' and v[3]=='20/12/2026' and v[4]=='20/01/2027' for v in valores))
+
+    def test_ordenacao_colunas_tres_cliques_e_filtro(self):
+        ids = []
+        for nome,total,dia in (('Álvaro',9000000,1),('Bruno',10000000,2),('Carlos',200000,3)):
+            ids.append(str(self.banco.salvar(dict(nome=nome,aquisicao=f'2026-01-0{dia}',previsto=total,
+                custo=100,conta='Vitor',previsao='2026-12-20',comissao=None,observacoes=''))))
+        self.programa.mostrar_historico()
+        self.root.update()
+        tabela = self.programa.tabela
+        normal = tuple(reversed(ids))
+        self.assertEqual(tabela.get_children(),normal)
+
+        def clicar(coluna):
+            self.root.tk.call(tabela.heading(coluna,'command'))
+            self.root.update()
+
+        clicar('previsto')
+        self.assertEqual(tabela.get_children(),(ids[1],ids[0],ids[2]))
+        clicar('previsto')
+        self.assertEqual(tabela.get_children(),(ids[2],ids[0],ids[1]))
+        clicar('previsto')
+        self.assertEqual(tabela.get_children(),normal)
+        self.assertEqual(tabela.heading('previsto','text'),'Valor Total RPV')
+        clicar('nome')
+        self.assertEqual(tabela.get_children(),tuple(ids))
+        clicar('nome')
+        self.assertEqual(tabela.get_children(),normal)
+        clicar('nome')
+        self.assertIsNone(self.programa.ordenacao)
+        clicar('data')
+        self.assertEqual(tabela.get_children(),normal)
+        clicar('data')
+        self.assertEqual(tabela.get_children(),tuple(ids))
+        self.programa.busca.set('Bruno')
+        self.root.update()
+        self.assertEqual(tabela.get_children(),(ids[1],))
+
+    def test_backup_importacao_cancelada_e_confirmada_pela_interface(self):
+        dados = dict(nome='Primeira',aquisicao='2026-10-01',previsto=2000000,
+                     custo=1200000,conta='Vitor',previsao='2026-12-20',comissao=None,observacoes='')
+        self.banco.salvar(dados)
+        botoes_iniciais = [w.cget('text') for w in filhos(self.root) if isinstance(w,app.ttk.Button)]
+        self.assertNotIn('Backup',botoes_iniciais)
+        self.assertNotIn('Lixeira',botoes_iniciais)
+        self.programa.mostrar_historico()
+        self.root.update()
+        pasta = Path(self.pasta.name)/'exportados'
+        with patch.object(app.filedialog,'askdirectory',return_value=str(pasta)), patch.object(app.messagebox,'showinfo'):
+            botao(self.programa.historico,'Backup').invoke()
+        arquivo = next(pasta.glob('*.rpvbackup'))
+        self.banco.salvar(dict(dados,nome='Segunda'))
+        with patch.object(app.filedialog,'askopenfilename',return_value=str(arquivo)), patch.object(app.messagebox,'askyesno',return_value=False):
+            botao(self.programa.historico,'Importar dados').invoke()
+        self.assertEqual(len(self.banco.listar()),2)
+        with patch.object(app.filedialog,'askopenfilename',return_value=str(arquivo)), patch.object(app.messagebox,'askyesno',return_value=True), patch.object(app.messagebox,'showinfo'):
+            botao(self.programa.historico,'Importar dados').invoke()
+        self.root.update()
+        self.assertEqual(len(self.banco.listar()),1)
+        self.assertEqual(self.banco.listar()[0]['nome'],'Primeira')
+        self.assertEqual(len(self.programa.tabela.get_children()),1)
+
 
 if __name__ == '__main__':
     unittest.main()

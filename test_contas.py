@@ -40,8 +40,8 @@ class TestContas(unittest.TestCase):
             with self.subTest(dados=dados), self.assertRaises(ValueError):
                 self.banco.salvar_conta(dados)
         self.banco.salvar_conta(dados_conta(cpf='529.982.247-25'), primeiro)
-        with self.assertRaises(ValueError):
-            self.banco.salvar_conta(dados_conta(identificacao='CPF repetido', cpf='52998224725', numero='777', pix='cpf@example.com'))
+        mesma_pessoa = self.banco.salvar_conta(dados_conta(identificacao='Outro banco', cpf='52998224725', numero='777', pix='cpf@example.com'))
+        self.assertEqual(self.banco.obter_conta(mesma_pessoa)['cpf'], '52998224725')
         for cpf in ('', '11111111111'):
             with self.subTest(cpf=cpf), self.assertRaises(ValueError):
                 self.banco.salvar_conta(dados_conta(cpf=cpf))
@@ -80,7 +80,8 @@ class TestContas(unittest.TestCase):
         self.assertEqual(lista[rpv]['previsao'], '2026-12-20')
         self.assertEqual(lista[outra]['total_prorrogacoes'], 0)
         self.banco.excluir(rpv)
-        self.assertEqual(self.banco.prorrogacoes(rpv), [])
+        self.assertEqual(len(self.banco.prorrogacoes(rpv)), 2)
+        self.assertIsNotNone(self.banco.obter(rpv)['lixeira_em'])
         self.assertIsNotNone(self.banco.obter(outra))
 
     def test_migracao_com_backup_preserva_registros_antigos_invalidos(self):

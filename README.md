@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.8.0
+# Gestor de RPV — 0.9.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -12,7 +12,7 @@ Se precisar ver uma mensagem de erro, abra o Prompt de Comando nessa pasta:
 python app.py
 ```
 
-Mantenha `app.py`, `dados.py`, `componentes.py`, `contas.py`, `interacao.py`, `tema.py`, `calculadora.py` e `versao.py` juntos.
+Mantenha `app.py`, `dados.py`, `componentes.py`, `contas.py`, `interacao.py`, `tema.py`, `calculadora.py`, `backup.py`, `ordenacao.py` e `versao.py` juntos.
 A tela inicial tem os botões **Nova entrada**, **Ver histórico total**,
 **Contas de recebimento** e **Sair**. A versão aparece no canto inferior direito.
 As janelas abrem centralizadas; o histórico abre maximizado no Windows.
@@ -39,10 +39,9 @@ A busca continua acima da tabela. Os menus de clique direito permanecem disponí
   **Ver / Editar** para completar os cadastros.
 - **Cadastrar nova conta** permite informar identificação, nome completo, endereço,
   número, cidade, estado, banco, agência, conta e chave Pix.
-  O estado é selecionado pela sigla em uma lista com as 27 UFs, incluindo DF. CPF é obrigatório, válido e exclusivo entre
-  as contas. Cadastros antigos sem CPF aparecem como **⚠ Completar cadastro**,
+  O estado é selecionado pela sigla em uma lista com as 27 UFs, incluindo DF. O CPF é obrigatório e deve ser válido. O mesmo CPF pode ser usado em várias contas bancárias distintas. Cadastros antigos sem CPF aparecem como **⚠ Completar cadastro**,
   em vermelho, e precisam ser completados ao editar.
-- Identificação, CPF, chave Pix e combinação banco/agência/conta não podem se repetir,
+- Identificação, chave Pix e combinação banco/agência/conta não podem se repetir,
   inclusive entre contas desativadas. Endereços podem ser iguais.
   Use o mesmo nome de banco nos cadastros para uma comparação consistente.
 - **Remover** pede confirmação e exclui definitivamente contas sem RPVs vinculadas.
@@ -71,7 +70,13 @@ A busca continua acima da tabela. Os menus de clique direito permanecem disponí
 - Comissão é opcional e apenas informativa: não altera o lucro.
 - Os valores são guardados em centavos, sem ponto flutuante.
 - As datas têm calendários com navegação por mês e ano.
-- O histórico permite buscar por nome/data, editar e excluir com confirmação.
+- O histórico permite buscar por nome/data, editar e enviar para a lixeira com confirmação.
+- Clique nos cabeçalhos para ordenar: valores e datas começam do maior/mais recente
+  para o menor; nomes e contas começam em ordem alfabética. O segundo clique inverte
+  a direção e o terceiro retorna à ordem original. A ordenação continua funcionando
+  com a busca. Os números são comparados em centavos, não como texto.
+- A visualização de total investido foi retirada. O Valor Total RPV permanece fixo
+  como valor esperado de recebimento; não há um segundo campo de valor realizado.
 - O histórico mostra somente **Previsão inicial** e **Previsão atual**, sem a
   coluna Prorrogação. Clique na data atual ou use o menu de contexto
   **Editar previsão atual** para alterá-la pelo calendário.
@@ -98,22 +103,51 @@ A busca continua acima da tabela. Os menus de clique direito permanecem disponí
   ou **Copiar** os dados completos.
 - Não há mais botão “Copiar dados”; a ação está no menu de contexto.
 
-## Dados e backup
+## Backup e importação
 
-O banco é criado em `%LOCALAPPDATA%\GestorRPV\gestor.sqlite3`, fora da pasta do
-código. Atualizar os arquivos do programa preserva esse banco.
-Na primeira abertura após uma mudança de estrutura, o banco é adaptado
-automaticamente após criar uma cópia na mesma pasta: `backup-antes-0.4.0-*.sqlite3`
-para bancos antigos, `backup-antes-0.6.0-*.sqlite3` para bancos da versão 0.5.0, ou
-`backup-antes-0.7.0-*.sqlite3` para bancos da versão 0.6.0.
-A migração mantém os cadastros, as cópias de dados bancários, os recebimentos
-e as datas anteriores. Número, cidade e UF ficam vazios nos cadastros antigos
-até serem preenchidos; não são inferidos do endereço existente.
-Registros antigos são preservados, mesmo se precisarem de correção pelas novas
-regras de valores quando forem editados.
+Os botões **Backup**, **Importar dados** e **Lixeira** aparecem somente no histórico,
+à direita da busca, separados das ações da barra de menus.
 
-Para backup manual, feche o programa e copie o banco para um local seguro.
-O banco não é criptografado. Não envie bancos ou documentos pessoais ao GitHub.
+1. Clique em **Backup** e escolha uma pasta do Windows.
+2. O programa salva um arquivo `GestorRPV-data-hora.rpvbackup`.
+3. No outro computador, abra o aplicativo e escolha **Importar dados**.
+4. Selecione esse arquivo, confira as quantidades e confirme.
+
+**Importar substitui os dados locais; não junta dois históricos.** Antes da troca,
+é criado um backup dos dados atuais em
+`%LOCALAPPDATA%\GestorRPV\backups_automaticos`. Esse arquivo também pode ser importado
+para voltar ao estado anterior.
+
+O formato `.rpvbackup` é um ZIP com um snapshot consistente do SQLite, os arquivos
+da pasta `documentos` e um manifesto com hashes SHA-256. Inclui contas, RPVs ativas,
+lixeira, datas e histórico de alterações. A importação valida formato, conteúdo,
+integridade do banco e hashes antes de alterar os dados locais. Em caso de falha
+durante a troca, os documentos anteriores são recuperados e a cópia de segurança permanece.
+
+A pasta de documentos já é incluída para comportar futuros PDFs e imagens.
+A interface para anexar documentos ainda não foi implementada.
+
+## Lixeira e histórico de alterações
+
+- **Excluir registro** envia a RPV para a lixeira, preservando seus dados e vínculos.
+- Abra **Lixeira**, selecione a linha e clique em **Restaurar entrada**.
+- Não há exclusão definitiva de RPVs por esta interface.
+- Selecione uma RPV e use **Editar → Histórico de alterações**, ou o clique direito.
+- Cada alteração registra data/hora, ação, campo, valor anterior e valor novo.
+  Selecione uma alteração para ler o conteúdo completo no painel inferior.
+- Cadastro, edição, previsão atual, recebimento, lixeira e restauração são registrados
+  na mesma transação dos dados. Tentativas inválidas não geram alterações.
+- A auditoria começa na versão 0.9.0. Registros antigos recebem uma referência ao
+  estado encontrado na migração; alterações antigas desconhecidas não são inventadas.
+
+## Dados e atualização
+
+O banco fica em `%LOCALAPPDATA%\GestorRPV\gestor.sqlite3`, fora da pasta do código.
+Atualizar os arquivos preserva esse banco. A adaptação da estrutura cria uma cópia
+`backup-antes-versao-*.sqlite3` na mesma pasta. Na versão 0.9.0 ela também remove a
+restrição antiga de CPF único, preservando contas, IDs, snapshots e vínculos.
+
+O banco e os backups não são criptografados. Não envie dados pessoais ao GitHub.
 
 ## Validação
 
@@ -152,6 +186,6 @@ baixa e executa a nova versão; não há atualização automática pela internet
 
 ## Próximas etapas
 
-PDFs anexados, registro de eventual diferença entre valor previsto e valor recebido,
-e backup/restauração pela interface ainda não estão implementados.
-A confirmação de recebimento desta versão registra a data, sem alterar os valores.
+A interface de anexos em PDF/imagem e os ajustes finais de layout ficam para etapas futuras.
+O backup já inclui a pasta reservada para documentos. A confirmação de recebimento
+registra a data e mantém o Valor Total RPV, conforme a regra do aplicativo.

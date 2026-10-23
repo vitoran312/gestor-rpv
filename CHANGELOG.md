@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## 0.9.0
+
+- Backup portátil `.rpvbackup` com banco, documentos, lixeira e auditoria.
+- Importação validada, com confirmação de substituição e backup automático anterior.
+- Histórico de alterações por RPV, com data/hora e valores anteriores/novos.
+- Exclusão para lixeira e restauração de entradas.
+- Ordenação por cabeçalhos em três cliques: primeira direção, inversa e ordem original.
+- Várias contas por CPF, mantendo proteção contra repetição de conta bancária e Pix.
+- Retirada do total investido da visualização.
+- Migração com backup e preservação dos vínculos existentes.
+
 ## 0.8.0
 
 - Correção do texto sobreposto à caixa de recebimento ao desmarcar.

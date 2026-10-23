@@ -2,8 +2,8 @@
 import sqlite3
 import json
 import tkinter as tk
-from datetime import date
-from tkinter import messagebox, ttk
+from datetime import date, datetime
+from tkinter import messagebox, ttk, filedialog
 
 from dados import Banco, centavos, moeda, data_iso, data_br, nome_formatado
 from componentes import CampoMoeda, CampoData, centralizar, maximizar
@@ -11,6 +11,8 @@ from contas import JanelaContas, dados_para_copiar
 from versao import VERSAO
 from tema import cores, definir_modo, atualizar_widgets
 from calculadora import JanelaCalculadora
+from backup import criar_backup, BackupPreparado
+from ordenacao import ordenar
 from interacao import instalar_menu_texto, aplicar_formato, capitalizar_inicio, menu_copia, novo_menu, mostrar_menu, copiar_texto
 
 
@@ -69,6 +71,7 @@ class Aplicativo:
         editar = novo_menu(barra)
         editar.add_command(label='Editar registro', command=self.abrir)
         editar.add_command(label='Excluir registro', command=self.excluir)
+        editar.add_command(label='Histórico de alterações', command=self.historico_selecionado)
         exibir = novo_menu(barra)
         exibir.add_radiobutton(label='Tema claro', variable=self.modo_tema, value='claro', command=self.configurar_tema)
         exibir.add_radiobutton(label='Tema escuro', variable=self.modo_tema, value='escuro', command=self.configurar_tema)
@@ -144,6 +147,11 @@ class Aplicativo:
         corpo.pack(fill='both', expand=True)
         barra = ttk.Frame(corpo)
         barra.pack(fill='x', pady=(0, 12))
+        protecao = ttk.Frame(barra)
+        protecao.pack(side='right', padx=(24, 0))
+        ttk.Button(protecao, text='Backup', command=self.exportar_backup).pack(side='left', padx=4)
+        ttk.Button(protecao, text='Importar dados', command=self.importar_dados).pack(side='left', padx=4)
+        ttk.Button(protecao, text='Lixeira', command=self.mostrar_lixeira).pack(side='left', padx=4)
         ttk.Label(barra, text='Buscar nome ou data:').pack(side='left', padx=(0, 6))
         self.busca = tk.StringVar()
         entrada_busca = ttk.Entry(barra, textvariable=self.busca)
@@ -157,8 +165,10 @@ class Aplicativo:
         self.tabela = ttk.Treeview(quadro, columns=colunas, show='headings', selectmode='browse')
         titulos = ('Titular original', 'Data de Aquisição', 'Valor de aquisição', 'Valor Total RPV',
                    'Lucro previsto', 'Conta de destino', 'Previsão inicial', 'Previsão atual', 'Recebido')
+        self.ordenacao = None
+        self.titulos_colunas = dict(zip(colunas, titulos))
         for coluna, titulo in zip(colunas, titulos):
-            self.tabela.heading(coluna, text=titulo, anchor='center')
+            self.tabela.heading(coluna, text=titulo, anchor='center', command=lambda c=coluna: self.ordenar_coluna(c))
             self.tabela.column(coluna, width=170 if coluna == 'nome' else 145, minwidth=100, anchor='center')
         self.acoes_linhas = {}
         self.reposicionar_pendente = False
@@ -194,6 +204,8 @@ class Aplicativo:
         if self.historico is None or not self.historico.winfo_exists():
             return
         registros = self.banco.listar(self.busca.get().strip())
+        if self.ordenacao:
+            registros = ordenar(registros, *self.ordenacao)
         self.recebimentos = {str(r['id']): r['recebimento'] for r in registros}
         for widgets in self.acoes_linhas.values():
             for widget in widgets:
@@ -208,8 +220,169 @@ class Aplicativo:
                 ''))
         self.agendar_acoes()
         self.resumo.config(text=f'{len(registros)} registro(s) • '
-            f"Investido: R$ {moeda(sum(r['custo'] for r in registros))} • "
             f"Lucro previsto: R$ {moeda(sum(r['previsto'] - r['custo'] for r in registros))}")
+
+    def ordenar_coluna(self, coluna):
+        primeira = 'asc' if coluna in ('nome', 'conta') else 'desc'
+        segunda = 'desc' if primeira == 'asc' else 'asc'
+        if self.ordenacao is None or self.ordenacao[0] != coluna:
+            self.ordenacao = (coluna, primeira)
+        elif self.ordenacao[1] == primeira:
+            self.ordenacao = (coluna, segunda)
+        else:
+            self.ordenacao = None
+        for chave, titulo in self.titulos_colunas.items():
+            seta = ''
+            if self.ordenacao and chave == self.ordenacao[0]:
+                seta = ' ▼' if self.ordenacao[1] == 'desc' else ' ▲'
+            self.tabela.heading(chave, text=titulo + seta)
+        self.atualizar()
+
+    def exportar_backup(self):
+        pasta = filedialog.askdirectory(parent=self.historico, title='Escolha onde salvar o backup')
+        if not pasta:
+            return
+        try:
+            arquivo = criar_backup(self.banco, pasta)
+        except (OSError, sqlite3.Error, ValueError) as erro:
+            messagebox.showerror('Backup', 'Não foi possível criar o backup. ' + str(erro), parent=self.historico)
+            return
+        messagebox.showinfo('Backup concluído', f'Backup salvo em:\n{arquivo}', parent=self.historico)
+
+    def importar_dados(self):
+        arquivo = filedialog.askopenfilename(parent=self.historico, title='Importar backup do Gestor de RPV',
+                                             filetypes=[('Backup do Gestor de RPV', '*.rpvbackup')])
+        if not arquivo:
+            return
+        try:
+            with BackupPreparado(arquivo) as pacote:
+                resumo = pacote.resumo
+                if not messagebox.askyesno('Importar dados',
+                    f"O backup contém {resumo['registros']} entrada(s), {resumo['lixeira']} na lixeira, "
+                    f"{resumo['contas']} conta(s) e {resumo['documentos']} documento(s).\n\n"
+                    'Ele substituirá os dados deste computador, sem juntar os históricos. '
+                    'Uma cópia automática dos dados atuais será salva antes. Continuar?',
+                    parent=self.historico, icon='warning', default='no'):
+                    return
+                seguranca = pacote.restaurar(self.banco)
+        except (OSError, sqlite3.Error, ValueError, RuntimeError) as erro:
+            messagebox.showerror('Importar dados', 'Não foi possível importar o backup. ' + str(erro), parent=self.historico)
+            return
+        # Formulários antigos não podem continuar editando IDs do banco substituído.
+        for janela in list(self.janela.winfo_children()):
+            if isinstance(janela, tk.Toplevel) and janela != self.historico and (
+                self.calculadora is None or janela != self.calculadora.tela):
+                janela.destroy()
+        for janela in list(self.historico.winfo_children()):
+            if isinstance(janela, tk.Toplevel):
+                janela.destroy()
+        self.busca.set('')
+        self.ordenacao = None
+        for chave, titulo in self.titulos_colunas.items():
+            self.tabela.heading(chave, text=titulo)
+        self.atualizar()
+        messagebox.showinfo('Importação concluída', 'Dados recuperados. Backup anterior salvo em:\n' + str(seguranca),
+                            parent=self.historico)
+
+    def historico_selecionado(self):
+        selecao = self.tabela.selection()
+        if not selecao:
+            messagebox.showinfo('Histórico de alterações', 'Selecione uma RPV na lista.', parent=self.historico)
+            return
+        self.mostrar_auditoria(int(selecao[0]))
+
+    def mostrar_auditoria(self, identificador):
+        registro = self.banco.obter(identificador)
+        if registro is None:
+            return
+        tela = tk.Toplevel(self.historico)
+        tela.withdraw()
+        tela.title('Histórico de alterações — ' + registro['nome'])
+        tela.configure(bg=cores()['fundo'])
+        corpo = ttk.Frame(tela, padding=20)
+        corpo.pack(fill='both', expand=True)
+        ttk.Label(corpo, text='Alterações registradas a partir da versão 0.9.0.').pack(anchor='w', pady=(0, 10))
+        quadro = ttk.Frame(corpo)
+        quadro.pack(fill='both', expand=True)
+        tabela = ttk.Treeview(quadro, columns=('quando','acao','campo','antes','depois'), show='headings')
+        for chave, titulo in (('quando','Data e hora'), ('acao','Ação'), ('campo','Campo'), ('antes','Antes'), ('depois','Depois')):
+            tabela.heading(chave, text=titulo)
+            tabela.column(chave, width=180, anchor='center')
+        scroll = ttk.Scrollbar(quadro, orient='vertical', command=tabela.yview)
+        tabela.configure(yscrollcommand=scroll.set)
+        tabela.pack(side='left', fill='both', expand=True)
+        scroll.pack(side='right', fill='y')
+        nomes = {'nome':'Titular', 'aquisicao':'Data de Aquisição', 'previsto':'Valor Total RPV',
+                 'custo':'Valor de aquisição', 'comissao':'Comissão', 'conta':'Conta de destino',
+                 'previsao':'Previsão inicial', 'previsao_atual':'Previsão atual', 'recebimento':'Recebimento',
+                 'observacoes':'Observações', 'lixeira_em':'Lixeira', 'conta_snapshot':'Dados de recebimento',
+                 'conta_id':'Identificador da conta', 'previsao_atual_definida':'Previsão atual'}
+
+        def exibir(campo, valor):
+            if valor is None:
+                return '—'
+            if campo in ('previsto','custo','comissao'):
+                return 'R$ ' + moeda(valor)
+            if campo in ('aquisicao','previsao','previsao_atual','previsao_atual_definida','recebimento'):
+                return data_br(valor)
+            return str(valor)
+
+        for evento in self.banco.historico(identificador):
+            quando = datetime.fromisoformat(evento['quando']).astimezone().strftime('%d/%m/%Y %H:%M:%S')
+            for campo, valores in json.loads(evento['alteracoes']).items():
+                tabela.insert('', 'end', values=(quando, evento['acao'], nomes.get(campo,campo),
+                    exibir(campo,valores['antes']), exibir(campo,valores['depois'])))
+        detalhe = tk.Text(corpo, height=5, wrap='word', state='disabled', font=('Verdana',10))
+        detalhe.pack(fill='x', pady=(12, 0))
+
+        def selecionar(_evento):
+            linhas = tabela.selection()
+            if linhas:
+                valores = tabela.item(linhas[0], 'values')
+                detalhe.configure(state='normal')
+                detalhe.delete('1.0', tk.END)
+                detalhe.insert('1.0', '\n'.join(str(v) for v in valores))
+                detalhe.configure(state='disabled')
+        tabela.bind('<<TreeviewSelect>>', selecionar)
+        centralizar(tela, 1050, 600)
+        tela.deiconify()
+
+    def mostrar_lixeira(self):
+        tela = tk.Toplevel(self.historico)
+        tela.withdraw()
+        tela.title('Lixeira')
+        tela.configure(bg=cores()['fundo'])
+        corpo = ttk.Frame(tela, padding=20)
+        corpo.pack(fill='both', expand=True)
+        tabela = ttk.Treeview(corpo, columns=('nome','data','removido'), show='headings', selectmode='browse')
+        for chave,titulo in (('nome','Titular'),('data','Data de Aquisição'),('removido','Enviado à lixeira')):
+            tabela.heading(chave,text=titulo)
+            tabela.column(chave,width=220,anchor='center')
+        tabela.pack(fill='both',expand=True)
+
+        def atualizar():
+            tabela.delete(*tabela.get_children())
+            for registro in self.banco.listar_lixeira():
+                quando = datetime.fromisoformat(registro['lixeira_em']).strftime('%d/%m/%Y %H:%M:%S')
+                tabela.insert('', 'end', iid=str(registro['id']), values=(registro['nome'],data_br(registro['aquisicao']),quando))
+
+        def restaurar():
+            selecao = tabela.selection()
+            if not selecao:
+                messagebox.showinfo('Lixeira','Selecione uma entrada para restaurar.',parent=tela)
+                return
+            try:
+                self.banco.restaurar(int(selecao[0]))
+            except (sqlite3.Error,ValueError) as erro:
+                messagebox.showerror('Lixeira',str(erro),parent=tela)
+                return
+            atualizar()
+            self.atualizar()
+
+        ttk.Button(corpo,text='Restaurar entrada',command=restaurar).pack(anchor='e',pady=(12,0))
+        atualizar()
+        centralizar(tela,800,450)
+        tela.deiconify()
 
     def agendar_acoes(self):
         if self.historico is None or not self.historico.winfo_exists():
@@ -319,6 +492,7 @@ class Aplicativo:
             self.tabela.selection_set(linha)
             menu.add_command(label='Editar', command=self.abrir)
             menu.add_command(label='Excluir', command=self.excluir)
+            menu.add_command(label='Histórico de alterações', command=lambda: self.mostrar_auditoria(int(linha)))
             menu.add_command(label='Recebido', command=lambda: self.abrir_recebimento(int(linha)))
             menu.add_command(label='Editar previsão atual', command=lambda: self.editar_previsao(int(linha)))
             menu.add_command(label='Copiar', command=lambda: self.copiar_linha(linha))
@@ -412,15 +586,15 @@ class Aplicativo:
             return
         confirmar = messagebox.askyesno(
             'Excluir registro',
-            f"Excluir o registro de {registro['nome']}\n"
+            f"Mover para a lixeira o registro de {registro['nome']}\n"
             f"adquirido em {data_br(registro['aquisicao'])}?\n\n"
-            'Esta exclusão é permanente e não pode ser desfeita.',
+            'Você poderá recuperar a entrada pela Lixeira.',
             parent=self.historico, icon='warning', default='no')
         if not confirmar:
             return
         try:
             self.banco.excluir(identificador)
-        except sqlite3.Error:
+        except (sqlite3.Error, ValueError):
             messagebox.showerror('Não foi possível excluir',
                                  'O registro não foi excluído. Tente novamente.',
                                  parent=self.historico)
