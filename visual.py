@@ -9,40 +9,81 @@ from tema import cores
 
 
 def familia_fonte(raiz):
+    raiz = raiz._root()
+    if hasattr(raiz,'_familia_moss'):
+        return raiz._familia_moss
     disponiveis = {f.casefold() for f in tkfont.families(raiz)}
-    return next((f for f in ('Segoe UI','Inter','DejaVu Sans','Liberation Sans','Helvetica') if f.casefold() in disponiveis), 'TkDefaultFont')
+    raiz._familia_moss = next((f for f in ('Segoe UI','Inter','DejaVu Sans','Liberation Sans','Helvetica') if f.casefold() in disponiveis),tkfont.nametofont('TkDefaultFont').actual('family'))
+    return raiz._familia_moss
 
 
 def _rgb(cor):
     return tuple(int(cor[i:i+2],16) for i in (1,3,5))
 
 
-@lru_cache(maxsize=32)
-def _png_arredondado(cor, sombra=True, raio=15):
-    """PNG RGBA com bordas antisserrilhadas; o centro aceita esticamento pelo ttk."""
-    largura,altura = 72,48
-    rgb = _rgb(cor)
-    dados = bytearray()
+@lru_cache(maxsize=4)
+def _mascara_arredondada(sombra,raio):
+    """A geometria da sombra é calculada uma única vez e reutilizada em todas as cores."""
     def distancia(x,y):
-        qx,qy = abs(x-36)-(30-raio), abs(y-22)-(16-raio)
+        qx,qy = abs(x-48)-(42-raio),abs(y-34)-(28-raio)
         return math.hypot(max(qx,0),max(qy,0))+min(max(qx,qy),0)-raio
-    for y in range(altura):
-        dados.append(0)
-        for x in range(largura):
-            sample_y = 22 if 20<=y<=26 else y
+    mascara = []
+    for y in range(72):
+        for x in range(96):
+            sample_y = y
             cobertura = sum(distancia(x+dx,sample_y+dy)<=0 for dx,dy in ((.25,.25),(.75,.25),(.25,.75),(.75,.75)))/4
             d = max(0,distancia(x+.5,sample_y-2.5))
             alpha = .13*math.exp(-d*d/13) if sombra else 0
-            a = cobertura + alpha*(1-cobertura)
-            if a:
-                pixels = tuple(round(c*cobertura/a) for c in rgb)
-                dados.extend((*pixels,round(255*a)))
-            else:
-                dados.extend((0,0,0,0))
+            a = cobertura+alpha*(1-cobertura)
+            mascara.append((cobertura/a if a else 0,round(255*a)))
+    return tuple(mascara)
+
+
+def _codificar_png(largura,altura,dados):
     def bloco(nome,valor):
         return struct.pack('!I',len(valor))+nome+valor+struct.pack('!I',zlib.crc32(nome+valor)&0xffffffff)
     return (b'\x89PNG\r\n\x1a\n'+bloco(b'IHDR',struct.pack('!2I5B',largura,altura,8,6,0,0,0))+
             bloco(b'IDAT',zlib.compress(bytes(dados)))+bloco(b'IEND',b''))
+
+
+@lru_cache(maxsize=32)
+def _png_arredondado(cor,sombra=True,raio=15):
+    rgb = _rgb(cor)
+    dados = bytearray()
+    for indice,(peso,alpha) in enumerate(_mascara_arredondada(sombra,raio)):
+        if indice%96==0: dados.append(0)
+        dados.extend((round(rgb[0]*peso),round(rgb[1]*peso),round(rgb[2]*peso),alpha))
+    return _codificar_png(96,72,dados)
+
+
+def icone_tema(raiz,modo):
+    """Lua para ativar o escuro e sol para ativar o claro, sem depender de uma fonte de símbolos."""
+    cache = getattr(raiz,'_icones_modo',{})
+    raiz._icones_modo = cache
+    cor = cores()['texto']
+    chave = (modo,cor)
+    if chave not in cache:
+        rgb = _rgb(cor)
+        def dentro(x,y):
+            if modo=='claro':
+                return math.hypot(x-10,y-10)<=8 and math.hypot(x-14,y-7)>7.5
+            if math.hypot(x-10,y-10)<=4:
+                return True
+            for i in range(8):
+                angulo=i*math.pi/4
+                ux,uy=math.cos(angulo),math.sin(angulo)
+                proj=max(6.5,min(9,(x-10)*ux+(y-10)*uy))
+                if math.hypot(x-10-proj*ux,y-10-proj*uy)<=.75:
+                    return True
+            return False
+        dados=bytearray()
+        for y in range(20):
+            dados.append(0)
+            for x in range(20):
+                alpha=round(255*sum(dentro(x+dx,y+dy) for dx,dy in ((.25,.25),(.75,.25),(.25,.75),(.75,.75)))/4)
+                dados.extend((*rgb,alpha))
+        cache[chave]=tk.PhotoImage(master=raiz,data=_codificar_png(20,20,dados))
+    return cache[chave]
 
 
 def aplicar_superficies(raiz):
@@ -63,8 +104,8 @@ def aplicar_superficies(raiz):
                                               ('primario','primario','primario_ativo','primario_pressionado')):
             estilo.element_create(prefixo+nome,'image',imagens[normal],
                                   ('disabled',imagens['inativo']),('pressed',imagens[pressionado]),
-                                  ('active',imagens[hover]),border=(24,22,24,24),padding=0,sticky='nsew')
-        estilo.element_create(prefixo+'cartao','image',imagens['cartao'],border=(24,22,24,24),padding=0,sticky='nsew')
+                                  ('active',imagens[hover]),border=(24,22,24,24),padding=0,width=72,height=48,sticky='nsew')
+        estilo.element_create(prefixo+'cartao','image',imagens['cartao'],border=(24,22,24,24),padding=0,width=72,height=48,sticky='nsew')
         cache[chave] = (prefixo,imagens)
     prefixo,_imagens = cache[chave]
     for nome,elemento in (('TButton','secundario'),('Salvar.TButton','primario'),

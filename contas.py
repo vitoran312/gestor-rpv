@@ -33,18 +33,18 @@ class JanelaContas:
         ttk.Button(barra, text='Ver / Editar', command=self.editar).pack(side='left', padx=8)
         ttk.Button(barra, text='Desativar / Reativar', command=self.alterar_status).pack(side='left')
         ttk.Button(barra, text='Remover', command=self.remover).pack(side='left', padx=8)
-        self.tabela = ttk.Treeview(corpo, columns=('nome', 'banco', 'status'), show='headings', selectmode='browse')
+        self.tabela = ttk.Treeview(corpo, style='Contas.Treeview', columns=('nome', 'banco', 'status'), show='headings', selectmode='browse')
         for chave, titulo in (('nome', 'Identificação'), ('banco', 'Banco'), ('status', 'Situação')):
             self.tabela.heading(chave, text=titulo, anchor='center')
-            self.tabela.column(chave, width=210, anchor='center')
+            self.tabela.column(chave, width=340 if chave=='status' else 240, anchor='center')
         self.tabela.tag_configure('incompleta', foreground=cores()['vermelho'])
         self.tabela.pack(fill='both', expand=True)
         habilitar_selecao(self.tabela,abrir=self.editar,excluir=self.remover)
         self.tabela.bind('<Button-3>', self.menu_contexto)
         self.tabela.bind('<Double-1>', lambda _: self.editar())
-        ttk.Label(corpo, text='Contas desativadas permanecem no histórico e podem ser reativadas.').pack(pady=(12, 0))
+        ttk.Label(corpo, text='Contas desativadas permanecem no histórico e podem ser reativadas.').pack(side='bottom',pady=(12,0),before=self.tabela)
         self.atualizar()
-        centralizar(self.tela, 850, 480)
+        centralizar(self.tela, 960, 520)
         self.tela.deiconify()
 
     def atualizar(self):

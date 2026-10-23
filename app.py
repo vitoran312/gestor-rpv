@@ -6,11 +6,11 @@ from datetime import date, datetime
 from tkinter import messagebox, ttk, filedialog, font as tkfont
 
 from dados import Banco, centavos, moeda, data_iso, data_br, nome_formatado, previsao_por_prazo
-from componentes import CampoMoeda, CampoData, centralizar, maximizar, AreaRolavel
+from componentes import CampoMoeda, CampoData, centralizar, maximizar, AreaRolavel, BalaoAjuda
 from contas import JanelaContas, dados_para_copiar
 from versao import VERSAO
 from tema import cores, definir_modo, atualizar_widgets
-from visual import aplicar_superficies, familia_fonte, Icone
+from visual import aplicar_superficies, familia_fonte, Icone, icone_tema
 from calculadora import JanelaCalculadora
 from backup import criar_backup, BackupPreparado
 from ordenacao import ordenar
@@ -39,9 +39,9 @@ class Aplicativo:
         inicio.pack(fill='both',expand=True)
         topo = ttk.Frame(inicio)
         topo.pack(fill='x')
-        ttk.Label(topo,text='VITORAN  /  TECH',style='Marca.TLabel').pack(side='left')
         self.texto_alternar_tema = tk.StringVar()
-        ttk.Button(topo,textvariable=self.texto_alternar_tema,command=self.alternar_tema,width=15).pack(side='right')
+        self.botao_alternar_tema=ttk.Button(topo,textvariable=self.texto_alternar_tema,command=self.alternar_tema,width=15,compound='left')
+        self.botao_alternar_tema.pack(side='right')
         ttk.Frame(inicio).pack(fill='both',expand=True)
         cabecalho = ttk.Frame(inicio)
         cabecalho.pack(fill='x',pady=(24,24))
@@ -50,15 +50,14 @@ class Aplicativo:
         self.grade_inicio = ttk.Frame(inicio)
         self.grade_inicio.pack(fill='x')
         self.cartoes_inicio = []
-        for icone,numero,titulo,descricao,rotulo,acao in (
-            ('entrada','01','Uma nova operação','Cadastre sua próxima aquisição\ne reúna os documentos da entrada.','Nova entrada',self.formulario),
-            ('historico','02','Tudo sob controle','Consulte valores, acompanhe prazos\ne confirme seus recebimentos.','Ver histórico total',self.mostrar_historico),
-            ('contas','03','Contas de recebimento','Mantenha seus dados bancários\norganizados e sempre à mão.','Contas de recebimento',self.mostrar_contas)):
+        for icone,titulo,descricao,rotulo,acao in (
+            ('entrada','Uma nova operação','Cadastre sua próxima aquisição\ne reúna os documentos da entrada.','Nova entrada',self.formulario),
+            ('historico','Tudo sob controle','Consulte valores, acompanhe prazos\ne confirme seus recebimentos.','Ver histórico total',self.mostrar_historico),
+            ('contas','Contas de recebimento','Mantenha seus dados bancários\norganizados e sempre à mão.','Contas de recebimento',self.mostrar_contas)):
             cartao = ttk.Frame(self.grade_inicio,style='Cartao.TFrame',padding=(26,24))
             faixa = ttk.Frame(cartao,style='Superficie.TFrame')
             faixa.pack(fill='x')
             Icone(faixa,icone).pack(side='left')
-            ttk.Label(faixa,text=numero,style='CartaoNumero.TLabel').pack(side='right')
             ttk.Label(cartao,text=titulo,style='CartaoTitulo.TLabel').pack(anchor='w',pady=(14,8))
             ttk.Label(cartao,text=descricao,style='CartaoTexto.TLabel',justify='left').pack(anchor='w')
             ttk.Button(cartao,text=rotulo,style='Inicio.Principal.TButton' if icone=='entrada' else 'Inicio.TButton',command=acao).pack(side='bottom',fill='x',pady=(20,8))
@@ -81,6 +80,7 @@ class Aplicativo:
     def atualizar_alternador_tema(self):
         if hasattr(self,'texto_alternar_tema'):
             self.texto_alternar_tema.set('Modo escuro' if self.modo_tema.get()=='claro' else 'Modo claro')
+            self.botao_alternar_tema.configure(image=icone_tema(self.janela,self.modo_tema.get()))
 
     def organizar_inicio(self,evento):
         colunas = 3 if evento.width>=1050 else 1
@@ -154,69 +154,80 @@ class Aplicativo:
             atualizar_widgets(evento.widget)
 
     def configurar_tema(self):
-        estilo = ttk.Style()
-        estilo.theme_use('clam')
-        definir_modo(self.modo_tema.get())
-        c = cores()
-        fundo,campo,texto = c['fundo'],c['campo'],c['texto']
-        fonte = familia_fonte(self.janela)
-        self.fonte = fonte
-        primario_texto = '#fffdf8' if self.modo_tema.get()=='claro' else '#193623'
-        estilo.configure('.',font=(fonte,10),background=fundo,foreground=texto,
-                         bordercolor=c['borda'],lightcolor=campo,darkcolor=fundo,troughcolor=fundo)
-        aplicar_superficies(self.janela)
-        estilo.configure('TButton',padding=(18,10),background=fundo,foreground=texto,anchor='center',focuscolor=c['floresta'])
-        estilo.map('TButton',background=[('disabled',fundo),('!disabled',fundo)],foreground=[('disabled',c['desabilitado']),('!disabled',texto)])
-        estilo.configure('Inicio.TButton',background=c['superficie'])
-        estilo.map('Inicio.TButton',background=[('disabled',c['superficie']),('!disabled',c['superficie'])])
-        estilo.configure('Inicio.Principal.TButton',background=c['superficie'])
-        estilo.map('Inicio.Principal.TButton',background=[('disabled',c['superficie']),('!disabled',c['superficie'])])
-        for nome in ('Salvar.TButton','Principal.TButton','DiaSelecionado.TButton','Resultado.Calculadora.TButton'):
-            estilo.configure(nome,font=(fonte,10,'bold'),padding=(18,10),foreground=primario_texto,focuscolor=primario_texto)
-            estilo.map(nome,foreground=[('disabled',c['desabilitado']),('!disabled',primario_texto)])
-        estilo.configure('Menu.TButton',font=(fonte,16,'bold'),padding=(22,16))
-        for tipo in ('TRadiobutton','TCheckbutton'):
-            estilo.configure(tipo,background=fundo,foreground=texto,indicatorbackground=campo,indicatorforeground=texto,padding=3)
-            estilo.map(tipo,background=[('disabled',fundo),('active',c['ativo']),('!disabled',fundo)],
-                       foreground=[('disabled',c['desabilitado']),('!disabled',texto)],
-                       indicatorbackground=[('disabled',fundo),('selected',c['primario']),('!disabled',campo)],
-                       indicatorforeground=[('disabled',c['desabilitado']),('selected',primario_texto),('!disabled',texto)])
-        for nome,tamanho,peso,cor in (
-            ('Marca.TLabel',12,'bold',c['floresta']),('InicioTitulo.TLabel',36,'bold',c['floresta']),
-            ('Titulo.TLabel',24,'bold',c['floresta']),('Subtitulo.TLabel',11,'normal',c['secundario']),
-            ('Discreto.TLabel',9,'normal',c['secundario'])):
-            estilo.configure(nome,font=(fonte,tamanho,peso),foreground=cor,background=fundo)
-        estilo.configure('Superficie.TFrame',background=c['superficie'])
-        for nome,tamanho,peso,cor in (
-            ('CartaoTitulo.TLabel',16,'bold',texto),('CartaoTexto.TLabel',10,'normal',c['secundario']),
-            ('CartaoNumero.TLabel',11,'normal',c['secundario']),('ResumoTitulo.TLabel',10,'normal',c['secundario']),
-            ('ResumoValor.TLabel',19,'bold',texto),('ResumoRealizado.TLabel',19,'bold',c['verde'])):
-            estilo.configure(nome,background=c['superficie'],font=(fonte,tamanho,peso),foreground=cor)
-        estilo.configure('DataCalculada.TLabel',background=fundo,font=(fonte,10,'bold'))
-        estilo.map('DataCalculada.TLabel',background=[('disabled',fundo),('!disabled',fundo)],foreground=[('disabled',c['desabilitado']),('!disabled',texto)])
-        estilo.configure('Dinheiro.TFrame',background=campo)
-        estilo.configure('Dinheiro.TLabel',background=campo)
-        estilo.configure('DiaSelecionado.TButton',font=(fonte,10,'bold'))
-        estilo.configure('Recebido.TCheckbutton',foreground=c['verde'],font=(fonte,10,'bold'),background=campo)
-        estilo.map('Recebido.TCheckbutton',foreground=[('!disabled',c['verde'])],background=[('active',c['ativo']),('!disabled',campo)])
-        estilo.configure('Previsao.TLabel',background=campo,anchor='center')
-        estilo.configure('PrevisaoAdiada.TLabel',background=campo,foreground=c['vermelho'],anchor='center')
-        estilo.configure('Recebido.TLabel',foreground=c['verde'],font=(fonte,10,'bold'))
-        estilo.configure('Restaurar.TButton',font=(fonte,10,'bold'),padding=(18,10))
-        estilo.configure('Calculadora.TButton',font=(fonte,15),padding=(8,10))
-        estilo.configure('Resultado.Calculadora.TButton',font=(fonte,15,'bold'),padding=(8,10))
-        for tipo in ('TEntry','TCombobox'):
-            estilo.configure(tipo,fieldbackground=campo,foreground=texto,insertcolor=texto,padding=(10,8),borderwidth=1,relief='flat',arrowsize=14)
-            estilo.map(tipo,fieldbackground=[('disabled',fundo),('readonly',campo)],
-                       foreground=[('disabled',c['desabilitado']),('readonly',texto)],
-                       bordercolor=[('focus',c['floresta']),('!focus',c['borda'])],
-                       selectbackground=[('!disabled',c['selecao'])],selectforeground=[('!disabled',c['texto_selecao'])])
-        estilo.configure('Treeview',background=campo,fieldbackground=campo,foreground=texto,rowheight=40,borderwidth=0)
-        estilo.map('Treeview',background=[('selected',c['selecao'])],foreground=[('selected',c['texto_selecao'])])
-        estilo.configure('Treeview.Heading',background=c['sage'],foreground=texto,font=(fonte,10,'bold'),padding=(12,12),relief='flat',borderwidth=0)
-        estilo.map('Treeview.Heading',background=[('active',c['ativo'])],foreground=[('active',texto)])
-        estilo.configure('TScrollbar',background=c['borda'],troughcolor=fundo,borderwidth=0,arrowsize=12)
-        estilo.map('TScrollbar',background=[('active',c['secundario'])])
+        estilo=ttk.Style(self.janela)
+        modo=self.modo_tema.get()
+        definir_modo(modo)
+        self.fonte=familia_fonte(self.janela)
+        fonte=self.fonte
+        nome_tema='VitoranMoss'+modo.title()
+        if nome_tema not in estilo.theme_names():
+            estilo.theme_create(nome_tema,parent='clam')
+            estilo.theme_use(nome_tema)
+            c = cores()
+            fundo,campo,texto = c['fundo'],c['campo'],c['texto']
+            primario_texto = '#fffdf8' if self.modo_tema.get()=='claro' else '#193623'
+            estilo.configure('.',font=(fonte,10),background=fundo,foreground=texto,
+                             bordercolor=c['borda'],lightcolor=campo,darkcolor=fundo,troughcolor=fundo)
+            aplicar_superficies(self.janela)
+            estilo.configure('TButton',padding=(18,10),background=fundo,foreground=texto,anchor='center',focuscolor=c['floresta'])
+            estilo.map('TButton',background=[('disabled',fundo),('!disabled',fundo)],foreground=[('disabled',c['desabilitado']),('!disabled',texto)])
+            estilo.configure('Inicio.TButton',background=c['superficie'])
+            estilo.map('Inicio.TButton',background=[('disabled',c['superficie']),('!disabled',c['superficie'])])
+            estilo.configure('Inicio.Principal.TButton',background=c['superficie'])
+            estilo.map('Inicio.Principal.TButton',background=[('disabled',c['superficie']),('!disabled',c['superficie'])])
+            for nome in ('Salvar.TButton','Principal.TButton','DiaSelecionado.TButton','Resultado.Calculadora.TButton'):
+                estilo.configure(nome,font=(fonte,10,'bold'),padding=(18,10),foreground=primario_texto,focuscolor=primario_texto)
+                estilo.map(nome,foreground=[('disabled',c['desabilitado']),('!disabled',primario_texto)])
+            estilo.configure('Menu.TButton',font=(fonte,16,'bold'),padding=(22,16))
+            for tipo in ('TRadiobutton','TCheckbutton'):
+                estilo.configure(tipo,background=fundo,foreground=texto,indicatorbackground=campo,indicatorforeground=texto,padding=3)
+                estilo.map(tipo,background=[('disabled',fundo),('active',c['ativo']),('!disabled',fundo)],
+                           foreground=[('disabled',c['desabilitado']),('!disabled',texto)],
+                           indicatorbackground=[('disabled',fundo),('selected',c['primario']),('!disabled',campo)],
+                           indicatorforeground=[('disabled',c['desabilitado']),('selected',primario_texto),('!disabled',texto)])
+            for nome,tamanho,peso,cor in (
+                ('InicioTitulo.TLabel',36,'bold',c['floresta']),
+                ('Titulo.TLabel',24,'bold',c['floresta']),('Subtitulo.TLabel',11,'normal',c['secundario']),
+                ('Discreto.TLabel',9,'normal',c['secundario'])):
+                estilo.configure(nome,font=(fonte,tamanho,peso),foreground=cor,background=fundo)
+            estilo.configure('Superficie.TFrame',background=c['superficie'])
+            for nome,tamanho,peso,cor in (
+                ('CartaoTitulo.TLabel',16,'bold',texto),('CartaoTexto.TLabel',10,'normal',c['secundario']),
+                ('ResumoTitulo.TLabel',10,'normal',c['secundario']),
+                ('ResumoValor.TLabel',19,'bold',texto),('ResumoRealizado.TLabel',19,'bold',c['verde'])):
+                estilo.configure(nome,background=c['superficie'],font=(fonte,tamanho,peso),foreground=cor)
+            estilo.configure('DataCalculada.TLabel',background=fundo,font=(fonte,10,'bold'))
+            estilo.map('DataCalculada.TLabel',background=[('disabled',fundo),('!disabled',fundo)],foreground=[('disabled',c['desabilitado']),('!disabled',texto)])
+            estilo.configure('Dinheiro.TFrame',background=campo)
+            estilo.configure('Dinheiro.TLabel',background=campo)
+            estilo.configure('DiaSelecionado.TButton',font=(fonte,10,'bold'))
+            estilo.configure('Recebido.TCheckbutton',foreground=c['verde'],font=(fonte,10,'bold'),background=campo)
+            estilo.map('Recebido.TCheckbutton',foreground=[('!disabled',c['verde'])],background=[('active',c['ativo']),('!disabled',campo)])
+            estilo.configure('Previsao.TLabel',background=campo,anchor='center')
+            estilo.configure('PrevisaoAdiada.TLabel',background=campo,foreground=c['vermelho'],anchor='center')
+            estilo.configure('Recebido.TLabel',foreground=c['verde'],font=(fonte,10,'bold'))
+            estilo.configure('Restaurar.TButton',font=(fonte,10,'bold'),padding=(18,10))
+            estilo.configure('Calculadora.TButton',font=(fonte,15),padding=(8,10))
+            estilo.configure('Resultado.Calculadora.TButton',font=(fonte,15,'bold'),padding=(8,10))
+            for tipo in ('TEntry','TCombobox'):
+                estilo.configure(tipo,fieldbackground=campo,foreground=texto,insertcolor=texto,padding=(10,8),borderwidth=1,relief='flat',arrowsize=14)
+                estilo.map(tipo,fieldbackground=[('disabled',fundo),('readonly',campo)],
+                           foreground=[('disabled',c['desabilitado']),('readonly',texto)],
+                           bordercolor=[('focus',c['floresta']),('!focus',c['borda'])],
+                           selectbackground=[('!disabled',c['selecao'])],selectforeground=[('!disabled',c['texto_selecao'])])
+            estilo.configure('Treeview',background=campo,fieldbackground=campo,foreground=texto,rowheight=40,borderwidth=0)
+            estilo.map('Treeview',background=[('selected',c['selecao'])],foreground=[('selected',c['texto_selecao'])])
+            estilo.configure('Contas.Treeview',font=(fonte,12),rowheight=44)
+            estilo.configure('Contas.Treeview.Heading',font=(fonte,11,'bold'))
+            estilo.configure('Ajuda.TLabel',font=(fonte,10),background=campo,foreground=texto,padding=12,wraplength=320,relief='solid',borderwidth=1)
+            estilo.configure('Treeview.Heading',background=c['sage'],foreground=texto,font=(fonte,10,'bold'),padding=(12,12),relief='flat',borderwidth=0)
+            estilo.map('Treeview.Heading',background=[('active',c['ativo'])],foreground=[('active',texto)])
+            estilo.configure('TScrollbar',background=c['borda'],troughcolor=fundo,borderwidth=0,arrowsize=12)
+            estilo.map('TScrollbar',background=[('active',c['secundario'])])
+        elif estilo.theme_use()!=nome_tema:
+            estilo.theme_use(nome_tema)
+        c=cores()
+        fundo,campo,texto=c['fundo'],c['campo'],c['texto']
         self.janela.option_add('*Menu.font',(fonte,10))
         self.janela.option_add('*TCombobox*Listbox.background',campo)
         self.janela.option_add('*TCombobox*Listbox.foreground',texto)
@@ -773,7 +784,7 @@ class Aplicativo:
             ('nome', 'Nome completo do titular original', ''),
             ('aquisicao', 'Data da aquisição (DD/MM/AAAA)', date.today().strftime('%d/%m/%Y')),
             ('previsto', 'Valor Total RPV', ''),
-            ('custo', 'Valor de aquisição (R$)', ''),
+            ('custo', 'Valor de aquisição', ''),
             ('conta', 'Receber na conta de', conta_inicial),
             ('previsao', 'Previsão inicial de recebimento (DD/MM/AAAA)', ''),
         ]
@@ -1048,7 +1059,11 @@ class Aplicativo:
             janela.deiconify()
             janela.grab_set()
 
-        ttk.Button(painel_documentos,text='Anexar documentos',command=anexar).pack(side='left')
+        botao_anexar=ttk.Button(painel_documentos,text='Anexar documentos',command=anexar)
+        botao_anexar.pack(side='left')
+        explicacao=('Anexe comprovantes do recebimento, como confirmações de transferência e extratos bancários.'
+                    if tipo=='recebimento' else 'Anexe PDFs e imagens desta entrada, como contratos e protocolos.')
+        BalaoAjuda(botao_anexar,explicacao)
         ttk.Button(painel_documentos,textvariable=texto_documentos,command=ver_documentos).pack(side='left',padx=8)
         atualizar_contagem()
 

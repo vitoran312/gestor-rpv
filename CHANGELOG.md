@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## 0.15.0
+
+- Retirada do “(R$)” repetido no rótulo Valor de aquisição, preservando a máscara monetária.
+- Balões de ajuda distintos para anexos de contratos/protocolos e comprovantes de recebimento.
+- Remoção da marca superior e dos números 01/02/03 dos cartões; assinatura mantida no rodapé.
+- Ícones próprios de lua e sol no botão de alternância de tema.
+- Fonte das linhas de contas aumentada de 10 para 12 pontos, com dimensões ajustadas.
+- Cache de temas nativos e fontes, geometria de sombras compartilhada e menos fragmentos na renderização.
+- Listas suspensas fechadas deixam de ser criadas durante a troca de tema.
+
 ## 0.14.0
 
 - Nova identidade visual inspirada na paleta Moss: floresta, sálvia e marfim.

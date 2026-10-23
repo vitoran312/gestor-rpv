@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.14.0
+# Gestor de RPV — 0.15.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -14,17 +14,19 @@ python app.py
 
 Mantenha `app.py`, `dados.py`, `componentes.py`, `contas.py`, `interacao.py`, `tema.py`, `calculadora.py`, `backup.py`, `ordenacao.py`, `selecao.py`, `documentos.py`, `visual.py` e `versao.py` juntos.
 A tela inicial tem os botões **Nova entrada**, **Ver histórico total**,
-**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.14.0** aparece no canto inferior direito.
+**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.15.0** aparece no canto inferior direito.
 O número é lido da versão do programa e acompanha cada atualização.
 As janelas abrem centralizadas; o histórico abre maximizado no Windows.
 
 ## Identidade visual Moss
 
 Visual inspirado em verde floresta, sálvia e marfim, com uma versão escura em tons
-verdes profundos. O botão **Modo escuro / Modo claro** da tela inicial alterna a
+verdes profundos. O botão **Modo escuro / Modo claro**, com ícones de lua e sol, alterna a
 aparência; o menu **Exibir** do histórico oferece as mesmas opções.
 
-- Tela inicial com três cartões de ações, ícones desenhados em Python e marca Vitoran Tech.
+- Tela inicial com três cartões de ações e ícones desenhados em Python, sem numeração.
+  A assinatura Vitoran Tech fica somente no rodapé.
+- Temas e fontes reutilizados, com renderização das sombras otimizada para agilizar a alternância.
 - Cantos arredondados, sombras discretas e verde nas ações principais.
 - Fonte Segoe UI no Windows, com alternativas locais em outros sistemas.
 - Histórico com linhas alternadas e quatro indicadores em cartões alinhados.
@@ -58,6 +60,9 @@ A busca continua acima da tabela. Os menus de clique direito permanecem disponí
 
 ## Contas de recebimento
 
+A lista usa fonte de 12 pontos, dois pontos maior que o padrão da interface,
+com altura das linhas e largura da janela ajustadas para a leitura.
+
 - Vitor e Lilian aparecem inicialmente sem dados bancários inventados. Use
   **Ver / Editar** para completar os cadastros.
 - **Cadastrar nova conta** permite informar identificação, nome completo, endereço,
@@ -83,6 +88,8 @@ A busca continua acima da tabela. Os menus de clique direito permanecem disponí
 - Nomes completos ganham iniciais maiúsculas enquanto você digita, inclusive
   após espaços. Endereços também ganham iniciais maiúsculas em cada palavra.
   Identificação, banco, busca e observações começam com maiúscula. Chaves Pix e identificadores bancários mantêm sua escrita original.
+- O rótulo **Valor de aquisição** não repete o símbolo R$; a máscara monetária
+  continua presente dentro do campo, como nos demais valores.
 - Os dois últimos dígitos dos valores são sempre centavos: `5200000` mostra
   `R$ 52.000,00`; `1523659` mostra `R$ 15.236,59`. A máscara é aplicada a cada tecla,
   sem salto do cursor. Também é possível colar um valor já formatado, como
@@ -182,6 +189,8 @@ durante a troca, os documentos anteriores são recuperados e a cópia de seguran
 
 - Em **Nova entrada** ou **Editar**, clique em **Anexar documentos** e selecione
   um ou vários PDFs ou imagens (PNG, JPEG, WebP, BMP, GIF e TIFF).
+- Ao manter o mouse sobre **Anexar documentos**, um balão explica que o botão
+  recebe PDFs e imagens como contratos e protocolos.
 - **Documentos (N)** lista os anexos e permite abrir com o programa padrão do Windows.
   Antes de salvar, é possível retirar arquivos da seleção.
 - Os arquivos são copiados para a pasta de dados somente ao **Salvar registro**.
@@ -193,6 +202,8 @@ durante a troca, os documentos anteriores são recuperados e a cópia de seguran
 
 - Ao marcar **Recebido**, a janela da data também oferece **Anexar documentos**.
   Aceita os mesmos PDFs e imagens dos anexos da entrada.
+- O balão de **Anexar documentos** nesta janela sugere confirmações de
+  transferência, comprovantes de recebimento e extratos bancários.
 - **Documentos (N)** mostra apenas os comprovantes daquele recebimento.
   Os anexos do cadastro são consultados pela edição da entrada.
 - Os comprovantes são copiados ao **Salvar recebimento**, para a pasta separada

@@ -1012,6 +1012,79 @@ class TestInterface(unittest.TestCase):
             self.assertLessEqual(salvar.winfo_rooty()+salvar.winfo_height(),conta.winfo_rooty()+conta.winfo_height())
             botao(conta,'Cancelar').invoke()
 
+    def test_baloes_documentos_distintos_preservam_modal_e_cancelam_ao_sair(self):
+        form=self.formulario()
+        rotulos=[w.cget('text') for w in filhos(form) if isinstance(w,app.ttk.Label)]
+        self.assertIn('Valor de aquisição',rotulos)
+        self.assertNotIn('Valor de aquisição (R$)',rotulos)
+        entrada=next(w for w in filhos(form) if isinstance(w,app.ttk.Entry))
+        entrada.focus_force()
+        self.root.update()
+        foco=self.root.focus_get()
+        b=botao(form,'Anexar documentos')
+        ajuda=b.balao
+        ajuda.agendar()
+        self.assertIsNotNone(ajuda.agendado)
+        b.event_generate('<Leave>')
+        self.assertIsNone(ajuda.agendado)
+        ajuda.agendar()
+        ajuda.mostrar()
+        self.root.update()
+        self.assertTrue(ajuda.janela.winfo_ismapped())
+        self.assertIn('contratos e protocolos',ajuda.texto)
+        self.assertEqual(self.root.grab_current(),form)
+        self.assertEqual(self.root.focus_get(),foco)
+        with patch.object(app.filedialog,'askopenfilenames',return_value=()):
+            b.event_generate('<ButtonPress-1>',x=5,y=5)
+            self.root.update()
+            self.assertIsNone(ajuda.janela)
+            b.event_generate('<ButtonRelease-1>',x=5,y=5)
+        ajuda.agendar()
+        botao(form,'Cancelar').invoke()
+        self.root.update()
+        self.assertIsNone(ajuda.agendado)
+        from test_contas import dados_rpv
+        identificador=self.banco.salvar(dados_rpv())
+        self.programa.mostrar_historico()
+        self.programa.abrir_recebimento(identificador)
+        self.root.update()
+        tela=next(w for w in self.programa.historico.winfo_children() if isinstance(w,tk.Toplevel))
+        ajuda=botao(tela,'Anexar documentos').balao
+        self.assertIn('confirmações de transferência',ajuda.texto)
+        self.assertIn('extratos bancários',ajuda.texto)
+        ajuda.mostrar()
+        self.root.update()
+        self.assertEqual(self.root.grab_current(),tela)
+        self.assertLessEqual(ajuda.janela.winfo_rootx()+ajuda.janela.winfo_width(),self.root.winfo_screenwidth())
+        self.programa.alternar_tema()
+        self.root.update()
+        self.assertEqual(str(app.ttk.Style().lookup('Ajuda.TLabel','foreground')),cores()['texto'])
+        ajuda.ocultar()
+        botao(tela,'Cancelar').invoke()
+
+    def test_temas_reutilizados_icones_e_fonte_das_contas(self):
+        textos=[w.cget('text') for w in filhos(self.root) if isinstance(w,app.ttk.Label)]
+        self.assertFalse(any(t in ('01','02','03') or t.startswith('VITORAN') for t in textos))
+        claro=str(self.programa.botao_alternar_tema.cget('image'))
+        self.assertTrue(claro)
+        self.programa.botao_alternar_tema.invoke()
+        self.root.update()
+        escuro=str(self.programa.botao_alternar_tema.cget('image'))
+        self.assertNotEqual(claro,escuro)
+        with patch.object(app,'aplicar_superficies',side_effect=AssertionError('Superfícies não devem ser recriadas')), \
+             patch('visual.tkfont.families',side_effect=AssertionError('Fontes não devem ser enumeradas novamente')):
+            for _ in range(3):
+                self.programa.alternar_tema()
+                self.root.update()
+        self.assertEqual(str(self.programa.botao_alternar_tema.cget('image')),claro)
+        self.programa.mostrar_contas()
+        self.root.update()
+        tabela=self.programa.janela_contas.tabela
+        estilo=app.ttk.Style()
+        fonte=app.tkfont.Font(font=estilo.lookup(tabela.cget('style'),'font'))
+        self.assertEqual(fonte.actual('size'),12)
+        self.assertGreaterEqual(int(estilo.lookup(tabela.cget('style'),'rowheight')),40)
+
 
 if __name__ == '__main__':
     unittest.main()

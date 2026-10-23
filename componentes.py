@@ -315,3 +315,58 @@ class AreaRolavel(ttk.Frame):
 
     def ajustar_canvas(self,evento):
         self.canvas.itemconfigure(self.janela_interna,width=max(evento.width,self.conteudo.winfo_reqwidth()))
+
+
+class BalaoAjuda:
+    """Ajuda ao passar o mouse: não muda o foco nem o controle de janelas modais."""
+    def __init__(self,widget,texto,atraso=600):
+        self.widget=widget
+        self.texto=texto
+        self.atraso=atraso
+        self.agendado=None
+        self.janela=None
+        widget.balao=self
+        widget.bind('<Enter>',self.agendar,add='+')
+        widget.bind('<Leave>',self.ocultar,add='+')
+        widget.bind('<ButtonPress>',self.ocultar,add='+')
+        widget.bind('<Destroy>',self.ocultar,add='+')
+        widget.winfo_toplevel().bind('<Unmap>',self.ocultar,add='+')
+        widget.winfo_toplevel().bind('<FocusOut>',self.ocultar,add='+')
+
+    def agendar(self,_evento=None):
+        self.ocultar()
+        if self.widget.winfo_exists():
+            self.agendado=self.widget.after(self.atraso,self.mostrar)
+
+    def mostrar(self):
+        if self.agendado is not None:
+            self.widget.after_cancel(self.agendado)
+            self.agendado=None
+        if self.janela is not None or not self.widget.winfo_exists() or not self.widget.winfo_ismapped():
+            return
+        if hasattr(self.widget,'instate') and self.widget.instate(['disabled']):
+            return
+        tela=tk.Toplevel(self.widget)
+        self.janela=tela
+        tela.withdraw()
+        tela.overrideredirect(True)
+        tela.transient(self.widget.winfo_toplevel())
+        tela.configure(bg=cores()['campo'])
+        ttk.Label(tela,text=self.texto,style='Ajuda.TLabel',justify='left').pack()
+        tela.update_idletasks()
+        largura,altura=tela.winfo_reqwidth(),tela.winfo_reqheight()
+        x=min(self.widget.winfo_rootx()+12,self.widget.winfo_screenwidth()-largura-8)
+        y=self.widget.winfo_rooty()+self.widget.winfo_height()+6
+        if y+altura>self.widget.winfo_screenheight()-8:
+            y=self.widget.winfo_rooty()-altura-6
+        tela.geometry(f'+{max(8,x)}+{max(8,y)}')
+        tela.deiconify()
+        tela.lift()
+
+    def ocultar(self,_evento=None):
+        if self.agendado is not None:
+            self.widget.after_cancel(self.agendado)
+            self.agendado=None
+        if self.janela is not None:
+            tela,self.janela=self.janela,None
+            if tela.winfo_exists(): tela.destroy()
