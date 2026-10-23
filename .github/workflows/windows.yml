@@ -1,0 +1,57 @@
+name: Executavel Windows
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  compilar:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: x64
+          cache: pip
+          cache-dependency-path: requirements-build.txt
+      - name: Instalar ferramenta de compilacao
+        run: python -m pip install -r requirements-build.txt
+      - name: Testar aplicativo e interface
+        env:
+          GESTOR_RPV_TESTE_UI: '1'
+        run: python -m unittest -q
+      - name: Gerar executavel com icone e versao
+        run: python gerar_exe.py
+      - name: Abrir executavel sem Python no PATH
+        run: python scripts/verificar_exe_windows.py "dist/Gestor de RPV.exe"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GestorRPV-Windows-x64
+          path: dist/GestorRPV-Windows-x64-v*.zip
+          if-no-files-found: error
+          retention-days: 30
+
+  publicar:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: compilar
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: GestorRPV-Windows-x64
+          path: pacote
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: pacote/*.zip
+          name: Gestor de RPV ${{ github.ref_name }}
+          body: |
+            Executável portátil para Windows 11 de 64 bits, com ícone Vitoran Tech.
+            Baixe GestorRPV-Windows-x64, extraia o ZIP e abra Gestor de RPV.exe.
+            Não é necessário instalar Python. Código-fonte e histórico de alterações no repositório.

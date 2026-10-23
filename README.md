@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.17.0
+# Gestor de RPV — 0.18.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -12,9 +12,9 @@ Se precisar ver uma mensagem de erro, abra o Prompt de Comando nessa pasta:
 python app.py
 ```
 
-Mantenha `app.py`, `dados.py`, `componentes.py`, `contas.py`, `interacao.py`, `tema.py`, `calculadora.py`, `backup.py`, `ordenacao.py`, `selecao.py`, `documentos.py`, `visual.py` e `versao.py` juntos.
+Mantenha todos os arquivos `.py` e a pasta `recursos` juntos. Essa pasta contém o ícone da Vitoran Tech.
 A tela inicial tem os botões **Nova entrada**, **Minhas operações**,
-**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.17.0** aparece no canto inferior direito.
+**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.18.0** aparece no canto inferior direito.
 O número é lido da versão do programa e acompanha cada atualização.
 As janelas abrem centralizadas; o histórico abre maximizado no Windows.
 
@@ -28,6 +28,9 @@ aparência; o menu **Exibir** do histórico oferece as mesmas opções.
 
 - Tela inicial com três cartões de ações e ícones desenhados em Python, sem numeração.
   A assinatura Vitoran Tech fica somente no rodapé.
+- Emblema Vitoran Tech com V em pêssego sobre vinho, aplicado às janelas e ao executável.
+- **Sobre**, na tela inicial, e **Ajuda → Sobre o Gestor de RPV**, em Minhas operações,
+  mostram a marca, o autor e a versão atual. O número acompanha automaticamente `versao.py`.
 - Temas e fontes reutilizados, com renderização das sombras otimizada para agilizar a alternância.
 - Cantos arredondados, sombras discretas e ações principais em vermelho no claro e pêssego no escuro.
   Os botões não mostram retângulo tracejado após o clique; a navegação por
@@ -39,8 +42,9 @@ aparência; o menu **Exibir** do histórico oferece as mesmas opções.
 - Cadastro de entradas e contas com rolagem e botões fixos no rodapé, inclusive em telas menores.
   A roda do mouse rola os campos; navegar pelo teclado revela o campo em foco.
 - Calendários, anexos, contas, calculadora e menus acompanham os dois temas.
-- As imagens de interface são geradas pelo próprio Python. Não é necessário instalar
-  pacotes, baixar fontes ou manter uma pasta externa de recursos para executar.
+- As superfícies da interface são geradas pelo próprio Python. O emblema acompanha
+  o código na pasta `recursos` e é incluído dentro do executável.
+  Não é necessário instalar pacotes ou baixar fontes para usar o aplicativo.
 
 ![Tela inicial](docs/tela-inicial.png)
 
@@ -49,6 +53,8 @@ aparência; o menu **Exibir** do histórico oferece as mesmas opções.
 ![Histórico com dados demonstrativos](docs/historico.png)
 
 [Ver a prévia do modo escuro](docs/historico-escuro.png)
+
+[Ver a janela Sobre](docs/sobre.png) · [Sobre no modo escuro](docs/sobre-escuro.png)
 
 ## Barra de menus do histórico
 
@@ -297,14 +303,48 @@ Todos usam bancos temporários, sem tocar no histórico do usuário.
 
 ## Executável
 
-Gere no Windows após testar a interface:
+O pacote é **portátil para Windows 11 de 64 bits**: extraia o ZIP e abra
+`Gestor de RPV.exe`. Não exige instalação de Python, privilégios de administrador
+nem instalação do programa. Os dados ficam em `%LOCALAPPDATA%\GestorRPV`,
+separados do executável. Atualizar o `.exe` preserva esse histórico.
+
+### Gerar no seu Windows
+
+1. Baixe o código e extraia todos os arquivos.
+2. Dê dois cliques em **`gerar_exe.bat`**.
+3. Aguarde a instalação do PyInstaller em um ambiente separado e a compilação.
+4. A pasta `dist` será aberta com **`Gestor de RPV.exe`** e o ZIP para compartilhar.
+
+A geração exige Python de 64 bits e acesso à internet para baixar a ferramenta
+de compilação. Quem recebe o executável não precisa dessas ferramentas.
+Também é possível gerar pelo terminal:
 
 ```bat
-python -m pip install pyinstaller
-python -m PyInstaller --onefile --windowed --name "Gestor de RPV" app.py
+python -m venv .venv-build
+.venv-build\Scripts\python -m pip install -r requirements-build.txt
+.venv-build\Scripts\python gerar_exe.py
 ```
 
-O executável fica em `dist`.
+O emblema `.ico` tem tamanhos de 16 a 256 pixels. O executável inclui o ícone,
+Python, Tcl/Tk, os recursos visuais e os metadados de produto/empresa/versão;
+não inclui bancos, documentos pessoais ou dados dos testes. Não abre console.
+
+### Compilação automática no GitHub
+
+O fluxo **Actions → Executavel Windows** compila em um Windows de 64 bits.
+Pode ser iniciado manualmente em **Run workflow**. Tags `v*` também iniciam o fluxo.
+Ele executa os testes, gera o `.exe`, abre e fecha o programa com dados temporários
+e sem Python no PATH e guarda o ZIP em **Artifacts**. Quando uma tag conclui
+o processo, o pacote também é publicado em **Releases**. O fluxo precisa estar
+habilitado no repositório; confirme seu resultado antes de distribuir o executável.
+
+### Testar
+
+Você pode manter o Python instalado no seu PC. Para confirmar a independência,
+teste também em outro computador sem Python ou no Windows Sandbox, se disponível.
+Cadastre uma entrada de exemplo, abra a janela Sobre, anexe um documento e teste
+backup/importação usando dados de teste. Em um computador novo, somente o `.exe`
+começa com um banco próprio; transfira os registros usando o backup do aplicativo.
 
 ## Versões
 
@@ -312,9 +352,3 @@ O executável fica em `dist`.
 `CHANGELOG.md`, passar pelos testes e receber uma tag correspondente no GitHub,
 como `v0.4.0`, apontando para o commit da entrega. O número muda quando a pessoa
 baixa e executa a nova versão; não há atualização automática pela internet.
-
-## Próximas etapas
-
-A interface de anexos em PDF/imagem e os ajustes finais de layout ficam para etapas futuras.
-O backup já inclui a pasta reservada para documentos. A confirmação de recebimento
-registra a data e mantém o Valor Total RPV, conforme a regra do aplicativo.

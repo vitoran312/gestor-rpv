@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## 0.18.0
+
+- Ícone Vitoran Tech com emblema vinho e V em pêssego nas janelas e no executável Windows.
+- Janela Sobre com marca, autor e versão, disponível no início e no menu Ajuda de Minhas operações.
+- Gerador Windows por dois cliques, com executável portátil único, ícone e metadados de versão.
+- Fluxo GitHub Actions para compilar, testar e publicar o ZIP do Windows a partir das tags.
+- Verificação do executável em banco temporário e sem Python no PATH, configurada para o ambiente Windows.
+
 ## 0.17.0
 
 - Lembrete discreto de backup no início e em Minhas operações: aparece antes do primeiro backup ou após sete dias sem realizar um.

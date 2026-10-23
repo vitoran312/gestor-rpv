@@ -17,6 +17,7 @@ from ordenacao import ordenar
 from selecao import habilitar_selecao, pressionar_linha, arrastar
 from documentos import validar_anexo, abrir_arquivo, abrir_pasta
 from interacao import instalar_menu_texto, aplicar_formato, capitalizar_inicio, menu_copia, novo_menu, mostrar_menu, copiar_texto
+from identidade import aplicar_icone, preparar_windows
 
 
 class Aplicativo:
@@ -25,11 +26,13 @@ class Aplicativo:
         self.banco = Banco()
         janela.withdraw()
         janela.title('Gestor de RPV')
+        aplicar_icone(janela)
         janela.resizable(False, False)
         janela.configure(bg=cores()['fundo'])
         self.historico = None
         self.janela_contas = None
         self.calculadora = None
+        self.sobre = None
         self.modo_tema = tk.StringVar(value='claro')
         self.configurar_tema()
         instalar_menu_texto(janela)
@@ -42,6 +45,7 @@ class Aplicativo:
         self.texto_alternar_tema = tk.StringVar()
         self.botao_alternar_tema=ttk.Button(topo,textvariable=self.texto_alternar_tema,command=self.alternar_tema,width=15,compound='left')
         self.botao_alternar_tema.pack(side='right')
+        ttk.Button(topo,text='Sobre',command=self.mostrar_sobre).pack(side='right',padx=(0,10))
         ttk.Frame(inicio).pack(fill='both',expand=True)
         cabecalho = ttk.Frame(inicio)
         cabecalho.pack(fill='x',pady=(24,24))
@@ -133,6 +137,33 @@ class Aplicativo:
             return
         self.calculadora = JanelaCalculadora(self.janela)
 
+    def mostrar_sobre(self):
+        if self.sobre is not None and self.sobre.winfo_exists():
+            self.sobre.deiconify()
+            self.sobre.lift()
+            self.sobre.focus_set()
+            return
+        tela = self.sobre = tk.Toplevel(self.janela)
+        tela.withdraw()
+        tela.title('Sobre o Gestor de RPV')
+        tela.resizable(False,False)
+        tela.transient(self.historico if self.historico is not None and self.historico.winfo_exists() else self.janela)
+        corpo = ttk.Frame(tela,padding=30)
+        corpo.pack(fill='both',expand=True)
+        ttk.Label(corpo,image=self.janela._marca_vitoran).pack(pady=(0,12))
+        ttk.Label(corpo,text='Gestor de RPV',style='Titulo.TLabel').pack()
+        ttk.Label(corpo,text='Organização de operações e recebimentos de RPV.',wraplength=430,
+                  justify='center',style='Subtitulo.TLabel').pack(pady=(8,20))
+        ttk.Label(corpo,text='Vitoran Tech',font=(self.fonte,13,'bold')).pack()
+        ttk.Label(corpo,text='Desenvolvido por Vitor Alves Nascimento').pack(pady=(6,0))
+        ttk.Label(corpo,text=f'Versão {VERSAO}',style='Discreto.TLabel').pack(pady=(8,20))
+        ttk.Button(corpo,text='Fechar',command=tela.destroy).pack()
+        tela.bind('<Escape>',lambda _: tela.destroy())
+        tela.bind('<Return>',lambda _: tela.destroy())
+        centralizar(tela,550)
+        tela.deiconify()
+        tela.focus_set()
+
     def criar_barra_historico(self):
         barra = novo_menu(self.historico)
         arquivo = novo_menu(barra)
@@ -150,11 +181,14 @@ class Aplicativo:
         exibir = novo_menu(barra)
         exibir.add_radiobutton(label='Tema claro', variable=self.modo_tema, value='claro', command=self.configurar_tema)
         exibir.add_radiobutton(label='Tema escuro', variable=self.modo_tema, value='escuro', command=self.configurar_tema)
+        ajuda = novo_menu(barra)
+        ajuda.add_command(label='Sobre o Gestor de RPV',command=self.mostrar_sobre)
         barra.add_cascade(label='Arquivo', menu=arquivo)
         barra.add_cascade(label='Editar', menu=editar)
         barra.add_cascade(label='Exibir', menu=exibir)
         barra.add_command(label='Calculadora', command=self.abrir_calculadora)
-        self.menus = {'Arquivo': arquivo, 'Editar': editar, 'Exibir': exibir, 'barra': barra}
+        barra.add_cascade(label='Ajuda',menu=ajuda)
+        self.menus = {'Arquivo': arquivo, 'Editar': editar, 'Exibir': exibir, 'Ajuda': ajuda, 'barra': barra}
         self.historico.configure(menu=barra)
 
     def tematizar_novo_widget(self, evento):
@@ -1202,6 +1236,7 @@ class Aplicativo:
 
 
 if __name__ == '__main__':
+    preparar_windows()
     janela = tk.Tk()
     Aplicativo(janela)
     janela.mainloop()

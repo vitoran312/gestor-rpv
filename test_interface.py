@@ -1168,6 +1168,33 @@ class TestInterface(unittest.TestCase):
         self.assertIsNone(self.banco.obter(identificador)['conta_id'])
         self.assertEqual(self.banco.obter(identificador)['conta_snapshot'],copia)
 
+    def test_sobre_marca_versao_tema_e_janela_unica(self):
+        self.assertTrue(self.root._icones_vitoran)
+        self.assertEqual(self.root._marca_vitoran.width(),128)
+        botao(self.root,'Sobre').invoke()
+        self.root.update()
+        tela=self.programa.sobre
+        textos=[w.cget('text') for w in filhos(tela) if isinstance(w,app.ttk.Label)]
+        for texto in ('Gestor de RPV','Vitoran Tech','Desenvolvido por Vitor Alves Nascimento',f'Versão {app.VERSAO}'):
+            self.assertIn(texto,textos)
+        fechar=botao(tela,'Fechar')
+        self.assertTrue(fechar.winfo_ismapped())
+        self.assertLessEqual(fechar.winfo_rooty()+fechar.winfo_height(),tela.winfo_rooty()+tela.winfo_height())
+        self.programa.alternar_tema()
+        self.root.update()
+        self.assertEqual(tela.cget('bg'),PALETAS['escuro']['fundo'])
+        self.programa.mostrar_historico()
+        self.programa.menus['Ajuda'].invoke('Sobre o Gestor de RPV')
+        self.root.update()
+        self.assertIs(self.programa.sobre,tela)
+        fechar.invoke()
+        self.programa.menus['Ajuda'].invoke('Sobre o Gestor de RPV')
+        self.root.update()
+        self.assertIsNot(self.programa.sobre,tela)
+        self.programa.sobre.event_generate('<Escape>')
+        self.root.update()
+        self.assertFalse(self.programa.sobre.winfo_exists())
+
     def test_lembrete_backup_no_inicio_e_historico_ate_exportar(self):
         self.assertIn('ainda não fez',self.programa.texto_aviso_backup.get())
         with patch.object(app.filedialog,'askdirectory',return_value=''):
