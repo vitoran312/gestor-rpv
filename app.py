@@ -169,14 +169,14 @@ class Aplicativo:
             estilo.configure('.',font=(fonte,10),background=fundo,foreground=texto,
                              bordercolor=c['borda'],lightcolor=campo,darkcolor=fundo,troughcolor=fundo)
             aplicar_superficies(self.janela)
-            estilo.configure('TButton',padding=(18,10),background=fundo,foreground=texto,anchor='center',focuscolor=c['floresta'])
+            estilo.configure('TButton',padding=(18,10),background=fundo,foreground=texto,anchor='center')
             estilo.map('TButton',background=[('disabled',fundo),('!disabled',fundo)],foreground=[('disabled',c['desabilitado']),('!disabled',texto)])
             estilo.configure('Inicio.TButton',background=c['superficie'])
             estilo.map('Inicio.TButton',background=[('disabled',c['superficie']),('!disabled',c['superficie'])])
             estilo.configure('Inicio.Principal.TButton',background=c['superficie'])
             estilo.map('Inicio.Principal.TButton',background=[('disabled',c['superficie']),('!disabled',c['superficie'])])
             for nome in ('Salvar.TButton','Principal.TButton','DiaSelecionado.TButton','Resultado.Calculadora.TButton'):
-                estilo.configure(nome,font=(fonte,10,'bold'),padding=(18,10),foreground=primario_texto,focuscolor=primario_texto)
+                estilo.configure(nome,font=(fonte,10,'bold'),padding=(18,10),foreground=primario_texto)
                 estilo.map(nome,foreground=[('disabled',c['desabilitado']),('!disabled',primario_texto)])
             estilo.configure('Menu.TButton',font=(fonte,16,'bold'),padding=(22,16))
             for tipo in ('TRadiobutton','TCheckbutton'):

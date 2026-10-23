@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.15.0
+# Gestor de RPV — 0.15.1
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -14,7 +14,7 @@ python app.py
 
 Mantenha `app.py`, `dados.py`, `componentes.py`, `contas.py`, `interacao.py`, `tema.py`, `calculadora.py`, `backup.py`, `ordenacao.py`, `selecao.py`, `documentos.py`, `visual.py` e `versao.py` juntos.
 A tela inicial tem os botões **Nova entrada**, **Ver histórico total**,
-**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.15.0** aparece no canto inferior direito.
+**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.15.1** aparece no canto inferior direito.
 O número é lido da versão do programa e acompanha cada atualização.
 As janelas abrem centralizadas; o histórico abre maximizado no Windows.
 
@@ -28,6 +28,8 @@ aparência; o menu **Exibir** do histórico oferece as mesmas opções.
   A assinatura Vitoran Tech fica somente no rodapé.
 - Temas e fontes reutilizados, com renderização das sombras otimizada para agilizar a alternância.
 - Cantos arredondados, sombras discretas e verde nas ações principais.
+  Os botões não mostram retângulo tracejado após o clique; a navegação por
+  teclado e a ativação pela barra de espaço continuam disponíveis.
 - Fonte Segoe UI no Windows, com alternativas locais em outros sistemas.
 - Histórico com linhas alternadas e quatro indicadores em cartões alinhados.
 - Cadastro de entradas e contas com rolagem e botões fixos no rodapé, inclusive em telas menores.

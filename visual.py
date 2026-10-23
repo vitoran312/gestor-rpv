@@ -112,7 +112,20 @@ def aplicar_superficies(raiz):
                           ('Principal.TButton','primario'),('DiaSelecionado.TButton','primario'),('Resultado.Calculadora.TButton','primario'),('Menu.TButton','secundario')):
         estilo.layout(nome,[(prefixo+elemento,{'sticky':'nsew','children':[
             ('Button.padding',{'sticky':'nsew','children':[
-                ('Button.focus',{'sticky':'nsew','children':[('Button.label',{'sticky':'nsew'})]})]})]})])
+                ('Button.label',{'sticky':'nsew'})]})]})])
+    def sem_contorno_foco(layout):
+        resultado=[]
+        for elemento,opcoes in layout:
+            opcoes=dict(opcoes)
+            if 'children' in opcoes:
+                opcoes['children']=sem_contorno_foco(opcoes['children'])
+            if elemento.endswith('.focus'):
+                resultado.extend(opcoes.get('children',[]))
+            else:
+                resultado.append((elemento,opcoes))
+        return resultado
+    for nome in ('TRadiobutton','TCheckbutton'):
+        estilo.layout(nome,sem_contorno_foco(estilo.layout(nome)))
     for nome in ('Cartao.TFrame','Resumo.TFrame'):
         estilo.layout(nome,[(prefixo+'cartao',{'sticky':'nsew','children':[('Frame.padding',{'sticky':'nsew'})]})])
         estilo.configure(nome,background=c['fundo'],borderwidth=0)

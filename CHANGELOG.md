@@ -1,5 +1,10 @@
 # Histórico de versões
 
+## 0.15.1
+
+- Remoção do retângulo tracejado de foco nos botões e controles de seleção, nos dois temas.
+- Navegação e acionamento pelo teclado preservados.
+
 ## 0.15.0
 
 - Retirada do “(R$)” repetido no rótulo Valor de aquisição, preservando a máscara monetária.
