@@ -152,9 +152,10 @@ class TestInterface(unittest.TestCase):
         self.root.update()
         tabela = self.programa.tabela
         self.assertNotIn('prorrogacao', tabela.cget('columns'))
+        esperado = {'nome': 'w', 'conta': 'w', 'custo': 'e', 'comissao': 'e', 'previsto': 'e', 'lucro': 'e'}
         for coluna in tabela.cget('columns'):
-            self.assertEqual(str(tabela.column(coluna, 'anchor')), 'center')
-            self.assertEqual(str(tabela.heading(coluna, 'anchor')), 'center')
+            self.assertEqual(str(tabela.column(coluna, 'anchor')), esperado.get(coluna, 'center'))
+            self.assertEqual(str(tabela.heading(coluna, 'anchor')), str(tabela.column(coluna, 'anchor')))
         tabela.xview_moveto(1)
         self.root.update()
         rotulo = self.programa.acoes_linhas[str(identificador)][0]
@@ -960,7 +961,7 @@ class TestInterface(unittest.TestCase):
                 opcao.event_generate('<Leave>')
                 self.root.update()
 
-    def test_inicio_moss_acoes_visiveis_e_temas_sem_recriar_imagens(self):
+    def test_inicio_pro_acoes_visiveis_e_temas_sem_recriar_imagens(self):
         self.assertEqual(self.programa.modo_tema.get(),'claro')
         self.assertEqual([w for w in filhos(self.root) if isinstance(w,ttk.Entry)],[])
         for largura,colunas in ((1286,3),(944,1)):
@@ -980,7 +981,7 @@ class TestInterface(unittest.TestCase):
         self.programa.alternar_tema()
         self.programa.alternar_tema()
         self.root.update()
-        self.assertEqual(len(self.root._superficies_moss),2)
+        self.assertEqual(len(self.root._superficies_pro),2)
         # Ícones de Canvas não criam novas imagens; as superfícies são reutilizadas.
         self.assertEqual(set(self.root.tk.call('image','names')),set(imagens))
 

@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.19.1
+# Gestor de RPV — 0.20.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -14,17 +14,18 @@ python app.py
 
 Mantenha todos os arquivos `.py` e a pasta `recursos` juntos. Essa pasta contém o ícone da Vitoran Tech.
 A tela inicial tem os botões **Nova entrada**, **Minhas operações**,
-**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.19.1**, acompanhada do emblema com 50% de opacidade,
+**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.20.0**, acompanhada do emblema com 50% de opacidade,
 aparece no canto inferior direito.
 O número é lido da versão do programa e acompanha cada atualização.
 As janelas abrem centralizadas; o histórico abre maximizado no Windows.
 
 ## Identidade visual
 
-Visual inspirado em azul profundo (`#191E32`, `#242F49`, `#384358`), pêssego (`#FFA586`),
-vermelho (`#B51A2B`) e vinho (`#551A2B`). O modo claro usa fundos suaves, ações em vermelho
-e detalhes em pêssego; o escuro usa superfícies azuis com destaques em pêssego. Recebimentos e lucro realizado continuam
-em verde. O botão **Modo escuro / Modo claro**, com ícones de lua e sol, alterna a
+Linguagem **Vitoran Pro**: base neutra, superfícies planas e um único acento de marca por tema.
+O modo claro usa cinzas frios (`#F5F6F8`, cartões brancos, texto `#14171F`) com ações em carmim (`#8C1D34`);
+o escuro usa grafite (`#0E1117`, superfícies `#161A22`) com ações em pêssego (`#FFA586`).
+Títulos ficam em tons neutros; a cor da marca é reservada às ações principais, ao foco e aos ícones.
+Recebimentos e lucro realizado continuam em verde. Todos os pares de texto e fundo atendem ao contraste WCAG AA. O botão **Modo escuro / Modo claro**, com ícones de lua e sol, alterna a
 aparência; o menu **Exibir** do histórico oferece as mesmas opções.
 
 - Tela inicial com três cartões de ações e ícones desenhados em Python, sem numeração.
@@ -33,13 +34,16 @@ aparência; o menu **Exibir** do histórico oferece as mesmas opções.
 - Emblema Vitoran Tech com V em pêssego sobre vinho, aplicado às janelas e ao executável.
 - **Sobre**, na tela inicial, e **Ajuda → Sobre o Gestor de RPV**, em Minhas operações,
   mostram a marca, o autor e a versão atual. O número acompanha automaticamente `versao.py`.
-- Temas e fontes reutilizados, com renderização das sombras otimizada para agilizar a alternância.
-- Cantos arredondados, sombras discretas e ações principais em vermelho no claro e pêssego no escuro.
+- Temas e fontes reutilizados; as superfícies são geradas uma vez por tema para agilizar a alternância.
+- Botões e cartões planos, sem sombras, com contorno de 1 px e cantos de 8 a 12 px.
+  Campos com contorno fino e anel de 2 px na cor da marca quando em foco.
+  Barras de rolagem finas, sem setas.
   Os botões não mostram retângulo tracejado após o clique; a navegação por
   teclado e a ativação pela barra de espaço continuam disponíveis.
 - Fonte Segoe UI no Windows, com alternativas locais em outros sistemas.
-- Minhas operações com cabeçalhos de 18 pontos e entradas de 12 pontos,
-  linhas alternadas e quatro indicadores em cartões alinhados.
+- Minhas operações com cabeçalhos de 18 pontos em tom discreto e entradas de 12 pontos,
+  linhas alternadas e quatro indicadores em cartões alinhados. Nomes e contas ficam à esquerda,
+  valores à direita e datas centralizadas, com margem interna nas células.
   Lucro realizado é o último cartão, à direita, inclusive no layout com duas linhas.
 - Cadastro de entradas e contas com rolagem e botões fixos no rodapé, inclusive em telas menores.
   A roda do mouse rola os campos; navegar pelo teclado revela o campo em foco.

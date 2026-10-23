@@ -2,17 +2,20 @@
 import tkinter as tk
 from tkinter import ttk
 
+# Vitoran Pro: base neutra e um único acento de marca por tema (carmim no claro, pêssego no escuro).
 PALETAS = {
-    'claro': dict(fundo='#f0f2f7', campo='#ffffff', superficie='#fafbfe', texto='#191e32',
-                  secundario='#525e76', botao='#e3e8f1', borda='#8b96aa', ativo='#d3dbea',
-                  selecao='#ffd8c7', texto_selecao='#191e32', verde='#286040', vermelho='#b51a2b',
-                  desabilitado='#737e92', primario='#b51a2b', primario_texto='#ffffff', primario_ativo='#951526',
-                  primario_pressionado='#551a2b', floresta='#551a2b', sage='#ffe0d3', linha='#eef1f7'),
-    'escuro': dict(fundo='#191e32', campo='#1c2339', superficie='#242f49', texto='#f3f5fa',
-                   secundario='#b8c2d7', botao='#384358', borda='#6c7a95', ativo='#45516b',
-                   selecao='#4b3550', texto_selecao='#fff3ee', verde='#abd5ba', vermelho='#ffa3a9',
-                   desabilitado='#a0acc3', primario='#ffa586', primario_texto='#191e32', primario_ativo='#ffc0a8',
-                   primario_pressionado='#df8568', floresta='#ffa586', sage='#384358', linha='#252e46'),
+    'claro': dict(fundo='#f5f6f8', campo='#ffffff', superficie='#ffffff', texto='#14171f',
+                  secundario='#5c6576', botao='#ffffff', borda='#c9ced8', borda_suave='#e3e6ec',
+                  ativo='#eef0f4', selecao='#f6e4e8', texto_selecao='#14171f', verde='#1d7a4c',
+                  vermelho='#c02a3b', desabilitado='#8a93a3', primario='#8c1d34', primario_texto='#ffffff',
+                  primario_ativo='#a3243f', primario_pressionado='#6a1527', floresta='#8c1d34',
+                  sage='#f0f2f5', realce='#fbeae4', linha='#f9fafb'),
+    'escuro': dict(fundo='#0e1117', campo='#141820', superficie='#161a22', texto='#e9ecf1',
+                   secundario='#9aa3b2', botao='#1b2029', borda='#333a47', borda_suave='#232935',
+                   ativo='#232935', selecao='#3a2a27', texto_selecao='#fff4ef', verde='#5fd39d',
+                   vermelho='#ff7b86', desabilitado='#6b7484', primario='#ffa586', primario_texto='#1b100c',
+                   primario_ativo='#ffb79e', primario_pressionado='#e98d6f', floresta='#ffa586',
+                   sage='#181d26', realce='#2b201d', linha='#12161d'),
 }
 _modo = 'claro'
 

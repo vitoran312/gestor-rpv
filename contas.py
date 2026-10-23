@@ -35,8 +35,9 @@ class JanelaContas:
         ttk.Button(barra, text='Remover', command=self.remover).pack(side='left', padx=8)
         self.tabela = ttk.Treeview(corpo, style='Contas.Treeview', columns=('nome', 'banco', 'status'), show='headings', selectmode='browse')
         for chave, titulo in (('nome', 'Identificação'), ('banco', 'Banco'), ('status', 'Situação')):
-            self.tabela.heading(chave, text=titulo, anchor='center')
-            self.tabela.column(chave, width=340 if chave=='status' else 240, anchor='center')
+            alinhamento = 'center' if chave == 'status' else 'w'
+            self.tabela.heading(chave, text=titulo, anchor=alinhamento)
+            self.tabela.column(chave, width=340 if chave=='status' else 240, anchor=alinhamento)
         self.situacoes_labels={}
         self.incompletas=set()
         self.situacoes_pendentes=False

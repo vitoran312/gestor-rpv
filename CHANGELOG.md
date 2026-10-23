@@ -1,5 +1,18 @@
 # Histórico de versões
 
+## 0.20.0
+
+- Nova interface Vitoran Pro: base neutra em cinzas frios (claro) e grafite (escuro), com um único acento
+  de marca por tema — carmim no claro, pêssego no escuro.
+- Botões e cartões planos, sem sombras, com contorno de 1 px e cantos de 8 a 12 px.
+- Títulos em tons neutros; a cor da marca fica reservada às ações principais, ao foco e aos ícones.
+- Campos com contorno fino e anel de foco de 2 px; setas das listas suspensas em tom discreto.
+- Tabelas com cabeçalho discreto, margem interna nas células e alinhamento por tipo de dado:
+  texto à esquerda, valores à direita e datas centralizadas.
+- Barras de rolagem finas, sem setas nem ranhuras.
+- Ícones da tela inicial com traço mais fino sobre fundo suave da cor da marca.
+- Contraste de texto conferido nos dois temas (WCAG AA).
+
 ## 0.19.1
 
 - Emblema Vitoran Tech maior e centralizado no espaço livre acima do título da tela inicial.

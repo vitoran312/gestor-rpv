@@ -1,4 +1,4 @@
-"""Elementos Moss: cantos suaves, sombras e ícones, usando só a biblioteca padrão."""
+"""Elementos Vitoran Pro: superfícies planas, cantos suaves e ícones, só com a biblioteca padrão."""
 import math
 import struct
 import zlib
@@ -10,32 +10,30 @@ from tema import cores
 
 def familia_fonte(raiz):
     raiz = raiz._root()
-    if hasattr(raiz,'_familia_moss'):
-        return raiz._familia_moss
+    if hasattr(raiz,'_familia_pro'):
+        return raiz._familia_pro
     disponiveis = {f.casefold() for f in tkfont.families(raiz)}
-    raiz._familia_moss = next((f for f in ('Segoe UI','Inter','DejaVu Sans','Liberation Sans','Helvetica') if f.casefold() in disponiveis),tkfont.nametofont('TkDefaultFont').actual('family'))
-    return raiz._familia_moss
+    raiz._familia_pro = next((f for f in ('Segoe UI','Inter','DejaVu Sans','Liberation Sans','Helvetica') if f.casefold() in disponiveis),tkfont.nametofont('TkDefaultFont').actual('family'))
+    return raiz._familia_pro
 
 
 def _rgb(cor):
     return tuple(int(cor[i:i+2],16) for i in (1,3,5))
 
 
-@lru_cache(maxsize=4)
-def _mascara_arredondada(sombra,raio):
-    """A geometria da sombra é calculada uma única vez e reutilizada em todas as cores."""
+@lru_cache(maxsize=8)
+def _mascara_arredondada(largura,altura,raio):
+    """Cobertura do preenchimento e do contorno de 1 px, calculada uma vez por geometria."""
     def distancia(x,y):
-        qx,qy = abs(x-48)-(42-raio),abs(y-34)-(28-raio)
+        qx,qy = abs(x-largura/2)-(largura/2-raio),abs(y-altura/2)-(altura/2-raio)
         return math.hypot(max(qx,0),max(qy,0))+min(max(qx,qy),0)-raio
+    amostras = ((.25,.25),(.75,.25),(.25,.75),(.75,.75))
     mascara = []
-    for y in range(72):
-        for x in range(96):
-            sample_y = y
-            cobertura = sum(distancia(x+dx,sample_y+dy)<=0 for dx,dy in ((.25,.25),(.75,.25),(.25,.75),(.75,.75)))/4
-            d = max(0,distancia(x+.5,sample_y-2.5))
-            alpha = .13*math.exp(-d*d/13) if sombra else 0
-            a = cobertura+alpha*(1-cobertura)
-            mascara.append((cobertura/a if a else 0,round(255*a)))
+    for y in range(altura):
+        for x in range(largura):
+            dentro = sum(distancia(x+dx,y+dy)<=0 for dx,dy in amostras)/4
+            miolo = sum(distancia(x+dx,y+dy)<=-1 for dx,dy in amostras)/4
+            mascara.append((dentro,miolo))
     return tuple(mascara)
 
 
@@ -46,14 +44,16 @@ def _codificar_png(largura,altura,dados):
             bloco(b'IDAT',zlib.compress(bytes(dados)))+bloco(b'IEND',b''))
 
 
-@lru_cache(maxsize=32)
-def _png_arredondado(cor,sombra=True,raio=15):
-    rgb = _rgb(cor)
+@lru_cache(maxsize=48)
+def _png_arredondado(cor,contorno=None,raio=8,largura=40,altura=36):
+    """Superfície plana: preenchimento com contorno opcional de 1 px, sem sombra."""
+    rgb,borda = _rgb(cor),_rgb(contorno or cor)
     dados = bytearray()
-    for indice,(peso,alpha) in enumerate(_mascara_arredondada(sombra,raio)):
-        if indice%96==0: dados.append(0)
-        dados.extend((round(rgb[0]*peso),round(rgb[1]*peso),round(rgb[2]*peso),alpha))
-    return _codificar_png(96,72,dados)
+    for indice,(dentro,miolo) in enumerate(_mascara_arredondada(largura,altura,raio)):
+        if indice%largura==0: dados.append(0)
+        peso = miolo/dentro if dentro else 0
+        dados.extend((*(round(a*peso+b*(1-peso)) for a,b in zip(rgb,borda)),round(255*dentro)))
+    return _codificar_png(largura,altura,dados)
 
 
 def _png_recebido(c,selecionado):
@@ -121,22 +121,25 @@ def aplicar_superficies(raiz):
     """Imagens guardadas pela raiz; estilos nativos mantêm foco, teclado e acessibilidade."""
     c = cores()
     estilo = ttk.Style(raiz)
-    cache = getattr(raiz,'_superficies_moss',{})
-    raiz._superficies_moss = cache
+    cache = getattr(raiz,'_superficies_pro',{})
+    raiz._superficies_pro = cache
     chave = c['fundo']
     if chave not in cache:
         imagens = {}
-        for nome,cor in (('botao',c['botao']),('ativo',c['ativo']),('pressionado',c['selecao']),
-                         ('primario',c['primario']),('primario_ativo',c['primario_ativo']),
-                         ('primario_pressionado',c['primario_pressionado']),('cartao',c['superficie']),('inativo',c['fundo'])):
-            imagens[nome] = tk.PhotoImage(master=raiz,data=_png_arredondado(cor))
-        prefixo = 'Moss'+chave[1:]
+        for nome,cor,contorno in (('botao',c['botao'],c['borda']),('ativo',c['ativo'],c['borda']),
+                                  ('pressionado',c['selecao'],c['floresta']),
+                                  ('primario',c['primario'],None),('primario_ativo',c['primario_ativo'],None),
+                                  ('primario_pressionado',c['primario_pressionado'],None),
+                                  ('inativo',c['fundo'],c['borda_suave'])):
+            imagens[nome] = tk.PhotoImage(master=raiz,data=_png_arredondado(cor,contorno))
+        imagens['cartao'] = tk.PhotoImage(master=raiz,data=_png_arredondado(c['superficie'],c['borda_suave'],12,48,48))
+        prefixo = 'Pro'+chave[1:]
         for nome,normal,hover,pressionado in (('secundario','botao','ativo','pressionado'),
                                               ('primario','primario','primario_ativo','primario_pressionado')):
             estilo.element_create(prefixo+nome,'image',imagens[normal],
                                   ('disabled',imagens['inativo']),('pressed',imagens[pressionado]),
-                                  ('active',imagens[hover]),border=(24,22,24,24),padding=0,width=72,height=48,sticky='nsew')
-        estilo.element_create(prefixo+'cartao','image',imagens['cartao'],border=(24,22,24,24),padding=0,width=72,height=48,sticky='nsew')
+                                  ('active',imagens[hover]),border=(10,10,10,10),padding=0,width=40,height=36,sticky='nsew')
+        estilo.element_create(prefixo+'cartao','image',imagens['cartao'],border=(14,14,14,14),padding=0,width=48,height=48,sticky='nsew')
         for selecionado in (False,True):
             imagens['recebido'+str(selecionado)]=tk.PhotoImage(master=raiz,data=_png_recebido(c,selecionado))
         estilo.element_create(prefixo+'recebido','image',imagens['recebidoFalse'],
@@ -180,8 +183,8 @@ class Icone(tk.Canvas):
         c = cores()
         self.configure(bg=c['superficie'])
         self.delete('all')
-        self.create_oval(2,2,52,52,fill=c['sage'],outline='')
-        linha = dict(fill=c['floresta'],width=2.2,capstyle='round',joinstyle='round')
+        self.create_oval(5,5,49,49,fill=c['realce'],outline='')
+        linha = dict(fill=c['floresta'],width=1.8,capstyle='round',joinstyle='round')
         if self.nome == 'entrada':
             self.create_line(17,14,32,14,38,20,38,40,17,40,17,14,**linha)
             self.create_line(31,14,31,21,38,21,**linha)

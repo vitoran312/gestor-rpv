@@ -198,7 +198,7 @@ class Aplicativo(OperacoesMixin, RegistroMixin, ArquivosMixin):
         self.salvar_tema(modo)
         self.fonte=familia_fonte(self.janela)
         fonte=self.fonte
-        nome_tema='VitoranMoss'+modo.title()
+        nome_tema='VitoranPro'+modo.title()
         if nome_tema not in estilo.theme_names():
             estilo.theme_create(nome_tema,parent='clam')
             estilo.theme_use(nome_tema)

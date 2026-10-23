@@ -75,10 +75,13 @@ class OperacoesMixin:
                    'Lucro previsto', 'Conta de destino', 'Previsão inicial', 'Previsão atual', 'Recebido')
         self.ordenacao = None
         self.titulos_colunas = dict(zip(colunas, titulos))
+        # Texto à esquerda, valores à direita e datas centralizadas, como em uma planilha.
+        alinhamentos = {'nome': 'w', 'conta': 'w', 'custo': 'e', 'comissao': 'e', 'previsto': 'e', 'lucro': 'e'}
         for coluna, titulo in zip(colunas, titulos):
-            self.tabela.heading(coluna, text=titulo, anchor='center', command=lambda c=coluna: self.ordenar_coluna(c))
-            largura = max(280 if coluna=='nome' else 160,tkfont.Font(font=(self.fonte,18,'bold')).measure(titulo)+28)
-            self.tabela.column(coluna,width=largura,minwidth=100,anchor='center')
+            alinhamento = alinhamentos.get(coluna, 'center')
+            self.tabela.heading(coluna, text=titulo, anchor=alinhamento, command=lambda c=coluna: self.ordenar_coluna(c))
+            largura = max(280 if coluna=='nome' else 160,tkfont.Font(font=(self.fonte,18)).measure(titulo)+40)
+            self.tabela.column(coluna,width=largura,minwidth=100,anchor=alinhamento)
         self.acoes_linhas = {}
         self.reposicionar_pendente = False
         vertical = ttk.Scrollbar(quadro, orient='vertical', command=self.tabela.yview)
