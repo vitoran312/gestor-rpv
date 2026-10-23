@@ -91,7 +91,7 @@ class TestBackupHistorico(unittest.TestCase):
         with self.assertRaises(ValueError), BackupPreparado(invalido):
             pass
 
-    def test_historico_atomicidade_lixeira_e_restauracao(self):
+    def test_lixeira_e_restauracao_sem_novas_alteracoes_registradas(self):
         identificador = self.origem.salvar(dados_rpv())
         self.origem.salvar(dados_rpv(observacoes='Alteração'), identificador)
         self.origem.atualizar_previsao(identificador,'2027-01-20')
@@ -106,11 +106,7 @@ class TestBackupHistorico(unittest.TestCase):
         self.origem.restaurar(identificador)
         self.assertEqual(self.origem.obter(identificador)['recebimento'], '2026-10-22')
         eventos = self.origem.historico(identificador)
-        self.assertEqual(len(eventos), 6)
-        self.assertEqual(eventos[0]['acao'],'Restaurado da lixeira')
-        previsao = next(e for e in eventos if e['acao']=='Previsão atual')
-        self.assertEqual(json.loads(previsao['alteracoes'])['previsao_atual'],
-                         {'antes':'2026-12-20','depois':'2027-01-20'})
+        self.assertEqual(eventos, [])
 
     def test_migracao_080_remove_unicidade_cpf_preserva_vinculos(self):
         conta = self.origem.salvar_conta(dados_conta())
@@ -137,7 +133,7 @@ class TestBackupHistorico(unittest.TestCase):
         with migrado.conectar() as con:
             self.assertEqual(con.execute('PRAGMA foreign_key_check').fetchall(),[])
             self.assertFalse(Banco.cpf_unico(con))
-        self.assertEqual(migrado.historico(identificador)[0]['acao'],'Registro anterior à versão 0.9.0')
+        self.assertEqual(migrado.historico(identificador),[])
         self.assertEqual(len(list(migrado.caminho.parent.glob('backup-antes-0.9.0-*.sqlite3'))),1)
 
     def test_backup_dentro_da_pasta_documentos_nao_inclui_a_si_mesmo(self):

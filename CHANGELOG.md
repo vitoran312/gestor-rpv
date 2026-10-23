@@ -1,5 +1,17 @@
 # Histórico de versões
 
+## 0.10.0
+
+- Seleção de várias linhas por arrasto, Ctrl+clique, Shift+clique e Ctrl+A.
+- Navegação por setas, Home/End e Page Up/Down; Enter edita, Delete envia à lixeira.
+- Exclusão e restauração em lote; menus de contexto preservam a seleção.
+- Lixeira com ícone isolado no canto inferior direito do histórico.
+- Correção da apresentação e do texto do botão Restaurar entradas.
+- Retirada do histórico de alterações da interface e de novos registros de auditoria.
+- Anexos PDF e imagens por entrada, com cópia local, consulta e abertura.
+- Backup e importação incluem os anexos; compatibilidade com backups da versão 0.9.0.
+- Migração com cópia de segurança e preservação dos dados existentes.
+
 ## 0.9.0
 
 - Backup portátil `.rpvbackup` com banco, documentos, lixeira e auditoria.

@@ -1,5 +1,8 @@
 """Persistência local. Valores monetários são armazenados em centavos."""
 import os
+import shutil
+import uuid
+from documentos import validar_anexo
 import json
 import re
 import unicodedata
@@ -100,14 +103,16 @@ class Banco:
             colunas = {r['name'] for r in con.execute('PRAGMA table_info(rpvs)')}
             colunas_contas = {r['name'] for r in con.execute('PRAGMA table_info(contas)')}
             cpf_unico = self.cpf_unico(con)
+            tem_documentos = con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='documentos'").fetchone() is not None
         migrar = ('previsao_atual_definida' not in colunas or 'recebimento' not in colunas or
                   not {'numero_endereco', 'cidade', 'estado'}.issubset(colunas_contas) or
-                  'lixeira_em' not in colunas or cpf_unico)
+                  'lixeira_em' not in colunas or cpf_unico or not tem_documentos)
         if colunas and migrar:
             versao_backup = ('0.4.0' if 'conta_id' not in colunas else
                              '0.6.0' if 'recebimento' not in colunas else
                              '0.7.0' if 'previsao_atual_definida' not in colunas or
-                             not {'numero_endereco', 'cidade', 'estado'}.issubset(colunas_contas) else '0.9.0')
+                             not {'numero_endereco', 'cidade', 'estado'}.issubset(colunas_contas) else
+                             '0.9.0' if 'lixeira_em' not in colunas or cpf_unico else '0.10.0')
             backup = self.caminho.with_name(f'backup-antes-{versao_backup}-' +
                 datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.sqlite3')
             with self.conectar() as origem:
@@ -175,11 +180,12 @@ class Banco:
             con.execute('''CREATE TABLE IF NOT EXISTS historico_alteracoes (
                 id INTEGER PRIMARY KEY, rpv_id INTEGER NOT NULL REFERENCES rpvs(id) ON DELETE CASCADE,
                 quando TEXT NOT NULL, acao TEXT NOT NULL, alteracoes TEXT NOT NULL)''')
-            for registro in con.execute('SELECT * FROM rpvs WHERE id NOT IN (SELECT rpv_id FROM historico_alteracoes)').fetchall():
-                self.auditar(con, registro['id'], 'Registro anterior à versão 0.9.0', {}, dict(registro))
             if con.execute('PRAGMA foreign_key_check').fetchall():
                 raise ValueError('Não foi possível migrar o banco: vínculos inconsistentes.')
-            con.execute('PRAGMA user_version=4')
+            con.execute('''CREATE TABLE IF NOT EXISTS documentos (
+                id INTEGER PRIMARY KEY, rpv_id INTEGER NOT NULL REFERENCES rpvs(id) ON DELETE CASCADE,
+                nome TEXT NOT NULL, caminho TEXT NOT NULL UNIQUE)''')
+            con.execute('PRAGMA user_version=5')
 
     @staticmethod
     def cpf_unico(con):
@@ -190,16 +196,6 @@ class Banco:
                 if campos == ['cpf']:
                     return True
         return False
-
-    @staticmethod
-    def auditar(con, identificador, acao, antes, depois):
-        diferencas = {k: {'antes': antes.get(k), 'depois': depois.get(k)}
-                      for k in sorted(set(antes) | set(depois))
-                      if antes.get(k) != depois.get(k)}
-        if diferencas:
-            con.execute('INSERT INTO historico_alteracoes (rpv_id,quando,acao,alteracoes) VALUES (?,?,?,?)',
-                        (identificador, datetime.now().astimezone().isoformat(timespec='seconds'), acao,
-                         json.dumps(diferencas, ensure_ascii=False)))
 
     @staticmethod
     def criar_rpvs(con, tabela):
@@ -281,13 +277,27 @@ class Banco:
             con.execute('UPDATE contas SET ativa=? WHERE id=?', (int(ativa), identificador))
 
     def remover_conta(self, identificador):
+        self.remover_contas([identificador])
+
+    def remover_contas(self, identificadores):
+        ids = list(dict.fromkeys(int(i) for i in identificadores))
         with self.conectar() as con:
             con.execute('BEGIN IMMEDIATE')
-            if con.execute('SELECT 1 FROM rpvs WHERE conta_id=? LIMIT 1', (identificador,)).fetchone():
-                raise ValueError('Esta conta está vinculada a uma RPV. Use Desativar para preservar o histórico.')
-            con.execute('DELETE FROM contas WHERE id=?', (identificador,))
+            for identificador in ids:
+                if con.execute('SELECT 1 FROM rpvs WHERE conta_id=? LIMIT 1',(identificador,)).fetchone():
+                    raise ValueError('Uma conta selecionada está vinculada a uma RPV. Use Desativar para preservar o histórico.')
+            con.executemany('DELETE FROM contas WHERE id=?',[(i,) for i in ids])
 
-    def salvar(self, dados, identificador=None):
+    def salvar(self, dados, identificador=None, anexos=()):
+        criados = []
+        try:
+            return self._salvar(dados, identificador, anexos, criados)
+        except Exception:
+            for arquivo in criados:
+                arquivo.unlink(missing_ok=True)
+            raise
+
+    def _salvar(self, dados, identificador, anexos, criados):
         dados = dict(dados)
         dados['nome'] = nome_formatado(dados['nome'])
         dados['observacoes'] = dados['observacoes'][:1].upper() + dados['observacoes'][1:]
@@ -324,12 +334,11 @@ class Banco:
             if identificador is None:
                 novo = con.execute('INSERT INTO rpvs (' + ','.join(campos) + ') VALUES (' +
                                    ','.join(':' + k for k in campos) + ')', dados).lastrowid
-                self.auditar(con, novo, 'Cadastro', {}, dict(con.execute('SELECT * FROM rpvs WHERE id=?', (novo,)).fetchone()))
+                self.copiar_anexos(con, novo, anexos, criados)
                 return novo
             con.execute('UPDATE rpvs SET ' + ','.join(k + '=:' + k for k in campos) + ' WHERE id=:id',
                         dict(dados, id=identificador))
-            depois = dict(con.execute('SELECT * FROM rpvs WHERE id=?', (identificador,)).fetchone())
-            self.auditar(con, identificador, 'Edição', dict(anterior), depois)
+            self.copiar_anexos(con, identificador, anexos, criados)
             return identificador
 
     def listar(self, busca=''):
@@ -342,27 +351,35 @@ class Banco:
             return con.execute(CONSULTA_RPVS + ' WHERE r.id=?', (identificador,)).fetchone()
 
     def excluir(self, identificador):
+        self.excluir_varios([identificador])
+
+    def excluir_varios(self, identificadores):
+        ids = list(dict.fromkeys(int(i) for i in identificadores))
         with self.conectar() as con:
             con.execute('BEGIN IMMEDIATE')
-            registro = con.execute('SELECT * FROM rpvs WHERE id=?', (identificador,)).fetchone()
-            if registro is None or registro['lixeira_em']:
-                raise ValueError('Registro não encontrado na lista ativa.')
+            for identificador in ids:
+                registro = con.execute('SELECT lixeira_em FROM rpvs WHERE id=?',(identificador,)).fetchone()
+                if registro is None or registro['lixeira_em']:
+                    raise ValueError('Uma entrada não está mais na lista ativa. Atualize a lista e tente novamente.')
             agora = datetime.now().astimezone().isoformat(timespec='seconds')
-            con.execute('UPDATE rpvs SET lixeira_em=? WHERE id=?', (agora, identificador))
-            self.auditar(con, identificador, 'Enviado para lixeira', {'lixeira_em': None}, {'lixeira_em': agora})
+            con.executemany('UPDATE rpvs SET lixeira_em=? WHERE id=?',[(agora,i) for i in ids])
 
     def listar_lixeira(self):
         with self.conectar() as con:
             return con.execute(CONSULTA_RPVS + ' WHERE r.lixeira_em IS NOT NULL ORDER BY lixeira_em DESC,id DESC').fetchall()
 
     def restaurar(self, identificador):
+        self.restaurar_varios([identificador])
+
+    def restaurar_varios(self, identificadores):
+        ids = list(dict.fromkeys(int(i) for i in identificadores))
         with self.conectar() as con:
             con.execute('BEGIN IMMEDIATE')
-            registro = con.execute('SELECT * FROM rpvs WHERE id=?', (identificador,)).fetchone()
-            if registro is None or not registro['lixeira_em']:
-                raise ValueError('Registro não encontrado na lixeira.')
-            con.execute('UPDATE rpvs SET lixeira_em=NULL WHERE id=?', (identificador,))
-            self.auditar(con, identificador, 'Restaurado da lixeira', {'lixeira_em': registro['lixeira_em']}, {'lixeira_em': None})
+            for identificador in ids:
+                registro = con.execute('SELECT lixeira_em FROM rpvs WHERE id=?',(identificador,)).fetchone()
+                if registro is None or not registro['lixeira_em']:
+                    raise ValueError('Uma entrada não está mais na lixeira. Reabra a lista e tente novamente.')
+            con.executemany('UPDATE rpvs SET lixeira_em=NULL WHERE id=?',[(i,) for i in ids])
 
     def historico(self, identificador):
         with self.conectar() as con:
@@ -399,7 +416,6 @@ class Banco:
                 if data > date.today().isoformat():
                     raise ValueError('O recebimento não pode estar no futuro.')
             con.execute('UPDATE rpvs SET recebimento=? WHERE id=?', (data, identificador))
-            self.auditar(con, identificador, 'Recebimento', {'recebimento': registro['recebimento']}, {'recebimento': data})
 
     def atualizar_previsao(self, identificador, nova_data):
         nova_data = data_iso(data_br(nova_data))
@@ -410,6 +426,30 @@ class Banco:
                 raise ValueError('Registro não encontrado na lista ativa.')
             if nova_data < registro['aquisicao']:
                 raise ValueError('A previsão atual não pode ser anterior à aquisição.')
-            antes = con.execute(CONSULTA_RPVS + ' WHERE r.id=?', (identificador,)).fetchone()['previsao_atual']
             con.execute('UPDATE rpvs SET previsao_atual_definida=? WHERE id=?', (nova_data, identificador))
-            self.auditar(con, identificador, 'Previsão atual', {'previsao_atual': antes}, {'previsao_atual': nova_data})
+
+    def copiar_anexos(self, con, identificador, anexos, criados):
+        for origem in anexos:
+            origem = validar_anexo(origem)
+            relativo = f'{identificador}/{uuid.uuid4().hex}{origem.suffix.lower()}'
+            destino = self.caminho.parent / 'documentos' / relativo
+            destino.parent.mkdir(parents=True, exist_ok=True)
+            criados.append(destino)
+            shutil.copyfile(origem, destino)
+            con.execute('INSERT INTO documentos (rpv_id,nome,caminho) VALUES (?,?,?)',
+                        (identificador,origem.name,relativo))
+
+    def documentos(self, identificador):
+        with self.conectar() as con:
+            return con.execute('SELECT * FROM documentos WHERE rpv_id=? ORDER BY id',(identificador,)).fetchall()
+
+    def caminho_documento(self, identificador):
+        with self.conectar() as con:
+            documento = con.execute('SELECT * FROM documentos WHERE id=?',(identificador,)).fetchone()
+        if documento is None:
+            raise ValueError('Documento não encontrado.')
+        raiz = (self.caminho.parent / 'documentos').resolve()
+        caminho = (raiz / documento['caminho']).resolve()
+        if not caminho.is_relative_to(raiz) or not caminho.is_file():
+            raise ValueError('O arquivo deste documento não está disponível.')
+        return caminho

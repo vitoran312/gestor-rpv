@@ -5,6 +5,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 from componentes import centralizar
+from selecao import habilitar_selecao
 from dados import nome_formatado, validar_cpf, ESTADOS
 from interacao import aplicar_formato, aplicar_cpf, capitalizar_inicio, formatar_cpf, novo_menu, mostrar_menu, copiar_texto
 
@@ -38,6 +39,7 @@ class JanelaContas:
             self.tabela.column(chave, width=210, anchor='center')
         self.tabela.tag_configure('incompleta', foreground=cores()['vermelho'])
         self.tabela.pack(fill='both', expand=True)
+        habilitar_selecao(self.tabela,abrir=self.editar,excluir=self.remover)
         self.tabela.bind('<Button-3>', self.menu_contexto)
         self.tabela.bind('<Double-1>', lambda _: self.editar())
         ttk.Label(corpo, text='Contas desativadas permanecem no histórico e podem ser reativadas.').pack(pady=(12, 0))
@@ -64,12 +66,14 @@ class JanelaContas:
         linha = self.tabela.identify_row(evento.y)
         menu = novo_menu(self.tabela)
         if linha:
-            self.tabela.selection_set(linha)
+            if linha not in self.tabela.selection():
+                self.tabela.selection_set(linha)
+            unica = len(self.tabela.selection()) == 1
             conta = self.banco.obter_conta(int(linha))
-            menu.add_command(label='Editar', command=self.editar)
-            menu.add_command(label='Desativar' if conta['ativa'] else 'Reativar', command=self.alterar_status)
+            menu.add_command(label='Editar', command=self.editar,state='normal' if unica else 'disabled')
+            menu.add_command(label='Desativar' if conta['ativa'] else 'Reativar', command=self.alterar_status,state='normal' if unica else 'disabled')
             menu.add_command(label='Remover', command=self.remover)
-            menu.add_command(label='Copiar', command=lambda: copiar_texto(self.tabela, dados_para_copiar(dict(conta))))
+            menu.add_command(label='Copiar', command=lambda: copiar_texto(self.tabela, '\n\n'.join(dados_para_copiar(dict(self.banco.obter_conta(int(i)))) for i in self.tabela.selection())))
             menu.add_separator()
         menu.add_command(label='Cadastrar nova conta', command=self.formulario)
         return mostrar_menu(menu, evento)
@@ -78,6 +82,9 @@ class JanelaContas:
         itens = self.tabela.selection()
         if not itens:
             messagebox.showinfo('Contas de recebimento', 'Selecione uma conta na lista.', parent=self.tela)
+            return None
+        if len(itens) != 1:
+            messagebox.showinfo('Contas de recebimento','Selecione apenas uma conta para esta ação.',parent=self.tela)
             return None
         return self.banco.obter_conta(int(itens[0]))
 
@@ -102,21 +109,20 @@ class JanelaContas:
         self.atualizar()
 
     def remover(self):
-        conta = self.selecionada()
-        if conta is None:
+        selecao = self.tabela.selection()
+        if not selecao:
+            messagebox.showinfo('Remover contas','Selecione uma ou mais contas.',parent=self.tela)
             return
-        if not messagebox.askyesno('Remover conta',
-            f"Remover permanentemente a conta {conta['identificacao']}?\n\n"
-            'Esta ação não pode ser desfeita. Contas vinculadas a RPVs devem ser desativadas.',
-            parent=self.tela, icon='warning', default='no'):
+        if not messagebox.askyesno('Remover contas',f'Remover permanentemente {len(selecao)} conta(s)?\n\n'
+            'Contas vinculadas a RPVs devem ser desativadas.',parent=self.tela,icon='warning',default='no'):
             return
         try:
-            self.banco.remover_conta(conta['id'])
+            self.banco.remover_contas(selecao)
         except ValueError as erro:
-            messagebox.showinfo('Preservar histórico', str(erro), parent=self.tela)
+            messagebox.showinfo('Preservar histórico',str(erro),parent=self.tela)
             return
         except sqlite3.Error:
-            messagebox.showerror('Remover conta', 'Não foi possível remover a conta.', parent=self.tela)
+            messagebox.showerror('Remover contas','Não foi possível remover as contas.',parent=self.tela)
             return
         self.atualizar()
 

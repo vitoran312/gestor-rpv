@@ -35,7 +35,8 @@ def validar_banco(caminho):
         try:
             if con.execute('PRAGMA integrity_check').fetchall() != [('ok',)]:
                 raise ValueError('O banco do backup está danificado.')
-            if con.execute('PRAGMA user_version').fetchone()[0] != 4:
+            versao_banco = con.execute('PRAGMA user_version').fetchone()[0]
+            if versao_banco not in (4,5):
                 raise ValueError('Este backup exige outra versão do Gestor de RPV.')
             requisitos = {
                 'rpvs': {'id','nome','aquisicao','previsto','custo','conta','previsao','comissao',
@@ -45,6 +46,8 @@ def validar_banco(caminho):
                 'historico_alteracoes': {'id','rpv_id','quando','acao','alteracoes'},
                 'prorrogacoes': {'id','rpv_id','data','criada_em'},
             }
+            if versao_banco == 5:
+                requisitos['documentos'] = {'id','rpv_id','nome','caminho'}
             for tabela, campos in requisitos.items():
                 presentes = {r[1] for r in con.execute(f'PRAGMA table_info({tabela})')}
                 if not campos.issubset(presentes):
@@ -175,6 +178,18 @@ class BackupPreparado:
                             saida.write(bloco)
                     if digest.hexdigest() != esperado:
                         raise ValueError('Um arquivo do backup está danificado ou foi alterado.')
+                validar_banco(self.pasta / 'banco.sqlite3')
+                from dados import Banco
+                banco_preparado = Banco(self.pasta / 'banco.sqlite3')
+                with banco_preparado.conectar() as con:
+                    for documento in con.execute('SELECT caminho FROM documentos'):
+                        relativo = PurePosixPath(documento['caminho'])
+                        if (relativo.is_absolute() or '..' in relativo.parts or '\\' in documento['caminho'] or
+                            ':' in documento['caminho'] or relativo.as_posix() != documento['caminho']):
+                            raise ValueError('Um documento contém um caminho inválido.')
+                        caminho_documento = self.pasta / 'documentos' / documento['caminho']
+                        if not caminho_documento.is_file():
+                            raise ValueError('Um documento vinculado está ausente no backup.')
                 self.resumo = validar_banco(self.pasta / 'banco.sqlite3')
                 self.resumo['documentos'] = sum(n.startswith('documentos/') for n in hashes)
                 self.criado_em = manifesto.get('criado_em', '')

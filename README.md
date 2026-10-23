@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.9.0
+# Gestor de RPV — 0.10.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -12,7 +12,7 @@ Se precisar ver uma mensagem de erro, abra o Prompt de Comando nessa pasta:
 python app.py
 ```
 
-Mantenha `app.py`, `dados.py`, `componentes.py`, `contas.py`, `interacao.py`, `tema.py`, `calculadora.py`, `backup.py`, `ordenacao.py` e `versao.py` juntos.
+Mantenha `app.py`, `dados.py`, `componentes.py`, `contas.py`, `interacao.py`, `tema.py`, `calculadora.py`, `backup.py`, `ordenacao.py`, `selecao.py`, `documentos.py` e `versao.py` juntos.
 A tela inicial tem os botões **Nova entrada**, **Ver histórico total**,
 **Contas de recebimento** e **Sair**. A versão aparece no canto inferior direito.
 As janelas abrem centralizadas; o histórico abre maximizado no Windows.
@@ -21,7 +21,7 @@ As janelas abrem centralizadas; o histórico abre maximizado no Windows.
 
 - **Arquivo → Nova entrada**: abre o cadastro de uma RPV.
 - **Arquivo → Contas de recebimento**: administra os dados bancários.
-- **Editar → Editar registro / Excluir registro**: atua sobre a linha selecionada.
+- **Editar → Editar registro / Excluir registro**: edita uma linha ou envia as selecionadas à lixeira.
 - **Exibir → Tema claro / Tema escuro**: muda o tema de todas as janelas,
   inclusive formulários, calendários, menus de contexto e calculadora.
   A escolha vale durante a execução; o aplicativo inicia no tema escuro.
@@ -105,8 +105,8 @@ A busca continua acima da tabela. Os menus de clique direito permanecem disponí
 
 ## Backup e importação
 
-Os botões **Backup**, **Importar dados** e **Lixeira** aparecem somente no histórico,
-à direita da busca, separados das ações da barra de menus.
+Os botões **Backup** e **Importar dados** aparecem somente no histórico, à direita
+da busca. O ícone de **lixeira** fica sozinho no canto inferior direito.
 
 1. Clique em **Backup** e escolha uma pasta do Windows.
 2. O programa salva um arquivo `GestorRPV-data-hora.rpvbackup`.
@@ -120,32 +120,46 @@ para voltar ao estado anterior.
 
 O formato `.rpvbackup` é um ZIP com um snapshot consistente do SQLite, os arquivos
 da pasta `documentos` e um manifesto com hashes SHA-256. Inclui contas, RPVs ativas,
-lixeira, datas e histórico de alterações. A importação valida formato, conteúdo,
+lixeira, datas e documentos anexados. Dados antigos de auditoria, se existentes,
+também são preservados no arquivo. A importação valida formato, conteúdo,
 integridade do banco e hashes antes de alterar os dados locais. Em caso de falha
 durante a troca, os documentos anteriores são recuperados e a cópia de segurança permanece.
 
-A pasta de documentos já é incluída para comportar futuros PDFs e imagens.
-A interface para anexar documentos ainda não foi implementada.
+## Documentos da entrada
 
-## Lixeira e histórico de alterações
+- Em **Nova entrada** ou **Editar**, clique em **Anexar documentos** e selecione
+  um ou vários PDFs ou imagens (PNG, JPEG, WebP, BMP, GIF e TIFF).
+- **Documentos (N)** lista os anexos e permite abrir com o programa padrão do Windows.
+  Antes de salvar, é possível retirar arquivos da seleção.
+- Os arquivos são copiados para a pasta de dados somente ao **Salvar registro**.
+  Cancelar o formulário não adiciona arquivos. Depois de salvar, os originais podem
+  ser movidos sem afetar a cópia do aplicativo.
+- Os anexos acompanham a entrada na lixeira, na restauração e no backup portátil.
 
-- **Excluir registro** envia a RPV para a lixeira, preservando seus dados e vínculos.
-- Abra **Lixeira**, selecione a linha e clique em **Restaurar entrada**.
+## Seleção, teclado e lixeira
+
+- Arraste sobre as linhas para selecionar um intervalo; use **Ctrl+clique** para
+  selecionar linhas separadas e **Shift+clique** para selecionar um intervalo.
+- **Ctrl+A** seleciona tudo; **Esc** limpa a seleção na tabela.
+- **Setas**, **Home/End** e **Page Up/Down** navegam pelas linhas.
+  **Shift+setas** amplia a seleção; **Ctrl+setas** move o foco sem trocar a seleção.
+- **Enter** abre a edição de uma entrada; **Delete** pede confirmação e envia as
+  selecionadas à lixeira. **Ctrl+C** copia as linhas selecionadas.
+- O clique direito mantém o grupo selecionado. Editar exige uma única linha;
+  excluir atua sobre o grupo. Os atalhos de tabela só atuam quando ela tem foco.
+- No histórico, **Ctrl+F** foca a busca, **Ctrl+N** abre nova entrada e **F5** atualiza.
+- Abra o ícone de lixeira, selecione uma ou mais entradas e use **Restaurar entradas**
+  ou **Enter**. O botão fica no rodapé, com texto visível nos dois temas.
 - Não há exclusão definitiva de RPVs por esta interface.
-- Selecione uma RPV e use **Editar → Histórico de alterações**, ou o clique direito.
-- Cada alteração registra data/hora, ação, campo, valor anterior e valor novo.
-  Selecione uma alteração para ler o conteúdo completo no painel inferior.
-- Cadastro, edição, previsão atual, recebimento, lixeira e restauração são registrados
-  na mesma transação dos dados. Tentativas inválidas não geram alterações.
-- A auditoria começa na versão 0.9.0. Registros antigos recebem uma referência ao
-  estado encontrado na migração; alterações antigas desconhecidas não são inventadas.
+- O histórico de alterações foi retirado; novas ações não geram auditoria.
+  Dados antigos já gravados são preservados internamente por compatibilidade.
 
 ## Dados e atualização
 
 O banco fica em `%LOCALAPPDATA%\GestorRPV\gestor.sqlite3`, fora da pasta do código.
 Atualizar os arquivos preserva esse banco. A adaptação da estrutura cria uma cópia
-`backup-antes-versao-*.sqlite3` na mesma pasta. Na versão 0.9.0 ela também remove a
-restrição antiga de CPF único, preservando contas, IDs, snapshots e vínculos.
+`backup-antes-versao-*.sqlite3` na mesma pasta. A versão 0.10.0 acrescenta o cadastro de anexos e preserva contas, IDs,
+snapshots e vínculos. Backups da versão 0.9.0 continuam podendo ser importados.
 
 O banco e os backups não são criptografados. Não envie dados pessoais ao GitHub.
 

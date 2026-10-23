@@ -149,6 +149,7 @@ class TestInterface(unittest.TestCase):
         self.assertEqual(rotulo.cget('style'), 'PrevisaoAdiada.TLabel')
         self.assertEqual(str(app.ttk.Style().lookup('PrevisaoAdiada.TLabel', 'foreground')), '#ff6b6b')
         rotulo.event_generate('<Button-1>')
+        rotulo.event_generate('<ButtonRelease-1>')
         self.root.update()
         tela = next(w for w in self.programa.historico.winfo_children() if isinstance(w, tk.Toplevel))
         campo = next(w for w in filhos(tela) if isinstance(w, CampoData))
@@ -162,6 +163,7 @@ class TestInterface(unittest.TestCase):
         self.assertEqual(registro['previsao'], '2026-12-20')
         self.assertEqual(len(self.banco.prorrogacoes(identificador)), 2)
         self.programa.acoes_linhas[str(identificador)][0].event_generate('<Button-1>')
+        self.programa.acoes_linhas[str(identificador)][0].event_generate('<ButtonRelease-1>')
         self.root.update()
         tela = next(w for w in self.programa.historico.winfo_children() if isinstance(w, tk.Toplevel))
         campo = next(w for w in filhos(tela) if isinstance(w, CampoData))
@@ -533,18 +535,11 @@ class TestInterface(unittest.TestCase):
         tela = next(w for w in self.programa.historico.winfo_children() if isinstance(w,tk.Toplevel) and w.title()=='Lixeira')
         tabela = next(w for w in filhos(tela) if isinstance(w,app.ttk.Treeview))
         tabela.selection_set(str(identificador))
-        botao(tela,'Restaurar entrada').invoke()
+        botao(tela,'Restaurar entradas').invoke()
         self.root.update()
         self.assertEqual(self.programa.tabela.get_children(),(str(identificador),))
         self.assertEqual(self.banco.obter(identificador)['previsao_atual'],'2027-01-20')
-        self.programa.tabela.selection_set(str(identificador))
-        self.programa.menus['Editar'].invoke('Histórico de alterações')
-        self.root.update()
-        auditoria = next(w for w in self.programa.historico.winfo_children() if isinstance(w,tk.Toplevel) and 'Histórico de alterações' in w.title())
-        registros = next(w for w in filhos(auditoria) if isinstance(w,app.ttk.Treeview))
-        valores = [registros.item(linha,'values') for linha in registros.get_children()]
-        self.assertTrue(any(v[1]=='Restaurado da lixeira' for v in valores))
-        self.assertTrue(any(v[2]=='Previsão atual' and v[3]=='20/12/2026' and v[4]=='20/01/2027' for v in valores))
+        self.assertFalse(hasattr(self.programa,'mostrar_auditoria'))
 
     def test_ordenacao_colunas_tres_cliques_e_filtro(self):
         ids = []
@@ -605,6 +600,101 @@ class TestInterface(unittest.TestCase):
         self.assertEqual(len(self.banco.listar()),1)
         self.assertEqual(self.banco.listar()[0]['nome'],'Primeira')
         self.assertEqual(len(self.programa.tabela.get_children()),1)
+
+    def test_selecao_mouse_teclado_exclusao_e_restauracao_em_lote(self):
+        from test_contas import dados_rpv
+        ids = [str(self.banco.salvar(dados_rpv(nome=f'Pessoa {n}'))) for n in range(4)]
+        self.programa.mostrar_historico()
+        self.root.update()
+        tabela = self.programa.tabela
+        linhas = list(tabela.get_children())
+        def clicar(linha, estado=0):
+            x,y,w,h = tabela.bbox(linha,'nome')
+            tabela.event_generate('<ButtonPress-1>',x=x+8,y=y+h//2,state=estado)
+            tabela.event_generate('<ButtonRelease-1>',x=x+8,y=y+h//2,state=estado)
+            self.root.update()
+        clicar(linhas[0])
+        clicar(linhas[2],4)
+        self.assertEqual(set(tabela.selection()),{linhas[0],linhas[2]})
+        clicar(linhas[3],1)
+        self.assertEqual(set(tabela.selection()),{linhas[2],linhas[3]})
+        clicar(linhas[0])
+        x,y,w,h = tabela.bbox(linhas[2],'nome')
+        tabela.event_generate('<B1-Motion>',x=x+8,y=y+h//2,state=256)
+        tabela.event_generate('<ButtonRelease-1>',x=x+8,y=y+h//2)
+        self.root.update()
+        self.assertEqual(set(tabela.selection()),set(linhas[:3]))
+        # O arrasto também pode começar no espaço vazio abaixo das linhas.
+        tabela.event_generate('<ButtonPress-1>',x=20,y=tabela.winfo_height()-20)
+        for linha in reversed(linhas[1:]):
+            x,y,w,h = tabela.bbox(linha,'nome')
+            tabela.event_generate('<B1-Motion>',x=x+8,y=y+h//2,state=256)
+        tabela.event_generate('<ButtonRelease-1>',x=x+8,y=y+h//2)
+        self.root.update()
+        self.assertEqual(set(tabela.selection()),set(linhas[1:]))
+        tabela.focus_force()
+        tabela.event_generate('<KeyPress>',keysym='Home')
+        tabela.event_generate('<KeyPress>',keysym='Down',state=1)
+        self.root.update()
+        self.assertEqual(set(tabela.selection()),set(linhas[:2]))
+        with patch.object(app.messagebox,'askyesno',return_value=True):
+            tabela.event_generate('<KeyPress>',keysym='Delete')
+            self.root.update()
+        self.assertEqual(len(self.banco.listar_lixeira()),2)
+        self.programa.mostrar_lixeira()
+        self.root.update()
+        tela = next(w for w in self.programa.historico.winfo_children()
+                    if isinstance(w,tk.Toplevel) and w.title()=='Lixeira')
+        restaurar = botao(tela,'Restaurar entradas')
+        self.assertTrue(restaurar.winfo_ismapped())
+        self.assertGreater(restaurar.winfo_width(),150)
+        self.assertLess(restaurar.winfo_rooty()+restaurar.winfo_height(),tela.winfo_rooty()+tela.winfo_height()+1)
+        estilo = app.ttk.Style(self.root)
+        self.assertNotEqual(estilo.lookup('Restaurar.TButton','foreground'),estilo.lookup('Restaurar.TButton','background'))
+        lixeira = next(w for w in filhos(tela) if isinstance(w,app.ttk.Treeview))
+        lixeira.focus_force()
+        self.root.update()
+        lixeira.event_generate('<Control-a>')
+        lixeira.event_generate('<Return>')
+        self.root.update()
+        self.assertEqual(len(self.banco.listar()),4)
+        self.assertEqual(str(self.programa.botao_lixeira.cget('compound')),'image')
+
+    def test_anexar_visualizar_salvar_reabrir_e_cancelar_documentos(self):
+        from test_contas import dados_rpv
+        identificador = self.banco.salvar(dados_rpv())
+        arquivo = Path(self.pasta.name)/'contrato.pdf'
+        arquivo.write_bytes(b'%PDF-1.4 teste')
+        self.programa.formulario(identificador)
+        self.root.update()
+        form = next(w for w in self.root.winfo_children() if isinstance(w,tk.Toplevel))
+        with patch.object(app.filedialog,'askopenfilenames',return_value=(str(arquivo),)):
+            botao(form,'Anexar documentos').invoke()
+            botao(form,'Anexar documentos').invoke()
+        self.root.update()
+        self.assertEqual(self.banco.documentos(identificador),[])
+        documentos = next(w for w in filhos(form) if isinstance(w,app.ttk.Button)
+                          and w.cget('textvariable') and self.root.getvar(w.cget('textvariable'))=='Documentos (1)')
+        documentos.invoke()
+        self.root.update()
+        janela = next(w for w in form.winfo_children() if isinstance(w,tk.Toplevel))
+        lista = next(w for w in filhos(janela) if isinstance(w,app.ttk.Treeview))
+        self.assertEqual(len(lista.get_children()),1)
+        lista.selection_set(lista.get_children()[0])
+        with patch.object(app,'abrir_arquivo') as abrir:
+            botao(janela,'Abrir documento').invoke()
+            abrir.assert_called_once_with(arquivo)
+        botao(janela,'Fechar').invoke()
+        botao(form,'Salvar registro').invoke()
+        self.root.update()
+        self.assertEqual(len(self.banco.documentos(identificador)),1)
+        arquivo.unlink()
+        self.programa.formulario(identificador)
+        self.root.update()
+        form = next(w for w in self.root.winfo_children() if isinstance(w,tk.Toplevel))
+        documento = self.banco.documentos(identificador)[0]
+        self.assertTrue(self.banco.caminho_documento(documento['id']).exists())
+        botao(form,'Cancelar').invoke()
 
 
 if __name__ == '__main__':

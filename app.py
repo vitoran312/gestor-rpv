@@ -13,6 +13,8 @@ from tema import cores, definir_modo, atualizar_widgets
 from calculadora import JanelaCalculadora
 from backup import criar_backup, BackupPreparado
 from ordenacao import ordenar
+from selecao import habilitar_selecao, pressionar_linha, arrastar
+from documentos import validar_anexo, abrir_arquivo
 from interacao import instalar_menu_texto, aplicar_formato, capitalizar_inicio, menu_copia, novo_menu, mostrar_menu, copiar_texto
 
 
@@ -71,7 +73,6 @@ class Aplicativo:
         editar = novo_menu(barra)
         editar.add_command(label='Editar registro', command=self.abrir)
         editar.add_command(label='Excluir registro', command=self.excluir)
-        editar.add_command(label='Histórico de alterações', command=self.historico_selecionado)
         exibir = novo_menu(barra)
         exibir.add_radiobutton(label='Tema claro', variable=self.modo_tema, value='claro', command=self.configurar_tema)
         exibir.add_radiobutton(label='Tema escuro', variable=self.modo_tema, value='escuro', command=self.configurar_tema)
@@ -106,6 +107,8 @@ class Aplicativo:
         estilo.configure('Previsao.TLabel', background=campo, anchor='center')
         estilo.configure('PrevisaoAdiada.TLabel', background=campo, foreground=c['vermelho'], anchor='center')
         estilo.configure('Recebido.TLabel', foreground=c['verde'], font=('Verdana', 10, 'bold'))
+        estilo.configure('Restaurar.TButton', foreground=texto, background=c['botao'], font=('Verdana',10,'bold'), padding=(16,10))
+        estilo.map('Restaurar.TButton', foreground=[('!disabled',texto)])
         estilo.configure('Calculadora.TButton', font=('Verdana', 14, 'bold'), padding=(6, 8))
         estilo.configure('Menu.TButton', font=('Verdana', 16, 'bold'), padding=(20, 15))
         for tipo in ('TEntry', 'TCombobox'):
@@ -127,6 +130,8 @@ class Aplicativo:
         self.janela.option_add('*TCombobox*Listbox.selectBackground', c['selecao'])
         self.janela.option_add('*TCombobox*Listbox.selectForeground', c['texto_selecao'])
         atualizar_widgets(self.janela)
+        if hasattr(self,'icone_lixeira'):
+            self.desenhar_icone_lixeira()
         if self.janela_contas is not None and self.janela_contas.tela.winfo_exists():
             self.janela_contas.tabela.tag_configure('incompleta', foreground=c['vermelho'])
 
@@ -151,7 +156,6 @@ class Aplicativo:
         protecao.pack(side='right', padx=(24, 0))
         ttk.Button(protecao, text='Backup', command=self.exportar_backup).pack(side='left', padx=4)
         ttk.Button(protecao, text='Importar dados', command=self.importar_dados).pack(side='left', padx=4)
-        ttk.Button(protecao, text='Lixeira', command=self.mostrar_lixeira).pack(side='left', padx=4)
         ttk.Label(barra, text='Buscar nome ou data:').pack(side='left', padx=(0, 6))
         self.busca = tk.StringVar()
         entrada_busca = ttk.Entry(barra, textvariable=self.busca)
@@ -189,12 +193,21 @@ class Aplicativo:
         horizontal.grid(row=1, column=0, sticky='ew')
         quadro.rowconfigure(0, weight=1)
         quadro.columnconfigure(0, weight=1)
+        habilitar_selecao(self.tabela, abrir=self.abrir, excluir=self.excluir, copiar=self.copiar_selecao)
         self.tabela.bind('<Button-3>', self.menu_historico)
         self.tabela.bind('<ButtonRelease-1>', self.clicar_historico)
         self.tabela.bind('<Double-1>', self.duplo_clique_historico)
-        self.resumo = ttk.Label(corpo)
-        self.resumo.pack(anchor='w', pady=(12, 4))
-        ttk.Label(corpo, text='Dados salvos neste computador').pack(anchor='w')
+        rodape = ttk.Frame(corpo)
+        rodape.pack(fill='x',pady=(12,0))
+        self.resumo = ttk.Label(rodape)
+        self.resumo.pack(side='left')
+        self.desenhar_icone_lixeira()
+        self.botao_lixeira = ttk.Button(rodape, text='Lixeira', image=self.icone_lixeira, compound='image',
+                                       width=3, command=self.mostrar_lixeira)
+        self.botao_lixeira.pack(side='right')
+        self.historico.bind('<Control-f>',lambda _: entrada_busca.focus_set())
+        self.historico.bind('<Control-n>',lambda _: self.formulario())
+        self.historico.bind('<F5>',lambda _: self.atualizar())
         self.atualizar()
         centralizar(self.historico, 1100, 650)
         self.historico.deiconify()
@@ -203,6 +216,8 @@ class Aplicativo:
     def atualizar(self):
         if self.historico is None or not self.historico.winfo_exists():
             return
+        selecionados = self.tabela.selection()
+        foco = self.tabela.focus()
         registros = self.banco.listar(self.busca.get().strip())
         if self.ordenacao:
             registros = ordenar(registros, *self.ordenacao)
@@ -218,6 +233,10 @@ class Aplicativo:
                 'R$ ' + moeda(r['previsto']), 'R$ ' + moeda(r['previsto'] - r['custo']),
                 r['conta'], data_br(r['previsao']), data_br(r['previsao_atual']),
                 ''))
+        disponiveis = set(self.tabela.get_children())
+        self.tabela.selection_set([i for i in selecionados if i in disponiveis])
+        if foco in disponiveis:
+            self.tabela.focus(foco)
         self.agendar_acoes()
         self.resumo.config(text=f'{len(registros)} registro(s) • '
             f"Lucro previsto: R$ {moeda(sum(r['previsto'] - r['custo'] for r in registros))}")
@@ -284,102 +303,69 @@ class Aplicativo:
         messagebox.showinfo('Importação concluída', 'Dados recuperados. Backup anterior salvo em:\n' + str(seguranca),
                             parent=self.historico)
 
-    def historico_selecionado(self):
-        selecao = self.tabela.selection()
-        if not selecao:
-            messagebox.showinfo('Histórico de alterações', 'Selecione uma RPV na lista.', parent=self.historico)
-            return
-        self.mostrar_auditoria(int(selecao[0]))
-
-    def mostrar_auditoria(self, identificador):
-        registro = self.banco.obter(identificador)
-        if registro is None:
-            return
-        tela = tk.Toplevel(self.historico)
-        tela.withdraw()
-        tela.title('Histórico de alterações — ' + registro['nome'])
-        tela.configure(bg=cores()['fundo'])
-        corpo = ttk.Frame(tela, padding=20)
-        corpo.pack(fill='both', expand=True)
-        ttk.Label(corpo, text='Alterações registradas a partir da versão 0.9.0.').pack(anchor='w', pady=(0, 10))
-        quadro = ttk.Frame(corpo)
-        quadro.pack(fill='both', expand=True)
-        tabela = ttk.Treeview(quadro, columns=('quando','acao','campo','antes','depois'), show='headings')
-        for chave, titulo in (('quando','Data e hora'), ('acao','Ação'), ('campo','Campo'), ('antes','Antes'), ('depois','Depois')):
-            tabela.heading(chave, text=titulo)
-            tabela.column(chave, width=180, anchor='center')
-        scroll = ttk.Scrollbar(quadro, orient='vertical', command=tabela.yview)
-        tabela.configure(yscrollcommand=scroll.set)
-        tabela.pack(side='left', fill='both', expand=True)
-        scroll.pack(side='right', fill='y')
-        nomes = {'nome':'Titular', 'aquisicao':'Data de Aquisição', 'previsto':'Valor Total RPV',
-                 'custo':'Valor de aquisição', 'comissao':'Comissão', 'conta':'Conta de destino',
-                 'previsao':'Previsão inicial', 'previsao_atual':'Previsão atual', 'recebimento':'Recebimento',
-                 'observacoes':'Observações', 'lixeira_em':'Lixeira', 'conta_snapshot':'Dados de recebimento',
-                 'conta_id':'Identificador da conta', 'previsao_atual_definida':'Previsão atual'}
-
-        def exibir(campo, valor):
-            if valor is None:
-                return '—'
-            if campo in ('previsto','custo','comissao'):
-                return 'R$ ' + moeda(valor)
-            if campo in ('aquisicao','previsao','previsao_atual','previsao_atual_definida','recebimento'):
-                return data_br(valor)
-            return str(valor)
-
-        for evento in self.banco.historico(identificador):
-            quando = datetime.fromisoformat(evento['quando']).astimezone().strftime('%d/%m/%Y %H:%M:%S')
-            for campo, valores in json.loads(evento['alteracoes']).items():
-                tabela.insert('', 'end', values=(quando, evento['acao'], nomes.get(campo,campo),
-                    exibir(campo,valores['antes']), exibir(campo,valores['depois'])))
-        detalhe = tk.Text(corpo, height=5, wrap='word', state='disabled', font=('Verdana',10))
-        detalhe.pack(fill='x', pady=(12, 0))
-
-        def selecionar(_evento):
-            linhas = tabela.selection()
-            if linhas:
-                valores = tabela.item(linhas[0], 'values')
-                detalhe.configure(state='normal')
-                detalhe.delete('1.0', tk.END)
-                detalhe.insert('1.0', '\n'.join(str(v) for v in valores))
-                detalhe.configure(state='disabled')
-        tabela.bind('<<TreeviewSelect>>', selecionar)
-        centralizar(tela, 1050, 600)
-        tela.deiconify()
+    def desenhar_icone_lixeira(self):
+        if not hasattr(self,'icone_lixeira'):
+            self.icone_lixeira = tk.PhotoImage(master=self.janela,width=24,height=24)
+        self.icone_lixeira.blank()
+        cor = cores()['texto']
+        for retangulo in ((4,5,20,7),(9,2,15,4),(6,8,8,21),(16,8,18,21),
+                          (6,20,18,22),(10,9,11,18),(13,9,14,18)):
+            self.icone_lixeira.put(cor,to=retangulo)
 
     def mostrar_lixeira(self):
         tela = tk.Toplevel(self.historico)
         tela.withdraw()
         tela.title('Lixeira')
         tela.configure(bg=cores()['fundo'])
-        corpo = ttk.Frame(tela, padding=20)
-        corpo.pack(fill='both', expand=True)
-        tabela = ttk.Treeview(corpo, columns=('nome','data','removido'), show='headings', selectmode='browse')
+        tela.minsize(620,350)
+        corpo = ttk.Frame(tela,padding=20)
+        corpo.pack(fill='both',expand=True)
+        corpo.rowconfigure(0,weight=1)
+        corpo.columnconfigure(0,weight=1)
+        tabela = ttk.Treeview(corpo,columns=('nome','data','removido'),show='headings')
         for chave,titulo in (('nome','Titular'),('data','Data de Aquisição'),('removido','Enviado à lixeira')):
             tabela.heading(chave,text=titulo)
             tabela.column(chave,width=220,anchor='center')
-        tabela.pack(fill='both',expand=True)
+        tabela.grid(row=0,column=0,sticky='nsew')
+        scroll = ttk.Scrollbar(corpo,orient='vertical',command=tabela.yview)
+        tabela.configure(yscrollcommand=scroll.set)
+        scroll.grid(row=0,column=1,sticky='ns')
 
         def atualizar():
             tabela.delete(*tabela.get_children())
             for registro in self.banco.listar_lixeira():
                 quando = datetime.fromisoformat(registro['lixeira_em']).strftime('%d/%m/%Y %H:%M:%S')
-                tabela.insert('', 'end', iid=str(registro['id']), values=(registro['nome'],data_br(registro['aquisicao']),quando))
+                tabela.insert('','end',iid=str(registro['id']),values=(registro['nome'],data_br(registro['aquisicao']),quando))
 
         def restaurar():
             selecao = tabela.selection()
             if not selecao:
-                messagebox.showinfo('Lixeira','Selecione uma entrada para restaurar.',parent=tela)
+                messagebox.showinfo('Lixeira','Selecione uma ou mais entradas para restaurar.',parent=tela)
                 return
             try:
-                self.banco.restaurar(int(selecao[0]))
+                self.banco.restaurar_varios(selecao)
             except (sqlite3.Error,ValueError) as erro:
                 messagebox.showerror('Lixeira',str(erro),parent=tela)
                 return
             atualizar()
             self.atualizar()
 
-        ttk.Button(corpo,text='Restaurar entrada',command=restaurar).pack(anchor='e',pady=(12,0))
+        def contexto(evento):
+            linha = tabela.identify_row(evento.y)
+            if not linha:
+                return
+            if linha not in tabela.selection():
+                tabela.selection_set(linha)
+            menu = novo_menu(tabela)
+            menu.add_command(label='Restaurar entradas',command=restaurar)
+            return mostrar_menu(menu,evento)
+
+        habilitar_selecao(tabela,abrir=restaurar)
+        tabela.bind('<Button-3>',contexto)
+        rodape = ttk.Frame(corpo,padding=(0,12,0,0))
+        rodape.grid(row=1,column=0,columnspan=2,sticky='ew')
+        ttk.Button(rodape,text='Restaurar entradas',style='Restaurar.TButton',width=22,
+                   command=restaurar).pack(side='right')
         atualizar()
         centralizar(tela,800,450)
         tela.deiconify()
@@ -407,7 +393,6 @@ class Aplicativo:
                 adiada = data_iso(valores[-2]) > data_iso(valores[-3])
                 botao = ttk.Label(self.tabela, text=valores[-2], anchor='center', cursor='hand2',
                                   style='PrevisaoAdiada.TLabel' if adiada else 'Previsao.TLabel')
-                botao.bind('<Button-1>', lambda _, i=int(linha): self.editar_previsao(i))
                 data_recebimento = self.recebimentos[linha]
                 recebido = data_recebimento is not None
                 estado = tk.BooleanVar(value=recebido)
@@ -417,6 +402,9 @@ class Aplicativo:
                     command=lambda i=int(linha), v=estado, atual=recebido: self.abrir_recebimento(i, v, atual))
                 caixa.estado = estado
                 for widget in (botao, caixa):
+                    widget.bind('<Button-1>',lambda e,i=linha: self.pressionar_controle(e,i))
+                    widget.bind('<B1-Motion>',lambda e: arrastar(self.tabela,e.y_root-self.tabela.winfo_rooty()))
+                    widget.bind('<ButtonRelease-1>',lambda e,i=linha,w=widget: self.soltar_controle(e,i,w))
                     widget.bind('<Button-3>', lambda e, i=linha: self.menu_historico(e, i))
                 self.acoes_linhas[linha] = (botao, caixa)
             for widget, caixa in zip(self.acoes_linhas[linha], caixas):
@@ -429,6 +417,18 @@ class Aplicativo:
                         widget.place(x=x+2, y=y+2, width=max(1, largura-4), height=max(1, altura-4))
                 else:
                     widget.place_forget()
+
+    def pressionar_controle(self,evento,linha):
+        pressionar_linha(self.tabela,linha,evento.state)
+        return 'break'
+
+    def soltar_controle(self,evento,linha,widget):
+        if not getattr(self.tabela,'_arrastando',False) and not getattr(self.tabela,'_modificadores_mouse',0):
+            if isinstance(widget,ttk.Checkbutton):
+                widget.invoke()
+            else:
+                self.editar_previsao(int(linha))
+        return 'break'
 
     def abrir_recebimento(self, identificador, variavel=None, atual=False):
         if variavel is not None:
@@ -489,13 +489,14 @@ class Aplicativo:
         linha = linha or self.tabela.identify_row(evento.y)
         menu = novo_menu(self.tabela)
         if linha:
-            self.tabela.selection_set(linha)
-            menu.add_command(label='Editar', command=self.abrir)
+            if linha not in self.tabela.selection():
+                self.tabela.selection_set(linha)
+            unica = len(self.tabela.selection()) == 1
+            menu.add_command(label='Editar', command=self.abrir, state='normal' if unica else 'disabled')
             menu.add_command(label='Excluir', command=self.excluir)
-            menu.add_command(label='Histórico de alterações', command=lambda: self.mostrar_auditoria(int(linha)))
-            menu.add_command(label='Recebido', command=lambda: self.abrir_recebimento(int(linha)))
-            menu.add_command(label='Editar previsão atual', command=lambda: self.editar_previsao(int(linha)))
-            menu.add_command(label='Copiar', command=lambda: self.copiar_linha(linha))
+            menu.add_command(label='Recebido', command=lambda: self.abrir_recebimento(int(linha)),state='normal' if unica else 'disabled')
+            menu.add_command(label='Editar previsão atual', command=lambda: self.editar_previsao(int(linha)),state='normal' if unica else 'disabled')
+            menu.add_command(label='Copiar', command=self.copiar_selecao)
             menu.add_separator()
         menu.add_command(label='Nova entrada', command=self.formulario)
         return mostrar_menu(menu, evento)
@@ -506,7 +507,21 @@ class Aplicativo:
         valores[-1] = data_br(data) if data else 'Não recebido'
         copiar_texto(self.tabela, '\t'.join(valores))
 
+    def copiar_selecao(self):
+        selecionados = set(self.tabela.selection())
+        linhas = []
+        for linha in self.tabela.get_children():
+            if linha in selecionados:
+                valores = list(self.tabela.item(linha,'values'))
+                data = self.recebimentos.get(linha)
+                valores[-1] = data_br(data) if data else 'Não recebido'
+                linhas.append('\t'.join(valores))
+        if linhas:
+            copiar_texto(self.tabela,'\n'.join(linhas))
+
     def clicar_historico(self, evento):
+        if getattr(self.tabela,'_arrastando',False) or evento.state & 5 or len(self.tabela.selection()) > 1:
+            return
         if self.tabela.identify_region(evento.x, evento.y) != 'cell':
             return
         coluna = self.tabela.identify_column(evento.x)
@@ -571,6 +586,9 @@ class Aplicativo:
         if not selecao:
             messagebox.showinfo('Editar registro', 'Selecione uma RPV na lista.', parent=self.historico)
             return
+        if len(selecao) != 1:
+            messagebox.showinfo('Editar registro','Selecione apenas uma entrada para editar.',parent=self.historico)
+            return
         self.formulario(int(selecao[0]))
 
     def excluir(self):
@@ -579,25 +597,15 @@ class Aplicativo:
             messagebox.showinfo('Excluir registro', 'Selecione uma RPV na lista.',
                                 parent=self.historico)
             return
-        identificador = int(selecao[0])
-        registro = self.banco.obter(identificador)
-        if registro is None:
-            self.atualizar()
-            return
-        confirmar = messagebox.askyesno(
-            'Excluir registro',
-            f"Mover para a lixeira o registro de {registro['nome']}\n"
-            f"adquirido em {data_br(registro['aquisicao'])}?\n\n"
-            'Você poderá recuperar a entrada pela Lixeira.',
-            parent=self.historico, icon='warning', default='no')
+        confirmar = messagebox.askyesno('Enviar para a lixeira',
+            f'Mover {len(selecao)} entrada(s) selecionada(s) para a lixeira?\n\n'
+            'Você poderá recuperá-las pela Lixeira.',parent=self.historico,default='no')
         if not confirmar:
             return
         try:
-            self.banco.excluir(identificador)
-        except (sqlite3.Error, ValueError):
-            messagebox.showerror('Não foi possível excluir',
-                                 'O registro não foi excluído. Tente novamente.',
-                                 parent=self.historico)
+            self.banco.excluir_varios(selecao)
+        except (sqlite3.Error,ValueError) as erro:
+            messagebox.showerror('Lixeira',str(erro),parent=self.historico)
             return
         self.atualizar()
 
@@ -702,6 +710,102 @@ class Aplicativo:
         if registro:
             observacoes.insert('1.0', registro['observacoes'])
 
+        anexos_pendentes = []
+        painel_documentos = ttk.Frame(quadro)
+        painel_documentos.grid(row=10,column=0,columnspan=2,sticky='ew',pady=(8,0))
+        texto_documentos = tk.StringVar()
+
+        def atualizar_contagem():
+            total = len(anexos_pendentes) + (len(self.banco.documentos(identificador)) if identificador else 0)
+            texto_documentos.set(f'Documentos ({total})')
+
+        def anexar():
+            arquivos = filedialog.askopenfilenames(parent=tela,title='Anexar documentos',
+                filetypes=[('PDFs e imagens','*.pdf *.png *.jpg *.jpeg *.webp *.bmp *.gif *.tif *.tiff')])
+            try:
+                novos = [validar_anexo(arquivo) for arquivo in arquivos]
+            except (OSError,ValueError) as erro:
+                messagebox.showerror('Anexar documentos',str(erro),parent=tela)
+                return
+            for arquivo in novos:
+                if arquivo not in anexos_pendentes:
+                    anexos_pendentes.append(arquivo)
+            atualizar_contagem()
+
+        def ver_documentos():
+            janela = tk.Toplevel(tela)
+            janela.withdraw()
+            janela.title('Documentos da entrada')
+            janela.configure(bg=cores()['fundo'])
+            janela.transient(tela)
+            corpo = ttk.Frame(janela,padding=15)
+            corpo.pack(fill='both',expand=True)
+            lista = ttk.Treeview(corpo,columns=('nome','situacao'),show='headings',selectmode='browse')
+            lista.heading('nome',text='Documento')
+            lista.heading('situacao',text='Situação')
+            lista.column('nome',width=370)
+            lista.column('situacao',width=160)
+            lista.pack(fill='both',expand=True)
+            caminhos = {}
+
+            def atualizar_lista():
+                lista.delete(*lista.get_children())
+                caminhos.clear()
+                if identificador:
+                    for documento in self.banco.documentos(identificador):
+                        iid = 'salvo:' + str(documento['id'])
+                        lista.insert('','end',iid=iid,values=(documento['nome'],'Salvo'))
+                        caminhos[iid] = ('salvo',documento['id'])
+                for indice,arquivo in enumerate(anexos_pendentes):
+                    iid = 'novo:' + str(indice)
+                    lista.insert('','end',iid=iid,values=(arquivo.name,'Salvar com a entrada'))
+                    caminhos[iid] = ('novo',arquivo)
+
+            def abrir_documento():
+                selecao = lista.selection()
+                if len(selecao) != 1:
+                    return
+                tipo,valor = caminhos[selecao[0]]
+                try:
+                    caminho = self.banco.caminho_documento(valor) if tipo == 'salvo' else valor
+                    abrir_arquivo(caminho)
+                except (OSError,ValueError) as erro:
+                    messagebox.showerror('Abrir documento',str(erro),parent=janela)
+
+            def retirar():
+                selecao = lista.selection()
+                if not selecao:
+                    return
+                tipo,valor = caminhos[selecao[0]]
+                if tipo != 'novo':
+                    messagebox.showinfo('Documentos','Somente anexos ainda não salvos podem ser retirados nesta tela.',parent=janela)
+                    return
+                anexos_pendentes.remove(valor)
+                atualizar_lista()
+                atualizar_contagem()
+
+            def fechar():
+                janela.destroy()
+                tela.grab_set()
+
+            rodape = ttk.Frame(corpo)
+            rodape.pack(fill='x',pady=(12,0))
+            ttk.Button(rodape,text='Abrir documento',command=abrir_documento).pack(side='left')
+            ttk.Button(rodape,text='Retirar da seleção',command=retirar).pack(side='left',padx=8)
+            ttk.Button(rodape,text='Fechar',command=fechar).pack(side='right')
+            lista.bind('<Double-1>',lambda _: abrir_documento())
+            lista.bind('<Return>',lambda _: abrir_documento())
+            janela.protocol('WM_DELETE_WINDOW',fechar)
+            janela.bind('<Escape>',lambda _: fechar())
+            atualizar_lista()
+            centralizar(janela,650,400)
+            janela.deiconify()
+            janela.grab_set()
+
+        ttk.Button(painel_documentos,text='Anexar documentos',command=anexar).pack(side='left')
+        ttk.Button(painel_documentos,textvariable=texto_documentos,command=ver_documentos).pack(side='left',padx=8)
+        atualizar_contagem()
+
         def salvar():
             try:
                 dados = {chave: variavel.get().strip() for chave, variavel in campos.items()}
@@ -716,11 +820,11 @@ class Aplicativo:
                 dados['conta_id'] = mapa_contas.get(dados['conta'])
                 dados['comissao'] = centavos(valor_comissao.get()) if tem_comissao.get() == 'Sim' else None
                 dados['observacoes'] = observacoes.get('1.0', 'end-1c').strip()
-                self.banco.salvar(dados, identificador)
+                self.banco.salvar(dados, identificador, anexos=anexos_pendentes)
             except ValueError as erro:
                 messagebox.showerror('Confira o cadastro', str(erro), parent=tela)
                 return
-            except sqlite3.Error:
+            except (sqlite3.Error,OSError):
                 messagebox.showerror('Não foi possível salvar', 'Confira o acesso à pasta de dados e tente novamente.', parent=tela)
                 return
             self.atualizar()
