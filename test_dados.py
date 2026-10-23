@@ -37,7 +37,7 @@ class TestDados(unittest.TestCase):
             self.assertIsNone(reaberto.obter(primeiro)['comissao'])
             self.assertEqual(len(reaberto.listar('APÓSTROFO')), 1)
             self.assertEqual(len(reaberto.listar('22/10/2026')), 2)
-            self.assertEqual(reaberto.obter(segundo)['nome'], 'Pessoa de teste')
+            self.assertEqual(reaberto.obter(segundo)['nome'], 'Pessoa De Teste')
 
     def test_exclusao_persistente_preserva_outro_registro_igual(self):
         with tempfile.TemporaryDirectory() as pasta:

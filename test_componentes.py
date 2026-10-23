@@ -4,11 +4,12 @@ from componentes import formatar_digitacao_moeda
 
 
 class TestMoeda(unittest.TestCase):
-    def test_digitacao_em_centavos_e_colagem(self):
+    def test_digitacao_em_reais_e_colagem(self):
         for entrada, esperado in (
-            ('', '0,00'), ('1', '0,01'), ('1056050', '10.560,50'),
-            ('R$ 10.560,50', '10.560,50'), ('0000100', '1,00'),
-            ('99999999999999', '999.999.999.999,99'),
+            ('', '0,00'), ('1', '1,00'), ('10560,50', '10.560,50'),
+            ('R$ 10.560,50', '10.560,50'), ('1.234', '1.234,00'),
+            ('10560.50', '10.560,50'), ('0000100', '100,00'),
+            ('999999999999,99', '999.999.999.999,99'),
         ):
             with self.subTest(entrada=entrada):
                 self.assertEqual(formatar_digitacao_moeda(entrada), esperado)

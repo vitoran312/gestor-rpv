@@ -1,0 +1,17 @@
+# Histórico de versões
+
+## 0.4.0
+
+Primeira entrega com número de versão visível na interface.
+
+- Contas de recebimento: cadastro, consulta, edição, desativação e reativação.
+- Validação de duplicidades de CPF, identificação, dados bancários e chave Pix.
+- Cópia dos dados de recebimento guardada em cada operação, com consulta e cópia.
+- Nomes completos com iniciais maiúsculas.
+- Correção do cursor nos valores: digitação em reais e formatação ao sair do campo.
+- Aquisição maior que zero e limitada ao valor previsto de recebimento.
+- Coluna clicável de prorrogações, calendário e histórico de datas por RPV.
+- Alinhamento centralizado de títulos e valores no histórico.
+- Migração automática do banco anterior com backup prévio.
+
+Antes desta versão, as entregas ainda não tinham numeração oficial.

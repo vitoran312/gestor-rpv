@@ -4,7 +4,7 @@ import tkinter as tk
 from datetime import date, datetime
 from tkinter import ttk
 
-from dados import moeda
+from dados import moeda, centavos
 
 
 def centralizar(janela, largura=None, altura=None):
@@ -32,46 +32,31 @@ def maximizar(janela):
 
 
 def formatar_digitacao_moeda(texto):
-    """Máscara em centavos: 1056050 -> 10.560,50; aceita colagem formatada."""
-    texto = texto.strip().replace('R$', '').strip()
-    if any(c not in '0123456789., ' for c in texto):
-        raise ValueError('Digite somente números.')
-    digitos = ''.join(c for c in texto if c in '0123456789').lstrip('0') or '0'
-    if len(digitos) > 14:
-        raise ValueError('Valor acima do limite permitido.')
-    return moeda(int(digitos))
+    """Formata valores em reais; a vírgula é digitada pelo usuário."""
+    return moeda(centavos(texto.strip() or '0'))
 
 
 class CampoMoeda(ttk.Frame):
     def __init__(self, pai, variavel):
         super().__init__(pai, style='Dinheiro.TFrame', padding=(8, 1))
         self.variavel = variavel
-        self.anterior = formatar_digitacao_moeda(variavel.get())
-        variavel.set(self.anterior)
+        variavel.set(formatar_digitacao_moeda(variavel.get()))
         ttk.Label(self, text='R$', style='Dinheiro.TLabel').pack(side='left')
         self.entrada = ttk.Entry(self, textvariable=variavel, justify='right', width=26)
         self.entrada.pack(side='left', fill='x', expand=True)
-        self.rastro = variavel.trace_add('write', self.formatar)
-        self.bind('<Destroy>', self.limpar_rastro)
+        self.entrada.bind('<FocusOut>', self.formatar)
+        self.entrada.bind('<FocusIn>', self.selecionar)
 
-    def limpar_rastro(self, evento):
-        if evento.widget is self:
-            self.variavel.trace_remove('write', self.rastro)
+    def selecionar(self, _evento=None):
+        # Facilita substituir o valor inicial, sem reescrever o texto a cada tecla.
+        self.entrada.selection_range(0, tk.END)
 
-    def formatar(self, *_):
+    def formatar(self, _evento=None):
         try:
-            texto = formatar_digitacao_moeda(self.variavel.get())
+            self.variavel.set(formatar_digitacao_moeda(self.variavel.get()))
         except ValueError:
-            texto = self.anterior
-        self.anterior = texto
-        if self.variavel.get() != texto:
-            self.variavel.set(texto)
-        # Digitação como em caixas bancárias: centavos entram pela direita.
-        self.entrada.after_idle(self.cursor_final)
-
-    def cursor_final(self):
-        if self.entrada.winfo_exists():
-            self.entrada.icursor(tk.END)
+            # O formulário mostrará a mensagem de validação ao salvar.
+            pass
 
 
 class CampoData(ttk.Frame):
