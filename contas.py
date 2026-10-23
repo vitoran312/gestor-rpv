@@ -1,4 +1,5 @@
 """Janelas para administrar contas de recebimento."""
+from tema import cores
 import sqlite3
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -22,7 +23,7 @@ class JanelaContas:
         self.tela = tk.Toplevel(aplicativo.janela)
         self.tela.withdraw()
         self.tela.title('Contas de recebimento')
-        self.tela.configure(bg='#181a1f')
+        self.tela.configure(bg=cores()['fundo'])
         corpo = ttk.Frame(self.tela, padding=20)
         corpo.pack(fill='both', expand=True)
         barra = ttk.Frame(corpo)
@@ -35,7 +36,7 @@ class JanelaContas:
         for chave, titulo in (('nome', 'Identificação'), ('banco', 'Banco'), ('status', 'Situação')):
             self.tabela.heading(chave, text=titulo, anchor='center')
             self.tabela.column(chave, width=210, anchor='center')
-        self.tabela.tag_configure('incompleta', foreground='#ff6b6b')
+        self.tabela.tag_configure('incompleta', foreground=cores()['vermelho'])
         self.tabela.pack(fill='both', expand=True)
         self.tabela.bind('<Button-3>', self.menu_contexto)
         self.tabela.bind('<Double-1>', lambda _: self.editar())
@@ -124,7 +125,7 @@ class JanelaContas:
         tela = tk.Toplevel(self.tela)
         tela.withdraw()
         tela.title('Editar conta' if conta else 'Cadastrar nova conta')
-        tela.configure(bg='#181a1f')
+        tela.configure(bg=cores()['fundo'])
         tela.resizable(False, False)
         tela.transient(self.tela)
         quadro = ttk.Frame(tela, padding=20)

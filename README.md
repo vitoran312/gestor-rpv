@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.7.0
+# Gestor de RPV — 0.8.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -12,10 +12,26 @@ Se precisar ver uma mensagem de erro, abra o Prompt de Comando nessa pasta:
 python app.py
 ```
 
-Mantenha `app.py`, `dados.py`, `componentes.py`, `contas.py`, `interacao.py` e `versao.py` juntos.
+Mantenha `app.py`, `dados.py`, `componentes.py`, `contas.py`, `interacao.py`, `tema.py`, `calculadora.py` e `versao.py` juntos.
 A tela inicial tem os botões **Nova entrada**, **Ver histórico total**,
 **Contas de recebimento** e **Sair**. A versão aparece no canto inferior direito.
 As janelas abrem centralizadas; o histórico abre maximizado no Windows.
+
+## Barra de menus do histórico
+
+- **Arquivo → Nova entrada**: abre o cadastro de uma RPV.
+- **Arquivo → Contas de recebimento**: administra os dados bancários.
+- **Editar → Editar registro / Excluir registro**: atua sobre a linha selecionada.
+- **Exibir → Tema claro / Tema escuro**: muda o tema de todas as janelas,
+  inclusive formulários, calendários, menus de contexto e calculadora.
+  A escolha vale durante a execução; o aplicativo inicia no tema escuro.
+- **Calculadora**: abre uma calculadora independente, sem modificar o cadastro.
+  Faz soma, subtração, multiplicação, divisão, porcentagem, troca de sinal e
+  apagamento. Aceita vírgula, teclado, Enter para calcular e Esc para limpar.
+  As operações são sequenciais, como em uma calculadora básica.
+
+Os antigos botões de ações do histórico foram movidos para essa barra.
+A busca continua acima da tabela. Os menus de clique direito permanecem disponíveis.
 
 ## Contas de recebimento
 
@@ -49,7 +65,9 @@ As janelas abrem centralizadas; o histórico abre maximizado no Windows.
   `R$ 52.000,00`; `1523659` mostra `R$ 15.236,59`. A máscara é aplicada a cada tecla,
   sem salto do cursor. Também é possível colar um valor já formatado, como
   `R$ 15.236,59`. O prefixo R$ permanece fixo.
-- A aquisição deve ser maior que zero e não pode superar o recebimento previsto.
+- O campo e a coluna **Valor Total RPV** representam o valor integral do crédito.
+- A coluna **Data de Aquisição** informa a data da compra.
+- A aquisição deve ser maior que zero e não pode superar o Valor Total RPV.
 - Comissão é opcional e apenas informativa: não altera o lucro.
 - Os valores são guardados em centavos, sem ponto flutuante.
 - As datas têm calendários com navegação por mês e ano.
@@ -66,6 +84,7 @@ As janelas abrem centralizadas; o histórico abre maximizado no Windows.
   calendário e salve: a confirmação e a data ficam centralizadas, em verde e negrito.
   A data não pode ser anterior à aquisição nem estar no futuro. Ao clicar de novo,
   é possível corrigir a data ou desmarcar o recebimento com confirmação.
+  A célula não desenha texto por trás da caixa, inclusive depois de desmarcar.
 - A frase explicativa de centavos foi retirada do formulário; a máscara permanece.
 
 ## Clique direito

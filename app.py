@@ -9,6 +9,8 @@ from dados import Banco, centavos, moeda, data_iso, data_br, nome_formatado
 from componentes import CampoMoeda, CampoData, centralizar, maximizar
 from contas import JanelaContas, dados_para_copiar
 from versao import VERSAO
+from tema import cores, definir_modo, atualizar_widgets
+from calculadora import JanelaCalculadora
 from interacao import instalar_menu_texto, aplicar_formato, capitalizar_inicio, menu_copia, novo_menu, mostrar_menu, copiar_texto
 
 
@@ -19,11 +21,14 @@ class Aplicativo:
         janela.withdraw()
         janela.title('Gestor de RPV')
         janela.resizable(False, False)
-        janela.configure(bg='#181a1f')
+        janela.configure(bg=cores()['fundo'])
         self.historico = None
         self.janela_contas = None
+        self.calculadora = None
+        self.modo_tema = tk.StringVar(value='escuro')
         self.configurar_tema()
         instalar_menu_texto(janela)
+        janela.bind_all('<Map>', self.tematizar_novo_widget, add='+')
 
         menu = ttk.Frame(janela, padding=40)
         menu.place(relx=0.5, rely=0.5, anchor='center', width=440)
@@ -46,44 +51,81 @@ class Aplicativo:
             return
         self.janela_contas = JanelaContas(self)
 
+    def abrir_calculadora(self):
+        if self.calculadora is not None and self.calculadora.tela.winfo_exists():
+            self.calculadora.tela.deiconify()
+            self.calculadora.tela.lift()
+            self.calculadora.tela.focus_set()
+            return
+        self.calculadora = JanelaCalculadora(self.janela)
+
+    def criar_barra_historico(self):
+        barra = novo_menu(self.historico)
+        arquivo = novo_menu(barra)
+        arquivo.add_command(label='Nova entrada', command=self.formulario)
+        arquivo.add_command(label='Contas de recebimento', command=self.mostrar_contas)
+        arquivo.add_separator()
+        arquivo.add_command(label='Fechar histórico', command=self.historico.destroy)
+        editar = novo_menu(barra)
+        editar.add_command(label='Editar registro', command=self.abrir)
+        editar.add_command(label='Excluir registro', command=self.excluir)
+        exibir = novo_menu(barra)
+        exibir.add_radiobutton(label='Tema claro', variable=self.modo_tema, value='claro', command=self.configurar_tema)
+        exibir.add_radiobutton(label='Tema escuro', variable=self.modo_tema, value='escuro', command=self.configurar_tema)
+        barra.add_cascade(label='Arquivo', menu=arquivo)
+        barra.add_cascade(label='Editar', menu=editar)
+        barra.add_cascade(label='Exibir', menu=exibir)
+        barra.add_command(label='Calculadora', command=self.abrir_calculadora)
+        self.menus = {'Arquivo': arquivo, 'Editar': editar, 'Exibir': exibir, 'barra': barra}
+        self.historico.configure(menu=barra)
+
+    def tematizar_novo_widget(self, evento):
+        if isinstance(evento.widget, (tk.Toplevel, tk.Text, tk.Menu)):
+            atualizar_widgets(evento.widget)
+
     def configurar_tema(self):
         estilo = ttk.Style()
         estilo.theme_use('clam')
-        fundo, campo, texto = '#181a1f', '#262a33', '#f2f4f8'
+        definir_modo(self.modo_tema.get())
+        c = cores()
+        fundo, campo, texto = c['fundo'], c['campo'], c['texto']
         estilo.configure('.', font=('Verdana', 10), background=fundo,
-                         foreground=texto, bordercolor='#414754',
+                         foreground=texto, bordercolor=c['borda'],
                          lightcolor=campo, darkcolor=fundo, troughcolor=fundo)
-        estilo.configure('TButton', background='#303745', padding=(12, 10))
-        estilo.map('TButton', background=[('pressed', '#234f78'), ('active', '#3c526b')],
-                   foreground=[('disabled', '#8b929e'), ('!disabled', texto)])
+        estilo.configure('TButton', background=c['botao'], padding=(12, 10))
+        estilo.map('TButton', background=[('pressed', c['selecao']), ('active', c['ativo'])],
+                   foreground=[('disabled', c['desabilitado']), ('!disabled', texto)])
         estilo.configure('Dinheiro.TFrame', background=campo)
         estilo.configure('Dinheiro.TLabel', background=campo)
-        estilo.configure('DiaSelecionado.TButton', background='#345777')
-        estilo.configure('Recebido.TCheckbutton', foreground='#63df8a', font=('Verdana', 10, 'bold'))
-        estilo.map('Recebido.TCheckbutton', foreground=[('!disabled', '#63df8a')])
+        estilo.configure('DiaSelecionado.TButton', background=c['selecao'])
+        estilo.configure('Recebido.TCheckbutton', foreground=c['verde'], font=('Verdana', 10, 'bold'))
+        estilo.map('Recebido.TCheckbutton', foreground=[('!disabled', c['verde'])])
         estilo.configure('Previsao.TLabel', background=campo, anchor='center')
-        estilo.configure('PrevisaoAdiada.TLabel', background=campo, foreground='#ff6b6b', anchor='center')
-        estilo.configure('Recebido.TLabel', foreground='#63df8a', font=('Verdana', 10, 'bold'))
-        estilo.configure('Celula.TButton', padding=(2, 2))
+        estilo.configure('PrevisaoAdiada.TLabel', background=campo, foreground=c['vermelho'], anchor='center')
+        estilo.configure('Recebido.TLabel', foreground=c['verde'], font=('Verdana', 10, 'bold'))
+        estilo.configure('Calculadora.TButton', font=('Verdana', 14, 'bold'), padding=(6, 8))
         estilo.configure('Menu.TButton', font=('Verdana', 16, 'bold'), padding=(20, 15))
         for tipo in ('TEntry', 'TCombobox'):
             estilo.configure(tipo, fieldbackground=campo, foreground=texto,
                              insertcolor=texto, padding=6)
             estilo.map(tipo, fieldbackground=[('readonly', campo)],
                        foreground=[('readonly', texto)],
-                       selectbackground=[('!disabled', '#345777')],
-                       selectforeground=[('!disabled', texto)])
+                       selectbackground=[('!disabled', c['selecao'])],
+                       selectforeground=[('!disabled', c['texto_selecao'])])
         estilo.configure('Treeview', background=campo, fieldbackground=campo,
                          foreground=texto, rowheight=34)
-        estilo.map('Treeview', background=[('selected', '#345777')],
-                   foreground=[('selected', texto)])
-        estilo.configure('Treeview.Heading', background='#303745',
+        estilo.map('Treeview', background=[('selected', c['selecao'])],
+                   foreground=[('selected', c['texto_selecao'])])
+        estilo.configure('Treeview.Heading', background=c['botao'],
                          font=('Verdana', 10, 'bold'), padding=8)
-        estilo.map('Treeview.Heading', background=[('active', '#3c526b')])
+        estilo.map('Treeview.Heading', background=[('active', c['ativo'])])
         self.janela.option_add('*TCombobox*Listbox.background', campo)
         self.janela.option_add('*TCombobox*Listbox.foreground', texto)
-        self.janela.option_add('*TCombobox*Listbox.selectBackground', '#345777')
-        self.janela.option_add('*TCombobox*Listbox.selectForeground', texto)
+        self.janela.option_add('*TCombobox*Listbox.selectBackground', c['selecao'])
+        self.janela.option_add('*TCombobox*Listbox.selectForeground', c['texto_selecao'])
+        atualizar_widgets(self.janela)
+        if self.janela_contas is not None and self.janela_contas.tela.winfo_exists():
+            self.janela_contas.tabela.tag_configure('incompleta', foreground=c['vermelho'])
 
     def mostrar_historico(self):
         if self.historico is not None and self.historico.winfo_exists():
@@ -96,15 +138,13 @@ class Aplicativo:
         self.historico.title('Histórico total — Gestor de RPV')
         self.historico.geometry('1100x650')
         self.historico.minsize(850, 500)
-        self.historico.configure(bg='#181a1f')
+        self.historico.configure(bg=cores()['fundo'])
+        self.criar_barra_historico()
         corpo = ttk.Frame(self.historico, padding=20)
         corpo.pack(fill='both', expand=True)
         barra = ttk.Frame(corpo)
         barra.pack(fill='x', pady=(0, 12))
-        ttk.Button(barra, text='Nova entrada', command=self.formulario).pack(side='left')
-        ttk.Button(barra, text='Editar', command=self.abrir).pack(side='left', padx=8)
-        ttk.Button(barra, text='Excluir', command=self.excluir).pack(side='left')
-        ttk.Label(barra, text='Buscar nome ou data:').pack(side='left', padx=(20, 6))
+        ttk.Label(barra, text='Buscar nome ou data:').pack(side='left', padx=(0, 6))
         self.busca = tk.StringVar()
         entrada_busca = ttk.Entry(barra, textvariable=self.busca)
         entrada_busca.pack(side='left', fill='x', expand=True)
@@ -115,7 +155,7 @@ class Aplicativo:
         quadro.pack(fill='both', expand=True)
         colunas = ('nome', 'data', 'custo', 'previsto', 'lucro', 'conta', 'previsao', 'previsao_atual', 'recebido')
         self.tabela = ttk.Treeview(quadro, columns=colunas, show='headings', selectmode='browse')
-        titulos = ('Titular original', 'Aquisição', 'Valor de aquisição', 'Recebimento previsto',
+        titulos = ('Titular original', 'Data de Aquisição', 'Valor de aquisição', 'Valor Total RPV',
                    'Lucro previsto', 'Conta de destino', 'Previsão inicial', 'Previsão atual', 'Recebido')
         for coluna, titulo in zip(colunas, titulos):
             self.tabela.heading(coluna, text=titulo, anchor='center')
@@ -144,7 +184,7 @@ class Aplicativo:
         self.tabela.bind('<Double-1>', self.duplo_clique_historico)
         self.resumo = ttk.Label(corpo)
         self.resumo.pack(anchor='w', pady=(12, 4))
-        ttk.Label(corpo, text='Dados salvos neste computador • Comissão apenas informativa').pack(anchor='w')
+        ttk.Label(corpo, text='Dados salvos neste computador').pack(anchor='w')
         self.atualizar()
         centralizar(self.historico, 1100, 650)
         self.historico.deiconify()
@@ -154,6 +194,7 @@ class Aplicativo:
         if self.historico is None or not self.historico.winfo_exists():
             return
         registros = self.banco.listar(self.busca.get().strip())
+        self.recebimentos = {str(r['id']): r['recebimento'] for r in registros}
         for widgets in self.acoes_linhas.values():
             for widget in widgets:
                 widget.destroy()
@@ -164,7 +205,7 @@ class Aplicativo:
                 r['nome'], data_br(r['aquisicao']), 'R$ ' + moeda(r['custo']),
                 'R$ ' + moeda(r['previsto']), 'R$ ' + moeda(r['previsto'] - r['custo']),
                 r['conta'], data_br(r['previsao']), data_br(r['previsao_atual']),
-                data_br(r['recebimento']) if r['recebimento'] else 'Não recebido'))
+                ''))
         self.agendar_acoes()
         self.resumo.config(text=f'{len(registros)} registro(s) • '
             f"Investido: R$ {moeda(sum(r['custo'] for r in registros))} • "
@@ -194,10 +235,11 @@ class Aplicativo:
                 botao = ttk.Label(self.tabela, text=valores[-2], anchor='center', cursor='hand2',
                                   style='PrevisaoAdiada.TLabel' if adiada else 'Previsao.TLabel')
                 botao.bind('<Button-1>', lambda _, i=int(linha): self.editar_previsao(i))
-                recebido = valores[-1] != 'Não recebido'
+                data_recebimento = self.recebimentos[linha]
+                recebido = data_recebimento is not None
                 estado = tk.BooleanVar(value=recebido)
                 caixa = ttk.Checkbutton(self.tabela, variable=estado,
-                    text=valores[-1] if recebido else 'Marcar',
+                    text=data_br(data_recebimento) if recebido else 'Marcar',
                     style='Recebido.TCheckbutton' if recebido else 'TCheckbutton',
                     command=lambda i=int(linha), v=estado, atual=recebido: self.abrir_recebimento(i, v, atual))
                 caixa.estado = estado
@@ -225,7 +267,7 @@ class Aplicativo:
         tela = tk.Toplevel(self.historico)
         tela.withdraw()
         tela.title('Recebimento')
-        tela.configure(bg='#181a1f')
+        tela.configure(bg=cores()['fundo'])
         tela.resizable(False, False)
         tela.transient(self.historico)
         corpo = ttk.Frame(tela, padding=20)
@@ -279,10 +321,16 @@ class Aplicativo:
             menu.add_command(label='Excluir', command=self.excluir)
             menu.add_command(label='Recebido', command=lambda: self.abrir_recebimento(int(linha)))
             menu.add_command(label='Editar previsão atual', command=lambda: self.editar_previsao(int(linha)))
-            menu.add_command(label='Copiar', command=lambda: copiar_texto(self.tabela, '\t'.join(self.tabela.item(linha, 'values'))))
+            menu.add_command(label='Copiar', command=lambda: self.copiar_linha(linha))
             menu.add_separator()
         menu.add_command(label='Nova entrada', command=self.formulario)
         return mostrar_menu(menu, evento)
+
+    def copiar_linha(self, linha):
+        valores = list(self.tabela.item(linha, 'values'))
+        data = self.recebimentos.get(linha)
+        valores[-1] = data_br(data) if data else 'Não recebido'
+        copiar_texto(self.tabela, '\t'.join(valores))
 
     def clicar_historico(self, evento):
         if self.tabela.identify_region(evento.x, evento.y) != 'cell':
@@ -312,7 +360,7 @@ class Aplicativo:
         tela = tk.Toplevel(self.historico)
         tela.withdraw()
         tela.title('Previsão atual')
-        tela.configure(bg='#181a1f')
+        tela.configure(bg=cores()['fundo'])
         tela.resizable(False, False)
         tela.transient(self.historico)
         corpo = ttk.Frame(tela, padding=20)
@@ -392,7 +440,7 @@ class Aplicativo:
         tela = tk.Toplevel(self.janela)
         tela.withdraw()
         tela.title('Editar registro' if registro else 'Nova entrada')
-        tela.configure(bg='#181a1f')
+        tela.configure(bg=cores()['fundo'])
         tela.resizable(False, False)
         tela.transient(self.historico if self.historico is not None and self.historico.winfo_exists() else self.janela)
         quadro = ttk.Frame(tela, padding=20)
@@ -401,7 +449,7 @@ class Aplicativo:
         definicoes = [
             ('nome', 'Nome completo do titular original', ''),
             ('aquisicao', 'Data da aquisição (DD/MM/AAAA)', date.today().strftime('%d/%m/%Y')),
-            ('previsto', 'Valor previsto de recebimento (R$)', ''),
+            ('previsto', 'Valor Total RPV', ''),
             ('custo', 'Valor de aquisição (R$)', ''),
             ('conta', 'Receber na conta de', conta_inicial),
             ('previsao', 'Previsão inicial de recebimento (DD/MM/AAAA)', ''),
@@ -445,7 +493,7 @@ class Aplicativo:
         escolha = ttk.Combobox(quadro, textvariable=tem_comissao, values=('Não', 'Sim'), state='readonly', width=29)
         escolha.grid(row=7, column=1, sticky='ew')
         valor_comissao = tk.StringVar(value=moeda(registro['comissao']) if registro and registro['comissao'] is not None else '')
-        rotulo_comissao = ttk.Label(quadro, text='Valor da comissão (só registro)')
+        rotulo_comissao = ttk.Label(quadro, text='Valor da comissão')
         entrada_comissao = CampoMoeda(quadro, valor_comissao)
         rotulo_comissao.grid(row=8, column=0, sticky='w', pady=6)
         entrada_comissao.grid(row=8, column=1, sticky='ew')
@@ -462,8 +510,8 @@ class Aplicativo:
         exibir_comissao()
         ttk.Label(quadro, text='Observações').grid(row=9, column=0, sticky='nw', pady=10)
         observacoes = tk.Text(quadro, height=4, width=32, wrap='word', font=('Verdana', 10),
-                              bg='#262a33', fg='#f2f4f8', insertbackground='#f2f4f8',
-                              selectbackground='#345777', selectforeground='white',
+                              bg=cores()['campo'], fg=cores()['texto'], insertbackground=cores()['texto'],
+                              selectbackground=cores()['selecao'], selectforeground=cores()['texto_selecao'],
                               relief='flat', padx=6, pady=6)
         observacoes.grid(row=9, column=1, pady=10)
 
@@ -526,7 +574,7 @@ class Aplicativo:
         tela = tk.Toplevel(pai)
         tela.withdraw()
         tela.title('Dados de recebimento usados nesta RPV')
-        tela.configure(bg='#181a1f')
+        tela.configure(bg=cores()['fundo'])
         tela.transient(pai)
         tela.resizable(False, False)
         corpo = ttk.Frame(tela, padding=20)

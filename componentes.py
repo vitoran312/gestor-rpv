@@ -1,4 +1,5 @@
 """Componentes de interface, sem dependências externas."""
+from tema import cores
 import calendar
 import tkinter as tk
 from datetime import date, datetime
@@ -161,7 +162,7 @@ class CampoData(ttk.Frame):
         tela = self.calendario
         tela.withdraw()
         tela.title('Selecionar data')
-        tela.configure(bg='#181a1f')
+        tela.configure(bg=cores()['fundo'])
         tela.resizable(False, False)
         tela.transient(pai)
         self.grab_anterior = self.grab_current()

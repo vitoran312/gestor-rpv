@@ -440,6 +440,81 @@ class TestInterface(unittest.TestCase):
         self.assertEqual(len(tabela.get_children()), 1)
         self.assertEqual(set(self.programa.acoes_linhas), set(tabela.get_children()))
 
+    def test_barra_menus_temas_e_calculadora(self):
+        self.programa.mostrar_historico()
+        self.root.update()
+        menus = self.programa.menus
+        self.assertEqual(str(self.programa.historico.cget('menu')), str(menus['barra']))
+        self.assertEqual(self.programa.tabela.heading('previsto', 'text'), 'Valor Total RPV')
+        self.assertEqual(self.programa.tabela.heading('data', 'text'), 'Data de Aquisição')
+        textos = [w.cget('text') for w in filhos(self.programa.historico) if isinstance(w, app.ttk.Label)]
+        self.assertFalse(any('Comissão apenas informativa' in texto for texto in textos))
+        menus['Arquivo'].invoke('Nova entrada')
+        self.root.update()
+        form = next(w for w in self.root.winfo_children() if isinstance(w, tk.Toplevel) and w.title() == 'Nova entrada')
+        textos = [w.cget('text') for w in filhos(form) if isinstance(w, app.ttk.Label)]
+        self.assertIn('Valor Total RPV', textos)
+        observacoes = next(w for w in filhos(form) if isinstance(w, tk.Text))
+        menus['Exibir'].invoke('Tema claro')
+        self.root.update()
+        self.assertEqual(self.root.cget('bg'), '#f3f5f8')
+        self.assertEqual(form.cget('bg'), '#f3f5f8')
+        self.assertEqual(observacoes.cget('bg'), '#ffffff')
+        self.assertEqual(str(app.ttk.Style().lookup('Treeview', 'fieldbackground')), '#ffffff')
+        form.destroy()
+        menus['barra'].invoke('Calculadora')
+        self.root.update()
+        calculadora = self.programa.calculadora
+        self.assertEqual(calculadora.tela.cget('bg'), '#f3f5f8')
+        for tecla in ('1', ',', '5', '+', '2', '='):
+            botao(calculadora.tela, tecla).invoke()
+        self.assertEqual(calculadora.texto.get(), '3,5')
+        menus['barra'].invoke('Calculadora')
+        self.assertIs(self.programa.calculadora, calculadora)
+        menus['Exibir'].invoke('Tema escuro')
+        self.root.update()
+        self.assertEqual(calculadora.tela.cget('bg'), '#181a1f')
+        self.assertEqual(calculadora.texto.get(), '3,5')
+        botao(calculadora.tela, 'C').invoke()
+        calculadora.tela.focus_force()
+        self.root.update()
+        for tecla in ('1', '2', 'plus', '3', 'Return'):
+            calculadora.tela.event_generate('<KeyPress>', keysym=tecla)
+        self.root.update()
+        self.assertEqual(calculadora.texto.get(), '15')
+        calculadora.tela.destroy()
+        menus['barra'].invoke('Calculadora')
+        self.root.update()
+        self.assertEqual(self.programa.calculadora.texto.get(), '0')
+
+    def test_recebido_sem_texto_sobreposto_apos_desmarcar(self):
+        identificador = self.banco.salvar(dict(nome='Teste', aquisicao='2026-10-01', previsto=2000000,
+            custo=1200000, conta='Vitor', previsao='2026-12-20', comissao=None, observacoes=''))
+        self.banco.registrar_recebimento(identificador, '2026-10-22')
+        self.programa.mostrar_historico()
+        self.root.update()
+        self.programa.tabela.xview_moveto(1)
+        self.root.update()
+        self.assertEqual(self.programa.tabela.set(str(identificador), 'recebido'), '')
+        caixa = self.programa.acoes_linhas[str(identificador)][1]
+        caixa.invoke()
+        self.root.update()
+        tela = next(w for w in self.programa.historico.winfo_children() if isinstance(w, tk.Toplevel))
+        with patch.object(app.messagebox, 'askyesno', return_value=True):
+            botao(tela, 'Desmarcar recebimento').invoke()
+        self.root.update()
+        caixa = self.programa.acoes_linhas[str(identificador)][1]
+        self.assertFalse(caixa.estado.get())
+        self.assertEqual(caixa.cget('text'), 'Marcar')
+        self.assertEqual(self.programa.tabela.set(str(identificador), 'recebido'), '')
+        self.programa.copiar_linha(str(identificador))
+        self.assertIn('Não recebido', self.programa.tabela.clipboard_get())
+        self.programa.busca.set('Teste')
+        self.root.update()
+        self.programa.menus['Exibir'].invoke('Tema claro')
+        self.root.update()
+        self.assertEqual(self.programa.tabela.set(str(identificador), 'recebido'), '')
+
 
 if __name__ == '__main__':
     unittest.main()

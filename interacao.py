@@ -2,6 +2,7 @@
 import re
 import tkinter as tk
 from tkinter import ttk
+from tema import cores
 
 
 def capitalizar_inicio(texto):
@@ -73,8 +74,9 @@ def aplicar_cpf(entrada, variavel):
 
 
 def novo_menu(pai):
-    return tk.Menu(pai, tearoff=False, bg='#262a33', fg='#f2f4f8',
-                   activebackground='#345777', activeforeground='white')
+    c = cores()
+    return tk.Menu(pai, tearoff=False, bg=c['campo'], fg=c['texto'],
+                   activebackground=c['selecao'], activeforeground=c['texto_selecao'])
 
 
 def mostrar_menu(menu, evento):

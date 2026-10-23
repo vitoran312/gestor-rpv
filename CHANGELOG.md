@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## 0.8.0
+
+- Correção do texto sobreposto à caixa de recebimento ao desmarcar.
+- Campos e colunas renomeados para “Valor Total RPV” e “Data de Aquisição”.
+- Ações do histórico movidas para uma barra de menus: Arquivo, Editar e Exibir.
+- Alternância entre tema claro e escuro em todas as janelas.
+- Calculadora integrada com botões e teclado, operações básicas e porcentagem.
+- Remoção da frase sobre comissão no histórico, sem alterar os cálculos.
+
 ## 0.7.0
 
 - Endereço com número, cidade e estado selecionado pelas siglas das 27 UFs.

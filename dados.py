@@ -252,7 +252,7 @@ class Banco:
         if dados['custo'] <= 0:
             raise ValueError('O valor de aquisição deve ser maior que zero.')
         if dados['custo'] > dados['previsto']:
-            raise ValueError('O valor de aquisição não pode superar o recebimento previsto.')
+            raise ValueError('O valor de aquisição não pode superar o Valor Total RPV.')
         with self.conectar() as con:
             anterior = con.execute('SELECT * FROM rpvs WHERE id=?', (identificador,)).fetchone() if identificador else None
             if 'conta_id' in dados:
