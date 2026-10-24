@@ -9,7 +9,7 @@ import stat
 import tempfile
 import time
 from datetime import date, datetime
-from zipfile import ZipFile, ZIP_DEFLATED, BadZipFile
+from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED, BadZipFile
 
 from versao import VERSAO
 from dados import Banco, limitar_backups
@@ -121,12 +121,15 @@ def criar_backup(banco, pasta, prefixo='GestorRPV-'):
                         raise ValueError('Há um atalho simbólico na pasta de documentos.')
                     if arquivo.is_file():
                         relativo = 'documentos/' + arquivo.relative_to(documentos).as_posix()
-                        pacote.write(arquivo, relativo)
-                        # O hash vem da cópia efetivamente escrita, inclusive se a origem mudou.
-                        with pacote.open(relativo) as entrada:
-                            digest = hashlib.sha256()
+                        # O hash é calculado sobre os mesmos bytes gravados no ZIP, inclusive se a origem mudar
+                        # durante a cópia. O nome é montado com barras, sem depender da normalização do Windows.
+                        info = ZipInfo(relativo, max(time.localtime(arquivo.stat().st_mtime)[:6], (1980, 1, 1, 0, 0, 0)))
+                        info.compress_type = ZIP_DEFLATED
+                        digest = hashlib.sha256()
+                        with open(arquivo, 'rb') as entrada, pacote.open(info, 'w') as saida:
                             for bloco in iter(lambda: entrada.read(1024 * 1024), b''):
                                 digest.update(bloco)
+                                saida.write(bloco)
                         arquivos[relativo] = digest.hexdigest()
             manifesto = {'formato': FORMATO, 'versao_formato': 1, 'versao_app': VERSAO,
                          'criado_em': datetime.now().astimezone().isoformat(timespec='seconds'),

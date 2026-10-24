@@ -702,7 +702,7 @@ class TestInterface(unittest.TestCase):
         lista.selection_set(lista.get_children()[0])
         with patch.object(tela_registro,'abrir_arquivo') as abrir:
             botao(janela,'Abrir documento').invoke()
-            abrir.assert_called_once_with(arquivo)
+            abrir.assert_called_once_with(arquivo.resolve())
         botao(janela,'Fechar').invoke()
         botao(form,'Salvar registro').invoke()
         self.root.update()

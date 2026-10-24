@@ -1,5 +1,6 @@
 import json
 import sqlite3
+from contextlib import closing
 import tempfile
 import unittest
 from pathlib import Path
@@ -96,7 +97,7 @@ class TestContas(unittest.TestCase):
 
     def test_migracao_com_backup_preserva_registros_antigos_invalidos(self):
         antigo = Path(self.pasta.name) / 'antigo.sqlite3'
-        with sqlite3.connect(antigo) as con:
+        with closing(sqlite3.connect(antigo)) as con, con:
             con.execute('''CREATE TABLE rpvs (id INTEGER PRIMARY KEY, nome TEXT, aquisicao TEXT,
                 previsto INTEGER, custo INTEGER, conta TEXT CHECK(conta IN ('Vitor','Lilian')),
                 previsao TEXT, comissao INTEGER, observacoes TEXT)''')
@@ -164,7 +165,7 @@ class TestContas(unittest.TestCase):
         self.assertEqual(len(migrado.prorrogacoes(identificador)), 1)
         backups = list(Path(self.pasta.name).glob('backup-antes-0.6.0-*.sqlite3'))
         self.assertEqual(len(backups), 1)
-        with sqlite3.connect(backups[0]) as con:
+        with closing(sqlite3.connect(backups[0])) as con:
             colunas = [r[1] for r in con.execute('PRAGMA table_info(rpvs)')]
             self.assertNotIn('recebimento', colunas)
         Banco(self.caminho)
