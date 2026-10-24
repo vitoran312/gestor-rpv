@@ -15,6 +15,7 @@ import estilos
 import tela_arquivos
 import tela_registro
 from componentes import CampoData, CampoMoeda, AreaRolavel
+from dados import Banco
 from test_contas import banco_com_contas
 from tema import cores, PALETAS
 
@@ -1391,6 +1392,30 @@ class TestInterface(unittest.TestCase):
         self.root.update()
         self.assertFalse(janela.tela.winfo_exists())
         self.assertTrue(self.programa.grafico_mensal.tela.winfo_exists())
+
+    def test_instalacao_nova_abre_com_demonstracao_e_apaga_pelo_aviso(self):
+        self.programa.mostrar_historico()
+        self.root.update()
+        self.assertFalse(self.programa.aviso_demonstracao.winfo_ismapped())
+        self.root.destroy()
+        self.root = tk.Tk()
+        self.root.report_callback_exception = lambda *args: self.erros.append(args)
+        novo = Banco(Path(self.pasta.name) / 'novo' / 'gestor.sqlite3')
+        with patch.object(app, 'Banco', return_value=novo):
+            self.programa = app.Aplicativo(self.root)
+        self.programa.mostrar_historico()
+        self.root.update()
+        self.assertTrue(self.programa.aviso_demonstracao.winfo_ismapped())
+        self.assertEqual(len(self.programa.tabela.get_children()), 13)
+        with patch.object(messagebox, 'askyesno', return_value=False):
+            botao(self.programa.historico, 'Apagar dados de demonstração').invoke()
+        self.assertEqual(len(self.programa.tabela.get_children()), 13)
+        with patch.object(messagebox, 'askyesno', return_value=True):
+            botao(self.programa.historico, 'Apagar dados de demonstração').invoke()
+        self.root.update()
+        self.assertEqual(self.programa.tabela.get_children(), ())
+        self.assertEqual(novo.contas(), [])
+        self.assertFalse(self.programa.aviso_demonstracao.winfo_ismapped())
 
     def test_backup_automatico_ativar_desativar_e_falha_discreta(self):
         from backup import PASTA_AUTOMATICA

@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.21.0
+# Gestor de RPV — 0.22.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -14,7 +14,7 @@ python app.py
 
 Mantenha todos os arquivos `.py` e a pasta `recursos` juntos. Essa pasta contém o ícone da Vitoran Tech.
 A tela inicial tem os botões **Nova entrada**, **Minhas operações**,
-**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.21.0**, acompanhada do emblema com 50% de opacidade,
+**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.22.0**, acompanhada do emblema com 50% de opacidade,
 aparece no canto inferior direito.
 O número é lido da versão do programa e acompanha cada atualização.
 As janelas abrem centralizadas; o histórico abre maximizado no Windows.
@@ -90,8 +90,8 @@ A busca continua acima da tabela. Os menus de clique direito permanecem disponí
 A lista usa fonte de 12 pontos, dois pontos maior que o padrão da interface,
 com altura das linhas e largura da janela ajustadas para a leitura.
 
-- Uma instalação nova começa sem contas. Cadastre a primeira conta antes de criar
-  uma entrada.
+- Uma instalação nova começa com duas contas fictícias de demonstração (veja “Dados de
+  demonstração”). Depois de apagá-las, cadastre a primeira conta antes de criar uma entrada.
 - **Cadastrar nova conta** permite informar identificação, nome completo, endereço,
   número, cidade, estado, banco, agência, conta e chave Pix.
   O estado é selecionado pela sigla em uma lista com as 27 UFs, incluindo DF. O CPF é obrigatório e deve ser válido. O mesmo CPF pode ser usado em várias contas bancárias distintas. Cadastros antigos sem CPF aparecem como **⚠ Completar cadastro**,
@@ -227,10 +227,12 @@ para voltar ao estado anterior. A pasta guarda somente os 10 backups automático
 
 ### Dados de demonstração
 
-O arquivo [`exemplos/GestorRPV-dados-ficticios.rpvbackup`](exemplos/GestorRPV-dados-ficticios.rpvbackup)
-traz 13 operações e 2 contas com nomes, CPFs e dados bancários inventados, para apresentar o programa
-sem expor dados reais. Em uma instalação nova, use **Arquivo → Importar dados** e escolha esse arquivo.
-A importação substitui os dados do computador. Ele pode ser recriado com `python scripts/gerar_dados_exemplo.py`.
+Na primeira abertura em um computador sem dados, o programa já mostra 13 operações e 2 contas
+fictícias — nomes, CPFs e dados bancários inventados —, para quem quiser conhecê-lo antes de usar.
+As datas acompanham o dia da instalação, então o cenário é sempre o mesmo: 5 pendentes,
+4 atrasadas e 4 recebidas. Uma faixa em Minhas operações avisa que são dados de demonstração;
+o botão **Apagar dados de demonstração** remove só o que é fictício e mantém o que a pessoa já
+tiver cadastrado. Em um computador que já tem dados, nada é acrescentado.
 
 ### Backup automático
 

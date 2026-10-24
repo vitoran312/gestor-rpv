@@ -134,6 +134,7 @@ def chave_pix(texto):
 class Banco:
     def __init__(self, caminho=None):
         self.caminho = Path(caminho) if caminho else pasta_dados() / 'gestor.sqlite3'
+        self.novo = not self.caminho.exists()  # Banco criado agora: instalação nova neste computador.
         self.caminho.parent.mkdir(parents=True, exist_ok=True)
         with self.conectar() as con:
             colunas = {r['name'] for r in con.execute('PRAGMA table_info(rpvs)')}

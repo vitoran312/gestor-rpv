@@ -44,6 +44,12 @@ def criar_estilos(janela, estilo, fonte):
         estilo.map(nome,background=[('!disabled',fundo)],foreground=[('selected',c['floresta'] if cor==texto else cor),('!disabled',cor)],
                    font=[('selected',(fonte,10,'bold')),('!selected',(fonte,10))])
 
+    # Aviso de dados de demonstração: faixa suave da cor da marca.
+    estilo.configure('Demonstracao.TFrame',background=c['realce'])
+    estilo.configure('Demonstracao.TLabel',background=c['realce'],foreground=texto)
+    estilo.configure('Demonstracao.TButton',background=c['realce'],padding=(14,6))
+    estilo.map('Demonstracao.TButton',background=[('disabled',c['realce']),('!disabled',c['realce'])])
+
     # Tipografia: títulos neutros e firmes; a cor da marca fica reservada às ações.
     for nome,tamanho,peso,cor in (
         ('InicioTitulo.TLabel',34,'bold',texto),

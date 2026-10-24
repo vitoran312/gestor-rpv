@@ -63,7 +63,10 @@ def verificar(exe):
             with closing(sqlite3.connect(Path(pasta)/'GestorRPV'/'gestor.sqlite3')) as con:
                 assert con.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
                 assert con.execute('PRAGMA user_version').fetchone()[0] == 8
-                assert con.execute('SELECT COUNT(*) FROM contas').fetchone()[0] == 0  # Instalação nova começa sem contas.
+                # Instalação nova abre com os dados fictícios de demonstração.
+                assert con.execute('SELECT COUNT(*) FROM contas').fetchone()[0] == 2
+                assert con.execute('SELECT COUNT(*) FROM rpvs').fetchone()[0] == 13
+                assert con.execute("SELECT COUNT(*) FROM configuracoes WHERE chave='dados_demonstracao'").fetchone()[0] == 1
             print('Executável abriu, criou o banco temporário e fechou sem Python no PATH.')
         finally:
             if processo.poll() is None:

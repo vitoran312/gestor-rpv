@@ -6,6 +6,7 @@ from tkinter import messagebox, ttk, font as tkfont
 
 from dados import moeda, data_iso, data_br, situacao
 from grafico import JanelaGrafico
+import demonstracao
 from componentes import centralizar, maximizar
 from tema import cores
 from ordenacao import ordenar
@@ -45,6 +46,21 @@ class OperacoesMixin:
         self.menus = {'Arquivo': arquivo, 'Editar': editar, 'Exibir': exibir, 'Ajuda': ajuda, 'barra': barra}
         self.historico.configure(menu=barra)
 
+    def apagar_demonstracao(self):
+        if not messagebox.askyesno('Apagar dados de demonstração',
+            'Apagar as operações e contas fictícias?\n\n'
+            'O que você cadastrou continua salvo. Depois disso, o programa fica pronto para os seus dados.',
+            parent=self.historico,default='no'):
+            return
+        try:
+            demonstracao.remover(self.banco)
+        except sqlite3.Error:
+            messagebox.showerror('Apagar dados de demonstração','Não foi possível apagar os dados.',parent=self.historico)
+            return
+        self.atualizar()
+        if self.janela_contas is not None and self.janela_contas.tela.winfo_exists():
+            self.janela_contas.atualizar()
+
     def mostrar_grafico(self):
         if self.grafico_mensal is not None and self.grafico_mensal.tela.winfo_exists():
             self.grafico_mensal.tela.destroy()
@@ -67,7 +83,12 @@ class OperacoesMixin:
         corpo.pack(fill='both', expand=True)
         ttk.Label(corpo,text='Minhas operações',style='Titulo.TLabel').pack(anchor='w',pady=(0,4))
         ttk.Label(corpo,text='Acompanhe cada operação, do cadastro ao recebimento.',style='Subtitulo.TLabel').pack(anchor='w',pady=(0,20))
-        barra = ttk.Frame(corpo)
+        self.aviso_demonstracao = ttk.Frame(corpo,style='Demonstracao.TFrame',padding=(16,10))
+        ttk.Label(self.aviso_demonstracao,style='Demonstracao.TLabel',
+                  text='Você está vendo dados de demonstração, com nomes e valores fictícios.').pack(side='left')
+        ttk.Button(self.aviso_demonstracao,text='Apagar dados de demonstração',style='Demonstracao.TButton',
+                   command=self.apagar_demonstracao).pack(side='right')
+        barra = self.barra_busca = ttk.Frame(corpo)
         barra.pack(fill='x', pady=(0, 12))
         ttk.Label(barra, text='Buscar nome ou data:').pack(side='left', padx=(0, 6))
         self.busca = tk.StringVar()
@@ -182,6 +203,11 @@ class OperacoesMixin:
         if self.historico is None or not self.historico.winfo_exists():
             return
         self.atualizar_ultimo_backup()
+        if demonstracao.ativa(self.banco):
+            if not self.aviso_demonstracao.winfo_manager():
+                self.aviso_demonstracao.pack(fill='x', pady=(0, 16), before=self.barra_busca)
+        else:
+            self.aviso_demonstracao.pack_forget()
         selecionados = self.tabela.selection()
         foco = self.tabela.focus()
         registros = self.banco.listar(self.busca.get().strip())

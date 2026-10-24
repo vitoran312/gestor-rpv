@@ -1,0 +1,68 @@
+import tempfile
+import unittest
+from datetime import date
+from pathlib import Path
+from unittest.mock import patch
+
+import demonstracao
+from dados import Banco, situacao
+from test_contas import dados_conta, dados_rpv
+
+
+class TestDemonstracao(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.caminho = Path(self.temp.name) / 'gestor.sqlite3'
+
+    def test_carrega_somente_em_instalacao_nova_e_vazia(self):
+        banco = Banco(self.caminho)
+        self.assertTrue(banco.novo)
+        self.assertTrue(demonstracao.deve_carregar(banco))
+        reaberto = Banco(self.caminho)
+        self.assertFalse(reaberto.novo)
+        self.assertFalse(demonstracao.deve_carregar(reaberto))
+        outro = Banco(Path(self.temp.name) / 'outro.sqlite3')
+        outro.salvar_conta(dados_conta())
+        self.assertFalse(demonstracao.deve_carregar(outro))
+
+    def test_mesmo_cenario_em_qualquer_data(self):
+        for hoje in (demonstracao.REFERENCIA, date(2027, 6, 15), date(2030, 1, 2)):
+            with self.subTest(hoje=hoje):
+                banco = Banco(Path(self.temp.name) / f'{hoje}.sqlite3')
+                # O cadastro recusa recebimentos futuros pela data real; aqui o relógio é o dia simulado.
+                dia_simulado = type('Dia', (date,), {'today': classmethod(lambda cls, h=hoje: h)})
+                with patch('dados.date', dia_simulado):
+                    demonstracao.carregar(banco, hoje=hoje)
+                registros = banco.listar()
+                self.assertEqual(len(registros), 13)
+                self.assertEqual(len(banco.contas()), 2)
+                situacoes = [situacao(r, hoje) for r in registros]
+                self.assertEqual({s: situacoes.count(s) for s in set(situacoes)},
+                                 {'pendente': 5, 'atrasada': 4, 'recebida': 4})
+                self.assertTrue(all(r['recebimento'] <= hoje.isoformat() for r in registros if r['recebimento']))
+                self.assertEqual(sum(r['previsto'] - r['custo'] for r in registros), 8640000)
+                self.assertTrue(demonstracao.ativa(banco))
+
+    def test_remover_apaga_so_a_demonstracao(self):
+        banco = Banco(self.caminho)
+        demonstracao.carregar(banco)
+        conta_demo = banco.contas()[0]
+        propria = banco.salvar(dados_rpv(nome='Minha operação', conta_id=conta_demo['id']))
+        conta_propria = banco.salvar_conta(dados_conta(identificacao='Minha conta', cpf='11144477735',
+                                                       numero='55555-5', pix='minha@exemplo.com'))
+        demonstracao.remover(banco)
+        self.assertFalse(demonstracao.ativa(banco))
+        self.assertEqual([r['id'] for r in banco.listar()], [propria])
+        self.assertEqual([c['id'] for c in banco.contas()], [conta_propria])
+        restante = banco.obter(propria)
+        self.assertIsNone(restante['conta_id'])
+        self.assertEqual(restante['conta'], conta_demo['identificacao'])
+        with banco.conectar() as con:
+            self.assertEqual(con.execute('SELECT COUNT(*) FROM previsoes_historico').fetchone()[0], 0)
+        demonstracao.remover(banco)
+        self.assertEqual(len(banco.listar()), 1)
+
+
+if __name__ == '__main__':
+    unittest.main()

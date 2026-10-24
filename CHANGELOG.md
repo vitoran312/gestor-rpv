@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## 0.22.0
+
+- Dados de demonstração embutidos: na primeira abertura em um computador sem dados, o programa mostra
+  13 operações e 2 contas fictícias, com datas ajustadas ao dia da instalação.
+- Faixa em Minhas operações avisa sobre os dados fictícios, com o botão Apagar dados de demonstração,
+  que remove só o que é fictício e preserva o que a pessoa cadastrou.
+- Computadores que já têm dados não recebem a demonstração.
+- Retirado o arquivo separado de exemplo (`exemplos/…rpvbackup`), substituído pela demonstração embutida.
+
 ## 0.21.0
 
 - Filtros Todas, Pendentes, Atrasadas e Recebidas em Minhas operações, com a quantidade de cada situação.

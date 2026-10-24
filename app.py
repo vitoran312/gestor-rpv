@@ -3,6 +3,7 @@ import sqlite3
 import tkinter as tk
 from tkinter import ttk
 
+import demonstracao
 from dados import Banco
 from componentes import centralizar
 from contas import JanelaContas
@@ -22,6 +23,11 @@ class Aplicativo(OperacoesMixin, RegistroMixin, ArquivosMixin):
     def __init__(self, janela):
         self.janela = janela
         self.banco = Banco()
+        if demonstracao.deve_carregar(self.banco):
+            try:
+                demonstracao.carregar(self.banco)
+            except (sqlite3.Error, ValueError):
+                pass  # Sem a demonstração, o programa abre vazio, como antes.
         janela.withdraw()
         janela.title('Gestor de RPV')
         aplicar_icone(janela)
