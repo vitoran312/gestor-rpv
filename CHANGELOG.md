@@ -9,6 +9,9 @@
   automáticas mais recentes e aviso discreto quando a pasta estiver indisponível.
 - Prorrogação recusada para entradas na lixeira, como as demais alterações.
 - Histórico geral de alterações removido de vez; registros antigos ficam na cópia feita antes da atualização.
+- Backup com documentos corrigido para o Python 3.13 mais recente no Windows, usado na geração do executável.
+- Geração do executável: testes no Windows com vigia contra travamentos, tela de 1920×1080 e
+  verificação do executável ajustada à instalação sem contas pré-cadastradas.
 
 ## 0.20.0
 
