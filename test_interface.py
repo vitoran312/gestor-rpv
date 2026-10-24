@@ -1,5 +1,6 @@
 """Testes reais do Tkinter: GESTOR_RPV_TESTE_UI=1 python -m unittest test_interface -v."""
 import os
+import sys
 import tempfile
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk, font as tkfont
@@ -39,6 +40,12 @@ def texto_resumo(programa):
 @unittest.skipUnless(os.environ.get('GESTOR_RPV_TESTE_UI') == '1', 'Requer sessão gráfica e GESTOR_RPV_TESTE_UI=1')
 class TestInterface(unittest.TestCase):
     def setUp(self):
+        if sys.platform == 'win32':
+            # No Windows, tk_popup espera o menu ser fechado por um clique real e travaria o teste.
+            # Os menus continuam sendo montados; os testes acionam as opções diretamente.
+            menu_sem_espera = patch.object(tk.Menu, 'tk_popup', lambda menu, x, y, entry='': None)
+            menu_sem_espera.start()
+            self.addCleanup(menu_sem_espera.stop)
         self.pasta = tempfile.TemporaryDirectory()
         self.banco = banco_com_contas(Path(self.pasta.name) / 'teste.sqlite3')
         self.root = tk.Tk()
