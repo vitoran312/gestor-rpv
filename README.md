@@ -225,6 +225,13 @@ O prazo é recalculado ao abrir ou voltar às janelas principais, sem interrompe
 `%LOCALAPPDATA%\GestorRPV\backups_automaticos`. Esse arquivo também pode ser importado
 para voltar ao estado anterior. A pasta guarda somente os 10 backups automáticos mais recentes.
 
+### Dados de demonstração
+
+O arquivo [`exemplos/GestorRPV-dados-ficticios.rpvbackup`](exemplos/GestorRPV-dados-ficticios.rpvbackup)
+traz 13 operações e 2 contas com nomes, CPFs e dados bancários inventados, para apresentar o programa
+sem expor dados reais. Em uma instalação nova, use **Arquivo → Importar dados** e escolha esse arquivo.
+A importação substitui os dados do computador. Ele pode ser recriado com `python scripts/gerar_dados_exemplo.py`.
+
 ### Backup automático
 
 Em **Arquivo → Backup automático…**, escolha uma pasta — de preferência sincronizada, como OneDrive
