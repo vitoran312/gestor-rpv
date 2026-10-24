@@ -21,6 +21,14 @@ jobs:
           cache-dependency-path: requirements-build.txt
       - name: Instalar ferramenta de compilacao
         run: python -m pip install -r requirements-build.txt
+      - name: Ajustar resolucao da tela
+        shell: pwsh
+        run: |
+          # Os testes de layout precisam de janelas largas; o Windows limita cada janela ao tamanho da tela.
+          try { Set-DisplayResolution -Width 1920 -Height 1080 -Force -ErrorAction Stop } catch { Write-Host "::warning title=Resolucao::$($_.Exception.Message)" }
+          Add-Type -AssemblyName System.Windows.Forms
+          $tela = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          Write-Host "::notice title=Tela::$($tela.Width)x$($tela.Height)"
       - name: Testar aplicativo e interface
         timeout-minutes: 15
         env:
