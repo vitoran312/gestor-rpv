@@ -1,5 +1,6 @@
 """Abre e fecha o .exe em dados temporários e sem Python no PATH do processo."""
 import ctypes
+from contextlib import closing
 from ctypes import wintypes
 import os
 from pathlib import Path
@@ -58,9 +59,11 @@ def verificar(exe):
             user32.PostMessageW(encontrada[0],0x0010,0,0)  # WM_CLOSE
             if processo.wait(timeout=20) != 0:
                 raise RuntimeError('O executável terminou com erro.')
-            with sqlite3.connect(Path(pasta)/'GestorRPV'/'gestor.sqlite3') as con:
+            # closing fecha o arquivo; no Windows, um banco aberto impede apagar a pasta temporária.
+            with closing(sqlite3.connect(Path(pasta)/'GestorRPV'/'gestor.sqlite3')) as con:
                 assert con.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
-                assert con.execute('SELECT COUNT(*) FROM contas').fetchone()[0] == 2
+                assert con.execute('PRAGMA user_version').fetchone()[0] == 8
+                assert con.execute('SELECT COUNT(*) FROM contas').fetchone()[0] == 0  # Instalação nova começa sem contas.
             print('Executável abriu, criou o banco temporário e fechou sem Python no PATH.')
         finally:
             if processo.poll() is None:
