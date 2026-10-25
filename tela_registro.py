@@ -14,6 +14,35 @@ from documentos import validar_anexo, abrir_arquivo
 from interacao import aplicar_formato, capitalizar_inicio, menu_copia
 
 
+# A janela de entrada é cerca de 30% maior que as demais: fontes de 10 para 13 pontos, campos e
+# espaçamentos na mesma proporção. Campos de texto crescem junto com a fonte, pois a largura é em caracteres.
+AMPLIACAO = 1.3
+ESTILOS_AMPLIADOS = {'': 'Form', 'Titulo.TLabel': 'FormTitulo.TLabel', 'DataCalculada.TLabel': 'FormDataCalculada.TLabel',
+                     'Dinheiro.TLabel': 'FormDinheiro.TLabel', 'Salvar.TButton': 'Form.Salvar.TButton'}
+
+
+def ampliar_formulario(widget, fonte):
+    """Aplica as versões ampliadas dos estilos a todos os elementos já criados na janela."""
+    if isinstance(widget, (ttk.Entry, ttk.Combobox)):
+        widget.configure(font=(fonte, 13), style='Form.' + widget.winfo_class())
+    elif isinstance(widget, tk.Text):
+        widget.configure(font=(fonte, 13), padx=8, pady=8)
+    elif isinstance(widget, (ttk.Label, ttk.Button, ttk.Radiobutton)):
+        estilo = str(widget.cget('style'))
+        novo = ESTILOS_AMPLIADOS.get(estilo)
+        if novo == 'Form':
+            novo = 'Form.' + widget.winfo_class()
+        if novo:
+            widget.configure(style=novo)
+    for filho in widget.winfo_children():
+        if not isinstance(filho, tk.Toplevel):
+            ampliar_formulario(filho, fonte)
+
+
+def pad(valor):
+    return round(valor * AMPLIACAO) if isinstance(valor, int) else tuple(round(v * AMPLIACAO) for v in valor)
+
+
 class RegistroMixin:
     def formulario(self, identificador=None):
         registro = self.banco.obter(identificador) if identificador else None
@@ -37,7 +66,7 @@ class RegistroMixin:
         tela.configure(bg=cores()['fundo'])
         tela.resizable(False, False)
         tela.transient(self.historico if self.historico is not None and self.historico.winfo_exists() else self.janela)
-        cabecalho = ttk.Frame(tela,padding=(24,16,24,0))
+        cabecalho = ttk.Frame(tela,padding=pad((24,16,24,0)))
         cabecalho.pack(fill='x')
         ttk.Label(cabecalho,text='Editar registro' if registro else 'Nova entrada',style='Titulo.TLabel').pack(anchor='w')
         area = AreaRolavel(tela)
@@ -55,9 +84,9 @@ class RegistroMixin:
         ]
         for linha, (chave, titulo, padrao) in enumerate(definicoes):
             if chave == 'previsao':
-                ttk.Radiobutton(quadro,text='Previsão inicial por calendário',variable=modo_previsao,value='calendario').grid(row=linha,column=0,sticky='w',pady=6,padx=(0,16))
+                ttk.Radiobutton(quadro,text='Previsão inicial por calendário',variable=modo_previsao,value='calendario').grid(row=linha,column=0,sticky='w',pady=pad(6),padx=pad((0,16)))
             else:
-                ttk.Label(quadro, text=titulo).grid(row=linha, column=0, sticky='w', pady=6, padx=(0, 16))
+                ttk.Label(quadro, text=titulo).grid(row=linha, column=0, sticky='w', pady=pad(6), padx=pad((0,16)))
             valor = conta_inicial if chave == 'conta' else (registro[chave] if registro else padrao)
             if registro and chave in ('aquisicao', 'previsao'):
                 valor = data_br(valor)
@@ -72,20 +101,20 @@ class RegistroMixin:
                 entrada = ttk.Combobox(quadro, textvariable=campos[chave], values=tuple(mapa_contas), state='readonly', width=29)
             else:
                 entrada = ttk.Entry(quadro, textvariable=campos[chave], width=32)
-            entrada.grid(row=linha, column=1, sticky='ew', pady=6)
+            entrada.grid(row=linha, column=1, sticky='ew', pady=pad(6))
             if chave == 'previsao':
                 campo_previsao = entrada
             if chave == 'nome':
                 entrada.focus_set()
                 aplicar_formato(entrada, campos['nome'], str.title)
 
-        ttk.Radiobutton(quadro,text='Previsão inicial de recebimento em',variable=modo_previsao,value='dias').grid(row=6,column=0,sticky='w',pady=6,padx=(0,16))
+        ttk.Radiobutton(quadro,text='Previsão inicial de recebimento em',variable=modo_previsao,value='dias').grid(row=6,column=0,sticky='w',pady=pad(6),padx=pad((0,16)))
         linha_prazo = ttk.Frame(quadro)
-        linha_prazo.grid(row=6,column=1,sticky='ew',pady=6)
+        linha_prazo.grid(row=6,column=1,sticky='ew',pady=pad(6))
         prazo = tk.StringVar()
         entrada_prazo = ttk.Entry(linha_prazo,textvariable=prazo,width=6,justify='center',name='prazo_dias')
         entrada_prazo.pack(side='left')
-        ttk.Label(linha_prazo,text='dias.').pack(side='left',padx=(8,12))
+        ttk.Label(linha_prazo,text='dias.').pack(side='left',padx=pad((8,12)))
         data_calculada = tk.StringVar(value='dd/mm/aaaa')
         resultado_prazo = ttk.Label(linha_prazo,textvariable=data_calculada,style='DataCalculada.TLabel',name='data_calculada')
         resultado_prazo.pack(side='left')
@@ -137,7 +166,7 @@ class RegistroMixin:
         escolher_modo()
 
         lucro = tk.StringVar()
-        ttk.Label(quadro, text='Lucro previsto').grid(row=7, column=0, sticky='w', pady=6)
+        ttk.Label(quadro, text='Lucro previsto').grid(row=7, column=0, sticky='w', pady=pad(6))
         ttk.Label(quadro, textvariable=lucro).grid(row=7, column=1, sticky='w')
 
         def atualizar_lucro(*_):
@@ -149,14 +178,14 @@ class RegistroMixin:
         for chave in ('previsto', 'custo'):
             campos[chave].trace_add('write', lambda *_: tela.after_idle(atualizar_lucro))
         atualizar_lucro()
-        ttk.Label(quadro, text='Há comissão?').grid(row=8, column=0, sticky='w', pady=6)
+        ttk.Label(quadro, text='Há comissão?').grid(row=8, column=0, sticky='w', pady=pad(6))
         tem_comissao = tk.StringVar(value='Sim' if registro and registro['comissao'] is not None else 'Não')
         escolha = ttk.Combobox(quadro, textvariable=tem_comissao, values=('Não', 'Sim'), state='readonly', width=29)
         escolha.grid(row=8, column=1, sticky='ew')
         valor_comissao = tk.StringVar(value=moeda(registro['comissao']) if registro and registro['comissao'] is not None else '')
         rotulo_comissao = ttk.Label(quadro, text='Valor da comissão')
         entrada_comissao = CampoMoeda(quadro, valor_comissao)
-        rotulo_comissao.grid(row=9, column=0, sticky='w', pady=6)
+        rotulo_comissao.grid(row=9, column=0, sticky='w', pady=pad(6))
         entrada_comissao.grid(row=9, column=1, sticky='ew')
 
         def exibir_comissao(*_):
@@ -169,12 +198,12 @@ class RegistroMixin:
 
         tem_comissao.trace_add('write', exibir_comissao)
         exibir_comissao()
-        ttk.Label(quadro, text='Observações').grid(row=10, column=0, sticky='nw', pady=10)
+        ttk.Label(quadro, text='Observações').grid(row=10, column=0, sticky='nw', pady=pad(10))
         observacoes = tk.Text(quadro, height=4, width=32, wrap='word', font=(self.fonte, 10),
                               bg=cores()['campo'], fg=cores()['texto'], insertbackground=cores()['texto'],
                               selectbackground=cores()['selecao'], selectforeground=cores()['texto_selecao'],
-                              relief='flat', padx=6, pady=6)
-        observacoes.grid(row=10, column=1, sticky='ew',pady=10)
+                              relief='flat', padx=pad(6), pady=pad(6))
+        observacoes.grid(row=10, column=1, sticky='ew',pady=pad(10))
 
         def capitalizar_observacoes(_evento=None):
             texto = observacoes.get('1.0', 'end-1c')
@@ -190,7 +219,7 @@ class RegistroMixin:
             observacoes.insert('1.0', registro['observacoes'])
 
         painel_documentos = ttk.Frame(quadro)
-        painel_documentos.grid(row=11,column=0,columnspan=2,sticky='ew',pady=(8,0))
+        painel_documentos.grid(row=11,column=0,columnspan=2,sticky='ew',pady=pad((8,0)))
         anexos_pendentes = self.criar_painel_documentos(painel_documentos, tela, identificador)
 
         def salvar():
@@ -219,16 +248,17 @@ class RegistroMixin:
             self.atualizar()
             tela.destroy()
 
-        ttk.Separator(tela).pack(fill='x',padx=24)
-        botoes = ttk.Frame(tela,padding=(20,8,20,12))
+        ttk.Separator(tela).pack(fill='x',padx=pad(24))
+        botoes = ttk.Frame(tela,padding=pad((20,8,20,12)))
         botoes.pack(fill='x')
         for coluna in range(3):
             botoes.columnconfigure(coluna,weight=1,uniform='acoes')
         ttk.Button(botoes,text='Dados de recebimento',width=20,
-                   command=lambda: self.ver_dados_recebimento(tela,registro,mapa_contas.get(campos['conta'].get()))).grid(row=0,column=0,sticky='ew',padx=(0,8))
-        ttk.Button(botoes,text='Cancelar',width=20,command=tela.destroy).grid(row=0,column=1,sticky='ew',padx=(4,4))
-        ttk.Button(botoes,text='Salvar registro',width=20,style='Salvar.TButton',command=salvar).grid(row=0,column=2,sticky='ew',padx=(8,0))
+                   command=lambda: self.ver_dados_recebimento(tela,registro,mapa_contas.get(campos['conta'].get()))).grid(row=0,column=0,sticky='ew',padx=pad((0,8)))
+        ttk.Button(botoes,text='Cancelar',width=20,command=tela.destroy).grid(row=0,column=1,sticky='ew',padx=pad((4,4)))
+        ttk.Button(botoes,text='Salvar registro',width=20,style='Salvar.TButton',command=salvar).grid(row=0,column=2,sticky='ew',padx=pad((8,0)))
         tela.bind('<Escape>', lambda _: tela.destroy())
+        ampliar_formulario(tela, self.fonte)
         centralizar(tela)
         tela.deiconify()
         tela.grab_set()

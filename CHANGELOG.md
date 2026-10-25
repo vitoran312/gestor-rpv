@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## 0.26.0
+
+- Janela de nova entrada e edição de registro cerca de 30% maior: fontes de 10 para 13 pontos, campos,
+  setas, espaçamentos e botões na mesma proporção. Em telas baixas, os campos rolam e os botões
+  continuam fixos no rodapé.
+
 ## 0.25.1
 
 - Troca entre modo claro e escuro cerca de 3 vezes mais rápida no Windows: cartões, botões e filtros

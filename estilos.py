@@ -50,6 +50,18 @@ def criar_estilos(janela, estilo, fonte):
     estilo.configure('Demonstracao.TButton',background=c['realce'],padding=(14,6))
     estilo.map('Demonstracao.TButton',background=[('disabled',c['realce']),('!disabled',c['realce'])])
 
+    # Janela de nova entrada/edição, cerca de 30% maior (veja tela_registro.ampliar_formulario).
+    estilo.configure('Form.TLabel',font=(fonte,13))
+    estilo.configure('FormTitulo.TLabel',font=(fonte,29,'bold'),foreground=texto,background=fundo)
+    estilo.configure('FormDataCalculada.TLabel',background=fundo,font=(fonte,13,'bold'))
+    estilo.map('FormDataCalculada.TLabel',background=[('disabled',fundo),('!disabled',fundo)],foreground=[('disabled',c['desabilitado']),('!disabled',texto)])
+    estilo.configure('FormDinheiro.TLabel',background=campo,foreground=c['secundario'],font=(fonte,13))
+    estilo.configure('Form.TButton',font=(fonte,13),padding=(21,10))
+    estilo.configure('Form.Salvar.TButton',font=(fonte,13,'bold'),padding=(21,10))
+    estilo.configure('Form.TRadiobutton',font=(fonte,13))
+    for tipo in ('TEntry','TCombobox'):
+        estilo.configure('Form.'+tipo,padding=(13,9),arrowsize=17)
+
     # Tipografia: títulos neutros e firmes; a cor da marca fica reservada às ações.
     for nome,tamanho,peso,cor in (
         ('InicioTitulo.TLabel',34,'bold',texto),

@@ -1,2 +1,2 @@
 """Versão da entrega publicada no GitHub com a tag correspondente."""
-VERSAO = '0.25.1'
+VERSAO = '0.26.0'
