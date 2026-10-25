@@ -111,6 +111,7 @@ class Aplicativo(NavegacaoMixin, OperacoesMixin, RegistroMixin, ArquivosMixin):
         janela.bind('<Alt-Left>',self.voltar)
         self.data_exibida = date.today()
         self.agendamento_data = janela.after(60 * 1000,self.vigiar_data)
+        self.agendamento_tema = janela.after(1200,self.preparar_outro_tema)
         self.falha_backup_automatico = False
         self.agendamento_backup = janela.after(1500,self.verificar_backup_automatico)
         janela.bind('<Destroy>',self.cancelar_agendamento_backup,add='+')
@@ -128,6 +129,27 @@ class Aplicativo(NavegacaoMixin, OperacoesMixin, RegistroMixin, ArquivosMixin):
     def alternar_tema(self):
         self.modo_tema.set('escuro' if self.modo_tema.get()=='claro' else 'claro')
         self.configurar_tema()
+
+    def preparar_outro_tema(self):
+        """Monta em segundo plano o tema ainda não usado, para a primeira troca ser tão rápida quanto as demais."""
+        self.agendamento_tema = None
+        estilo = ttk.Style(self.janela)
+        atual = self.modo_tema.get()
+        outro = 'escuro' if atual == 'claro' else 'claro'
+        nome = 'VitoranPro' + outro.title()
+        if nome in estilo.theme_names():
+            return
+        estilo.theme_create(nome, parent='clam')
+        definir_modo(outro)
+        try:
+            # theme settings aplica os estilos ao outro tema sem colocá-lo em uso.
+            comando = self.janela.register(lambda: criar_estilos(self.janela, estilo, self.fonte))
+            try:
+                self.janela.tk.call('ttk::style', 'theme', 'settings', nome, comando)
+            finally:
+                self.janela.deletecommand(comando)
+        finally:
+            definir_modo(atual)
 
     def salvar_tema(self, modo):
         try:
@@ -239,7 +261,8 @@ class Aplicativo(NavegacaoMixin, OperacoesMixin, RegistroMixin, ArquivosMixin):
         estilo=ttk.Style(self.janela)
         modo=self.modo_tema.get()
         definir_modo(modo)
-        self.salvar_tema(modo)
+        # A preferência é gravada depois que a tela se redesenha: no Windows, gravar no disco atrasaria a troca.
+        self.janela.after_idle(lambda m=modo: self.salvar_tema(m))
         self.fonte=familia_fonte(self.janela)
         fonte=self.fonte
         nome_tema='VitoranPro'+modo.title()
@@ -265,6 +288,7 @@ class Aplicativo(NavegacaoMixin, OperacoesMixin, RegistroMixin, ArquivosMixin):
             self.tabela.tag_configure('atrasada',foreground=c['vermelho'],background=c['atraso'])
         if self.janela_contas is not None and self.janela_contas.tela.winfo_exists():
             self.janela_contas.atualizar_situacoes()
+            self.janela_contas.mostrar_detalhe()
 
 
 if __name__ == '__main__':

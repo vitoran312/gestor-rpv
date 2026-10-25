@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## 0.24.0
+
+- Contas de recebimento em lista e detalhes: a conta selecionada mostra dados bancários, situação,
+  ações e as operações que a usam, com atrasadas primeiro e totais a receber e já recebidos.
+- Resumo de contas no topo da página e seleção automática da primeira conta.
+- Troca entre modo claro e escuro mais rápida: o outro tema é preparado em segundo plano após a abertura
+  e a preferência é gravada depois do redesenho.
+
 ## 0.23.0
 
 - Uma única janela: Minhas operações, Contas de recebimento e Gráfico mensal abrem como páginas dentro

@@ -6,7 +6,7 @@ from tkinter import ttk, messagebox
 
 from componentes import centralizar, AreaRolavel
 from selecao import habilitar_selecao, pressionar_linha, arrastar
-from dados import validar_cpf, ESTADOS
+from dados import validar_cpf, ESTADOS, moeda, data_br, situacao
 from interacao import aplicar_formato, aplicar_cpf, capitalizar_inicio, formatar_cpf, novo_menu, mostrar_menu, copiar_texto
 
 
@@ -26,36 +26,48 @@ class JanelaContas:
         corpo.pack(fill='both', expand=True)
         aplicativo.cabecalho_pagina(corpo, 'Contas de recebimento', 'Dados bancários usados nas suas operações.')
         barra = ttk.Frame(corpo)
-        barra.pack(fill='x', pady=(0, 15))
-        ttk.Button(barra, text='Cadastrar nova conta', style='Principal.TButton', command=self.formulario).pack(side='left')
-        ttk.Button(barra, text='Ver / Editar', command=self.editar).pack(side='left', padx=8)
-        ttk.Button(barra, text='Desativar / Reativar', command=self.alterar_status).pack(side='left')
-        ttk.Button(barra, text='Remover', command=self.remover).pack(side='left', padx=8)
-        self.tabela = ttk.Treeview(corpo, style='Contas.Treeview', columns=('nome', 'banco', 'status'), show='headings', selectmode='browse')
-        for chave, titulo in (('nome', 'Identificação'), ('banco', 'Banco'), ('status', 'Situação')):
+        barra.pack(fill='x', pady=(0, 14))
+        self.texto_resumo = tk.StringVar()
+        ttk.Label(barra, textvariable=self.texto_resumo, style='ContasResumo.TLabel').pack(side='left')
+        ttk.Button(barra, text='Cadastrar nova conta', style='Principal.TButton', command=self.formulario).pack(side='right')
+        # Lista à esquerda e detalhes da conta selecionada à direita, com as operações que a usam.
+        area = ttk.Frame(corpo)
+        area.pack(fill='both', expand=True)
+        area.columnconfigure(0, weight=2, minsize=440)
+        area.columnconfigure(1, weight=3)
+        area.rowconfigure(0, weight=1)
+        lista = ttk.Frame(area)
+        lista.grid(row=0, column=0, sticky='nsew', padx=(0, 20))
+        self.tabela = ttk.Treeview(lista, style='Contas.Treeview', columns=('nome', 'banco', 'status'), show='headings', selectmode='browse')
+        for chave, titulo, largura in (('nome', 'Identificação', 190), ('banco', 'Banco', 150), ('status', 'Situação', 200)):
             alinhamento = 'center' if chave == 'status' else 'w'
             self.tabela.heading(chave, text=titulo, anchor=alinhamento)
-            self.tabela.column(chave, width=340 if chave=='status' else 240, anchor=alinhamento)
+            self.tabela.column(chave, width=largura, minwidth=110, anchor=alinhamento)
+        self.tabela.pack(fill='both', expand=True)
+        ttk.Label(lista, text='Contas desativadas permanecem no histórico e podem ser reativadas.',
+                  style='Discreto.TLabel', wraplength=440).pack(anchor='w', pady=(10, 0))
+        self.detalhe = ttk.Frame(area, style='Cartao.TFrame', padding=(28, 24))
+        self.detalhe.grid(row=0, column=1, sticky='nsew')
         self.situacoes_labels={}
         self.incompletas=set()
         self.situacoes_pendentes=False
         self.tabela.bind('<Configure>',lambda _:self.agendar_situacoes())
-        self.tabela.bind('<<TreeviewSelect>>',lambda _:self.agendar_situacoes())
+        self.tabela.bind('<<TreeviewSelect>>',lambda _:(self.agendar_situacoes(),self.mostrar_detalhe()))
         self.tabela.configure(yscrollcommand=lambda *_:self.agendar_situacoes(),xscrollcommand=lambda *_:self.agendar_situacoes())
-        self.tabela.pack(fill='both', expand=True)
         habilitar_selecao(self.tabela,abrir=self.editar,excluir=self.remover)
         self.tabela.bind('<Button-3>', self.menu_contexto)
         self.tabela.bind('<Double-1>', lambda _: self.editar())
-        ttk.Label(corpo, text='Contas desativadas permanecem no histórico e podem ser reativadas.').pack(side='bottom',pady=(12,0),before=self.tabela)
         self.atualizar()
         aplicativo.abrir_pagina(self.tela, 'Contas de recebimento')
 
     def atualizar(self):
+        selecionadas = self.tabela.selection()
         for w in self.situacoes_labels.values():w.destroy()
         self.situacoes_labels.clear()
         self.incompletas.clear()
         self.tabela.delete(*self.tabela.get_children())
-        for conta in self.banco.contas():
+        contas = self.banco.contas()
+        for conta in contas:
             status = 'Ativa' if conta['ativa'] else 'Desativada'
             incompleta = any(not conta[c] for c in ('nome', 'cpf', 'endereco', 'numero_endereco', 'cidade', 'estado', 'banco', 'numero', 'pix'))
             if not incompleta:
@@ -68,8 +80,106 @@ class JanelaContas:
                 status = '⚠ Completar cadastro' + (' — Desativada' if not conta['ativa'] else '')
             self.tabela.insert('', 'end', iid=str(conta['id']), values=(conta['identificacao'], conta['banco'], status),
                                tags=('incompleta',) if incompleta else ())
-
+        ativas = sum(1 for conta in contas if conta['ativa'])
+        partes = [f"{len(contas)} conta{'s' if len(contas) != 1 else ''}", f"{ativas} ativa{'s' if ativas != 1 else ''}"]
+        if self.incompletas:
+            partes.append(f"{len(self.incompletas)} a completar")
+        self.texto_resumo.set(' · '.join(partes) if contas else 'Nenhuma conta cadastrada.')
+        # Mantém a conta que estava selecionada; sem ela, mostra a primeira para o painel não ficar vazio.
+        disponiveis = self.tabela.get_children()
+        manter = [i for i in selecionadas if i in disponiveis]
+        if manter or disponiveis:
+            self.tabela.selection_set(manter or disponiveis[0])
+            self.tabela.focus(manter[0] if manter else disponiveis[0])
+        self.mostrar_detalhe()
         self.agendar_situacoes()
+
+    def mostrar_detalhe(self):
+        for filho in self.detalhe.winfo_children():
+            filho.destroy()
+        selecao = self.tabela.selection()
+        if len(selecao) != 1:
+            texto = ('Cadastre a primeira conta para receber suas operações.' if not self.tabela.get_children()
+                     else 'Selecione uma conta na lista para ver os detalhes.')
+            ttk.Label(self.detalhe, text=texto, style='CartaoTexto.TLabel').pack(anchor='w')
+            return
+        conta = self.banco.obter_conta(int(selecao[0]))
+        if conta is None:
+            return
+        c = dict(conta)
+        topo = ttk.Frame(self.detalhe, style='Superficie.TFrame')
+        topo.pack(fill='x')
+        ttk.Label(topo, text=c['identificacao'], style='DetalheTitulo.TLabel').pack(side='left')
+        if selecao[0] in self.incompletas:
+            selo, estilo = '⚠ Completar cadastro', 'SeloIncompleta.TLabel'
+        elif c['ativa']:
+            selo, estilo = '● Ativa', 'SeloAtiva.TLabel'
+        else:
+            selo, estilo = '● Desativada', 'SeloDesativada.TLabel'
+        ttk.Label(topo, text=selo, style=estilo).pack(side='right')
+        ttk.Label(self.detalhe, text=c['nome'] or 'Nome não informado', style='CartaoTexto.TLabel').pack(anchor='w', pady=(2, 18))
+
+        campos = ttk.Frame(self.detalhe, style='Superficie.TFrame')
+        campos.pack(fill='x')
+        endereco = ', '.join(p for p in (c['endereco'], c['numero_endereco']) if p)
+        local = '/'.join(p for p in (c['cidade'], c['estado']) if p)
+        for indice, (rotulo, valor) in enumerate((
+                ('CPF', formatar_cpf(c['cpf']) if c['cpf'] else ''), ('Chave Pix', c['pix']),
+                ('Banco', c['banco']), ('Agência', c['agencia']),
+                ('Conta', c['numero']), ('Endereço', ' — '.join(p for p in (endereco, local) if p)))):
+            celula = ttk.Frame(campos, style='Superficie.TFrame')
+            celula.grid(row=indice // 2, column=indice % 2, sticky='nw', padx=(0, 24), pady=(0, 14))
+            ttk.Label(celula, text=rotulo, style='DetalheRotulo.TLabel').pack(anchor='w')
+            ttk.Label(celula, text=valor or 'Não informado', style='DetalheValor.TLabel', wraplength=320).pack(anchor='w')
+        campos.columnconfigure((0, 1), weight=1, uniform='campos')
+
+        botoes = ttk.Frame(self.detalhe, style='Superficie.TFrame')
+        botoes.pack(fill='x', pady=(4, 20))
+        ttk.Button(botoes, text='Editar', style='Inicio.Principal.TButton', command=self.editar).pack(side='left')
+        copiar = ttk.Button(botoes, text='Copiar dados', style='Inicio.TButton')
+        copiar.configure(command=lambda: self.copiar_dados(c, copiar))
+        copiar.pack(side='left', padx=8)
+        ttk.Button(botoes, text='Desativar' if c['ativa'] else 'Reativar', style='Inicio.TButton',
+                   command=self.alterar_status).pack(side='left')
+        ttk.Button(botoes, text='Remover', style='Inicio.TButton', command=self.remover).pack(side='right')
+
+        ttk.Separator(self.detalhe).pack(fill='x', pady=(0, 16))
+        # O que pede atenção vem primeiro: atrasadas, depois pendentes pela previsão; recebidas por último.
+        prioridade = {'atrasada': 0, 'pendente': 1, 'recebida': 2}
+        operacoes = sorted((r for r in self.banco.listar() if r['conta_id'] == c['id']),
+                           key=lambda r: (prioridade[situacao(r)], r['previsao_atual']))
+        a_receber = sum(r['previsto'] for r in operacoes if not r['recebimento'])
+        recebido = sum(r['previsto'] for r in operacoes if r['recebimento'])
+        ttk.Label(self.detalhe, text=f'Operações nesta conta ({len(operacoes)})', style='DetalheSecao.TLabel').pack(anchor='w')
+        ttk.Label(self.detalhe, style='CartaoTexto.TLabel',
+                  text=f'R$ {moeda(a_receber)} a receber · R$ {moeda(recebido)} já recebidos').pack(anchor='w', pady=(2, 10))
+        if not operacoes:
+            ttk.Label(self.detalhe, text='Nenhuma operação usa esta conta.', style='CartaoTexto.TLabel').pack(anchor='w')
+            return
+        quadro = ttk.Frame(self.detalhe, style='Superficie.TFrame')
+        quadro.pack(fill='both', expand=True)
+        lista = ttk.Treeview(quadro, style='ContaOperacoes.Treeview', columns=('nome', 'total', 'previsao', 'situacao'),
+                             show='headings', selectmode='none', height=6)
+        for chave, titulo, largura, alinhamento in (('nome', 'Titular', 200, 'w'), ('total', 'Valor Total RPV', 130, 'e'),
+                                                     ('previsao', 'Previsão atual', 120, 'center'), ('situacao', 'Situação', 110, 'center')):
+            lista.heading(chave, text=titulo, anchor=alinhamento)
+            lista.column(chave, width=largura, minwidth=80, anchor=alinhamento)
+        lista.tag_configure('atrasada', foreground=cores()['vermelho'], background=cores()['atraso'])
+        lista.tag_configure('recebida', foreground=cores()['secundario'])
+        rotulos = {'pendente': 'Pendente', 'atrasada': 'Atrasada', 'recebida': 'Recebida'}
+        for r in operacoes:
+            estado = situacao(r)
+            lista.insert('', 'end', values=(r['nome'], 'R$ ' + moeda(r['previsto']), data_br(r['previsao_atual']),
+                                            rotulos[estado]), tags=(estado,))
+        rolagem = ttk.Scrollbar(quadro, orient='vertical', command=lista.yview)
+        lista.configure(yscrollcommand=rolagem.set)
+        lista.pack(side='left', fill='both', expand=True)
+        rolagem.pack(side='right', fill='y')
+
+    def copiar_dados(self, conta, botao):
+        copiar_texto(self.tabela, dados_para_copiar(conta))
+        botao.configure(text='Copiado ✓')
+        botao.after(1500, lambda: botao.winfo_exists() and botao.configure(text='Copiar dados'))
 
     def agendar_situacoes(self):
         if not self.situacoes_pendentes:
