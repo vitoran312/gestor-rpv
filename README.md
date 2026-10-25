@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.25.0
+# Gestor de RPV — 0.25.1
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -14,7 +14,7 @@ python app.py
 
 Mantenha todos os arquivos `.py` e a pasta `recursos` juntos. Essa pasta contém o ícone da Vitoran Tech.
 A tela inicial tem os botões **Nova entrada**, **Minhas operações**,
-**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.25.0**, acompanhada do emblema com 50% de opacidade,
+**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.25.1**, acompanhada do emblema com 50% de opacidade,
 aparece no canto inferior direito.
 O número é lido da versão do programa e acompanha cada atualização.
 O programa funciona em uma única janela, que abre maximizada. **Minhas operações**, **Contas de
@@ -39,7 +39,9 @@ aparência; o menu **Exibir** do histórico oferece as mesmas opções.
   mostram a marca, o autor e a versão atual. O número acompanha automaticamente `versao.py`.
 - Temas e fontes reutilizados; as superfícies são geradas uma vez por tema para agilizar a alternância.
   O tema ainda não usado é preparado em segundo plano logo após a abertura, e a preferência é gravada
-  depois do redesenho, para a troca entre claro e escuro não travar.
+  depois do redesenho. Cartões, botões e filtros usam imagens do tamanho real das superfícies, que o
+  Windows desenha de uma vez, em vez de centenas de pedaços pequenos.
+  Para medir a troca no Windows, rode o fluxo **Medir troca de tema** em Actions (`scripts/medir_tema.py`).
 - Botões e cartões planos, sem sombras, com contorno de 1 px e cantos de 8 a 12 px.
   Campos com contorno fino e anel de 2 px na cor da marca quando em foco.
   Barras de rolagem finas, sem setas.

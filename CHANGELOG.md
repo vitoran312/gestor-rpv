@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## 0.25.1
+
+- Troca entre modo claro e escuro cerca de 3 vezes mais rápida no Windows: cartões, botões e filtros
+  passam a usar imagens do tamanho real, em vez de centenas de pedaços pequenos repetidos. Medido no
+  Windows do GitHub: início de ~200 para ~60 ms, Minhas operações de ~145 para ~88 ms, Contas de ~160
+  para ~58 ms; abertura de 1,9 para 1,3 s. A aparência é idêntica (comparação pixel a pixel).
+- Fluxo manual “Medir troca de tema” no GitHub Actions para medir a troca no Windows.
+
 ## 0.25.0
 
 - Fontes nítidas no Windows com escala de tela acima de 100%: o programa declara suporte a DPI e deixa
