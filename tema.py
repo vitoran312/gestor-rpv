@@ -9,13 +9,13 @@ PALETAS = {
                   ativo='#eef0f4', selecao='#f6e4e8', texto_selecao='#14171f', verde='#1d7a4c',
                   vermelho='#c02a3b', desabilitado='#8a93a3', primario='#8c1d34', primario_texto='#ffffff',
                   primario_ativo='#a3243f', primario_pressionado='#6a1527', floresta='#8c1d34',
-                  sage='#f0f2f5', realce='#fbeae4', linha='#f9fafb'),
+                  sage='#f0f2f5', realce='#fbeae4', linha='#f9fafb', atraso='#fde8eb'),
     'escuro': dict(fundo='#0e1117', campo='#141820', superficie='#161a22', texto='#e9ecf1',
                    secundario='#9aa3b2', botao='#1b2029', borda='#333a47', borda_suave='#232935',
                    ativo='#232935', selecao='#3a2a27', texto_selecao='#fff4ef', verde='#5fd39d',
                    vermelho='#ff7b86', desabilitado='#6b7484', primario='#ffa586', primario_texto='#1b100c',
                    primario_ativo='#ffb79e', primario_pressionado='#e98d6f', floresta='#ffa586',
-                   sage='#181d26', realce='#2b201d', linha='#12161d'),
+                   sage='#181d26', realce='#2b201d', linha='#12161d', atraso='#2c1519'),
 }
 _modo = 'claro'
 

@@ -1,4 +1,4 @@
-"""Janelas para administrar contas de recebimento."""
+"""Página e formulário para administrar contas de recebimento."""
 from tema import cores
 import sqlite3
 import tkinter as tk
@@ -21,12 +21,10 @@ class JanelaContas:
     def __init__(self, aplicativo):
         self.app = aplicativo
         self.banco = aplicativo.banco
-        self.tela = tk.Toplevel(aplicativo.janela)
-        self.tela.withdraw()
-        self.tela.title('Contas de recebimento')
-        self.tela.configure(bg=cores()['fundo'])
-        corpo = ttk.Frame(self.tela, padding=20)
+        self.tela = ttk.Frame(aplicativo.janela)
+        corpo = ttk.Frame(self.tela, padding=(20, 16, 20, 20))
         corpo.pack(fill='both', expand=True)
+        aplicativo.cabecalho_pagina(corpo, 'Contas de recebimento', 'Dados bancários usados nas suas operações.')
         barra = ttk.Frame(corpo)
         barra.pack(fill='x', pady=(0, 15))
         ttk.Button(barra, text='Cadastrar nova conta', style='Principal.TButton', command=self.formulario).pack(side='left')
@@ -50,8 +48,7 @@ class JanelaContas:
         self.tabela.bind('<Double-1>', lambda _: self.editar())
         ttk.Label(corpo, text='Contas desativadas permanecem no histórico e podem ser reativadas.').pack(side='bottom',pady=(12,0),before=self.tabela)
         self.atualizar()
-        centralizar(self.tela, 960, 520)
-        self.tela.deiconify()
+        aplicativo.abrir_pagina(self.tela, 'Contas de recebimento')
 
     def atualizar(self):
         for w in self.situacoes_labels.values():w.destroy()

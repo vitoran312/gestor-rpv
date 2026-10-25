@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.22.0
+# Gestor de RPV — 0.23.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -14,10 +14,13 @@ python app.py
 
 Mantenha todos os arquivos `.py` e a pasta `recursos` juntos. Essa pasta contém o ícone da Vitoran Tech.
 A tela inicial tem os botões **Nova entrada**, **Minhas operações**,
-**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.22.0**, acompanhada do emblema com 50% de opacidade,
+**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.23.0**, acompanhada do emblema com 50% de opacidade,
 aparece no canto inferior direito.
 O número é lido da versão do programa e acompanha cada atualização.
-As janelas abrem centralizadas; o histórico abre maximizado no Windows.
+O programa funciona em uma única janela, que abre maximizada. **Minhas operações**, **Contas de
+recebimento** e **Gráfico mensal** abrem como páginas dentro dela, com o botão **← Voltar** no topo
+(ou **Alt+←**) para retornar à página anterior. Formulários, confirmações, lixeira, calculadora e
+Sobre continuam como janelas pequenas por cima.
 
 ## Identidade visual
 
@@ -153,8 +156,10 @@ com altura das linhas e largura da janela ajustadas para a leitura.
 - O histórico permite buscar por nome/data, editar e enviar para a lixeira com confirmação.
 - Abaixo da busca, os filtros **Todas**, **Pendentes**, **Atrasadas** e **Recebidas** mostram
   a quantidade de cada situação e limitam a tabela e os totais. Uma operação está **atrasada**
-  quando a previsão atual já passou e o recebimento não foi registrado: a linha fica em vermelho
-  e o filtro Atrasadas também, enquanto houver alguma.
+  quando a previsão atual já passou e o recebimento não foi registrado. A conferência é automática,
+  pela data do computador: ao abrir o programa, ao voltar a cada página e na virada do dia, mesmo com
+  o programa aberto. A **linha inteira** fica com fundo e texto vermelhos, a tela inicial avisa quantas
+  operações estão atrasadas (clique no aviso para ver só elas) e o filtro Atrasadas também fica vermelho.
 - Clique nos cabeçalhos para ordenar: valores e datas começam do maior/mais recente
   para o menor; nomes e contas começam em ordem alfabética. O segundo clique inverte
   a direção e o terceiro retorna à ordem original. A ordenação continua funcionando

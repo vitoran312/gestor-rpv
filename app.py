@@ -1,11 +1,12 @@
 """Gestor de RPV: interface desktop em Python."""
 import sqlite3
 import tkinter as tk
+from datetime import date
 from tkinter import ttk
 
 import demonstracao
-from dados import Banco
-from componentes import centralizar
+from dados import Banco, situacao
+from componentes import centralizar, maximizar
 from contas import JanelaContas
 from versao import VERSAO
 from tema import cores, definir_modo, atualizar_widgets
@@ -14,12 +15,13 @@ from calculadora import JanelaCalculadora
 from interacao import instalar_menu_texto
 from estilos import criar_estilos
 from identidade import aplicar_icone, preparar_windows
+from navegacao import NavegacaoMixin
 from tela_operacoes import OperacoesMixin
 from tela_registro import RegistroMixin
 from tela_arquivos import ArquivosMixin
 
 
-class Aplicativo(OperacoesMixin, RegistroMixin, ArquivosMixin):
+class Aplicativo(NavegacaoMixin, OperacoesMixin, RegistroMixin, ArquivosMixin):
     def __init__(self, janela):
         self.janela = janela
         self.banco = Banco()
@@ -31,8 +33,9 @@ class Aplicativo(OperacoesMixin, RegistroMixin, ArquivosMixin):
         janela.withdraw()
         janela.title('Gestor de RPV')
         aplicar_icone(janela)
-        janela.resizable(False, False)
+        janela.minsize(900, 620)
         janela.configure(bg=cores()['fundo'])
+        self.paginas = []
         self.historico = None
         self.janela_contas = None
         self.calculadora = None
@@ -44,7 +47,7 @@ class Aplicativo(OperacoesMixin, RegistroMixin, ArquivosMixin):
         instalar_menu_texto(janela)
         janela.bind_all('<Map>', self.tematizar_novo_widget, add='+')
 
-        inicio = ttk.Frame(janela,padding=(40,24))
+        inicio = self.inicio = ttk.Frame(janela,padding=(40,24))
         inicio.pack(fill='both',expand=True)
         topo = ttk.Frame(inicio)
         topo.grid(row=0,column=0,sticky='ew')
@@ -84,10 +87,16 @@ class Aplicativo(OperacoesMixin, RegistroMixin, ArquivosMixin):
         self.colunas_inicio = None
         self.grade_inicio.bind('<Configure>',self.organizar_inicio)
         ttk.Frame(inicio).grid(row=4,column=0,sticky='nsew')
+        avisos = ttk.Frame(inicio)
+        avisos.grid(row=5,column=0,sticky='w',pady=(10,0))
+        self.texto_aviso_atrasadas = tk.StringVar()
+        self.aviso_atrasadas_inicio = ttk.Label(avisos,textvariable=self.texto_aviso_atrasadas,
+            style='AtrasadasAviso.TLabel',cursor='hand2')
+        self.aviso_atrasadas_inicio.bind('<Button-1>',lambda _: self.mostrar_atrasadas())
         self.texto_aviso_backup = tk.StringVar()
-        self.aviso_backup_inicio = ttk.Label(inicio,textvariable=self.texto_aviso_backup,
+        self.aviso_backup_inicio = ttk.Label(avisos,textvariable=self.texto_aviso_backup,
             style='BackupAviso.TLabel',cursor='hand2',wraplength=760)
-        self.aviso_backup_inicio.grid(row=5,column=0,sticky='w',pady=(10,0))
+        self.aviso_backup_inicio.pack(anchor='w')
         self.aviso_backup_inicio.bind('<Button-1>',lambda _: self.exportar_backup())
         rodape_inicio = ttk.Frame(inicio)
         rodape_inicio.grid(row=6,column=0,sticky='ew',pady=(22,0))
@@ -97,12 +106,18 @@ class Aplicativo(OperacoesMixin, RegistroMixin, ArquivosMixin):
         self.assinatura_inicio.pack(side='right')
         self.atualizar_alternador_tema()
         self.atualizar_ultimo_backup()
+        self.atualizar_aviso_atrasadas()
         janela.bind('<FocusIn>',self.atualizar_backup_ao_ativar,add='+')
+        janela.bind('<Alt-Left>',self.voltar)
+        self.data_exibida = date.today()
+        self.agendamento_data = janela.after(60 * 1000,self.vigiar_data)
         self.falha_backup_automatico = False
         self.agendamento_backup = janela.after(1500,self.verificar_backup_automatico)
         janela.bind('<Destroy>',self.cancelar_agendamento_backup,add='+')
         centralizar(janela, 1480, 980)
         janela.deiconify()
+        # As páginas (operações, contas, gráfico) usam a mesma janela; maximizada, a tabela tem o espaço de antes.
+        maximizar(janela)
 
     def posicionar_emblema(self,evento):
         if evento.height >= self.emblema_inicio.winfo_reqheight():
@@ -155,10 +170,29 @@ class Aplicativo(OperacoesMixin, RegistroMixin, ArquivosMixin):
                 botao.grid(row=0,column=2,rowspan=2,sticky='e',padx=(18,0))
             cartao.grid(row=i//colunas,column=i%colunas,sticky='nsew',padx=(4,4),pady=4)
 
+    def atualizar_aviso_atrasadas(self):
+        """Varre as previsões atuais ao abrir e ao voltar ao início; nada depende de abrir a lista."""
+        try:
+            total = sum(situacao(r) == 'atrasada' for r in self.banco.listar())
+        except sqlite3.Error:
+            total = 0
+        self.texto_aviso_atrasadas.set(
+            '' if not total else f'{total} operação atrasada. Clique para ver.' if total == 1
+            else f'{total} operações atrasadas. Clique para ver.')
+        if total:
+            self.aviso_atrasadas_inicio.pack(anchor='w',pady=(0,6),before=self.aviso_backup_inicio)
+        else:
+            self.aviso_atrasadas_inicio.pack_forget()
+
+    def mostrar_atrasadas(self):
+        self.mostrar_historico()
+        self.filtro.set('atrasada')
+        self.atualizar()
+
     def mostrar_contas(self):
         if self.janela_contas is not None and self.janela_contas.tela.winfo_exists():
+            self.trazer_pagina(self.janela_contas.tela)
             self.janela_contas.atualizar()
-            self.janela_contas.tela.lift()
             return
         self.janela_contas = JanelaContas(self)
 
@@ -228,7 +262,7 @@ class Aplicativo(OperacoesMixin, RegistroMixin, ArquivosMixin):
             self.desenhar_icone_lixeira()
         if hasattr(self,'tabela') and self.tabela.winfo_exists():
             self.tabela.tag_configure('alternada',background=c['linha'])
-            self.tabela.tag_configure('atrasada',foreground=c['vermelho'])
+            self.tabela.tag_configure('atrasada',foreground=c['vermelho'],background=c['atraso'])
         if self.janela_contas is not None and self.janela_contas.tela.winfo_exists():
             self.janela_contas.atualizar_situacoes()
 

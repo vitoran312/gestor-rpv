@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## 0.23.0
+
+- Uma única janela: Minhas operações, Contas de recebimento e Gráfico mensal abrem como páginas dentro
+  da janela principal, com o botão ← Voltar (ou Alt+←) para a página anterior. A janela abre maximizada.
+- A barra de menus aparece apenas na página Minhas operações, onde suas ações se aplicam.
+- Operações atrasadas com a linha inteira em vermelho: fundo e texto, inclusive Previsão atual e Recebido.
+- Conferência automática das atrasadas pela data do computador ao abrir, ao voltar às páginas e na virada
+  do dia com o programa aberto.
+- Aviso na tela inicial com a quantidade de operações atrasadas; o clique abre a lista já filtrada.
+
 ## 0.22.0
 
 - Dados de demonstração embutidos: na primeira abertura em um computador sem dados, o programa mostra

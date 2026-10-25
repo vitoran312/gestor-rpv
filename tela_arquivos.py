@@ -50,9 +50,12 @@ class ArquivosMixin:
         return arquivo
 
     def cancelar_agendamento_backup(self, evento):
-        if evento.widget is self.janela and self.agendamento_backup:
-            self.janela.after_cancel(self.agendamento_backup)
-            self.agendamento_backup = None
+        if evento.widget is not self.janela:
+            return
+        for nome in ('agendamento_backup', 'agendamento_data'):
+            if getattr(self, nome, None):
+                self.janela.after_cancel(getattr(self, nome))
+                setattr(self, nome, None)
 
     def configurar_backup_automatico(self):
         pai = self.historico if self.historico is not None and self.historico.winfo_exists() else self.janela

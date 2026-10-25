@@ -54,6 +54,8 @@ class TestInterface(unittest.TestCase):
         self.root.report_callback_exception = lambda *args: self.erros.append(args)
         with patch.object(app, 'Banco', return_value=self.banco):
             self.programa = app.Aplicativo(self.root)
+        if sys.platform == 'win32':
+            self.root.state('normal')  # Maximizada, a janela ignoraria os tamanhos pedidos pelos testes de layout.
         self.root.update()
 
     def tearDown(self):
@@ -469,7 +471,7 @@ class TestInterface(unittest.TestCase):
         self.programa.mostrar_historico()
         self.root.update()
         menus = self.programa.menus
-        self.assertEqual(str(self.programa.historico.cget('menu')), str(menus['barra']))
+        self.assertEqual(str(self.root.cget('menu')), str(menus['barra']))
         self.assertEqual(self.programa.tabela.heading('previsto', 'text'), 'Valor Total RPV')
         self.assertEqual(self.programa.tabela.heading('data', 'text'), 'Data de Aquisição')
         textos = [w.cget('text') for w in filhos(self.programa.historico) if isinstance(w, ttk.Label)]
@@ -631,7 +633,7 @@ class TestInterface(unittest.TestCase):
         from test_contas import dados_rpv
         ids = [str(self.banco.salvar(dados_rpv(nome=f'Pessoa {n}'))) for n in range(4)]
         self.programa.mostrar_historico()
-        self.programa.historico.geometry('1100x900')
+        self.root.geometry('1100x900')
         self.root.update()
         tabela = self.programa.tabela
         linhas = list(tabela.get_children())
@@ -883,21 +885,19 @@ class TestInterface(unittest.TestCase):
                           if isinstance(w,tk.Toplevel) and w.title()==titulo)
             botao(janela,'Cancelar').invoke() if titulo=='Recebimento' else janela.destroy()
             self.root.update()
-        self.programa.historico.geometry('850x500')
+        self.root.geometry('900x620')
         self.root.update()
         self.assertTrue(self.programa.botao_lixeira.winfo_ismapped())
         self.assertLess(self.programa.botao_lixeira.winfo_rootx()+self.programa.botao_lixeira.winfo_width(),
-                        self.programa.historico.winfo_rootx()+self.programa.historico.winfo_width()+1)
+                        self.root.winfo_rootx()+self.root.winfo_width()+1)
 
     def test_layout_responsivo_indicadores_e_botoes_e_salvamento_por_dias(self):
         from test_contas import dados_rpv
         identificador = self.banco.salvar(dados_rpv())
         self.programa.mostrar_historico()
         self.root.update()
-        historico = self.programa.historico
-        historico.state('normal')
-        for largura,colunas in ((1600,4),(850,2)):
-            historico.geometry(f'{largura}x650')
+        for largura,colunas in ((1600,4),(900,2)):
+            self.root.geometry(f'{largura}x650')
             self.root.update()
             self.assertEqual(self.programa.colunas_resumo,colunas)
             cartoes = [c for c,_ in self.programa.cartoes_resumo]
@@ -1204,6 +1204,9 @@ class TestInterface(unittest.TestCase):
         self.programa.menus['Ajuda'].invoke('Sobre o Gestor de RPV')
         self.root.update()
         self.assertIsNot(self.programa.sobre,tela)
+        # Sem gerenciador de janelas, o foco do teclado segue o ponteiro, que outro teste pode ter movido.
+        self.programa.sobre.focus_force()
+        self.root.update()
         self.programa.sobre.event_generate('<Escape>')
         self.root.update()
         self.assertFalse(self.programa.sobre.winfo_exists())
@@ -1346,7 +1349,10 @@ class TestInterface(unittest.TestCase):
         self.assertEqual(str(tabela.tag_configure('atrasada', 'foreground')), cores()['vermelho'])
         tabela.xview_moveto(1)
         self.root.update()
-        self.assertEqual(str(self.programa.acoes_linhas[atrasada][0].cget('style')), 'PrevisaoAdiada.TLabel')
+        self.assertEqual(str(self.programa.acoes_linhas[atrasada][0].cget('style')), 'PrevisaoAtrasada.TLabel')
+        self.assertEqual(str(self.programa.acoes_linhas[atrasada][1].cget('style')), 'Atrasada.Operacoes.TCheckbutton')
+        self.assertEqual(str(tabela.tag_configure('atrasada', 'background')), cores()['atraso'])
+        self.assertEqual(list(tabela.item(atrasada, 'tags')), ['atrasada'])
         self.assertEqual(str(self.programa.acoes_linhas[pendente][0].cget('style')), 'Previsao.TLabel')
         for valor, esperado in (('atrasada', [atrasada]), ('pendente', [pendente]), ('recebida', [recebida]),
                                 ('todas', [recebida, pendente, atrasada])):
@@ -1416,6 +1422,85 @@ class TestInterface(unittest.TestCase):
         self.assertEqual(self.programa.tabela.get_children(), ())
         self.assertEqual(novo.contas(), [])
         self.assertFalse(self.programa.aviso_demonstracao.winfo_ismapped())
+
+    def test_paginas_na_mesma_janela_com_seta_para_voltar(self):
+        inicio = self.programa.inicio
+        self.assertEqual([w for w in self.root.winfo_children() if isinstance(w, tk.Toplevel)], [])
+        self.programa.mostrar_historico()
+        self.root.update()
+        historico = self.programa.historico
+        self.assertIsInstance(historico, ttk.Frame)
+        self.assertIs(historico.master, self.root)
+        self.assertFalse(inicio.winfo_ismapped())
+        self.assertTrue(historico.winfo_ismapped())
+        self.assertEqual(self.root.title(), 'Gestor de RPV — Minhas operações')
+        self.assertEqual(str(self.root.cget('menu')), str(self.programa.menus['barra']))
+        self.programa.menus['Exibir'].invoke('Gráfico mensal')
+        self.root.update()
+        grafico = self.programa.grafico_mensal.tela
+        self.assertTrue(grafico.winfo_ismapped())
+        self.assertFalse(historico.winfo_ismapped())
+        self.assertEqual(str(self.root.cget('menu')), '')
+        self.assertEqual(self.root.title(), 'Gestor de RPV — Gráfico mensal')
+        botao(grafico, '←  Voltar').invoke()
+        self.root.update()
+        self.assertFalse(grafico.winfo_exists())
+        self.assertTrue(historico.winfo_ismapped())
+        self.assertEqual(str(self.root.cget('menu')), str(self.programa.menus['barra']))
+        self.programa.menus['Arquivo'].invoke('Contas de recebimento')
+        self.root.update()
+        contas = self.programa.janela_contas.tela
+        self.assertTrue(contas.winfo_ismapped())
+        self.programa.mostrar_historico()
+        self.root.update()
+        self.assertFalse(contas.winfo_exists())
+        self.assertTrue(historico.winfo_ismapped())
+        self.root.event_generate('<Alt-Left>')
+        self.root.update()
+        self.assertFalse(historico.winfo_exists())
+        self.assertTrue(inicio.winfo_ismapped())
+        self.assertEqual(self.root.title(), 'Gestor de RPV')
+        self.assertEqual(str(self.root.cget('menu')), '')
+        self.programa.voltar()
+        self.assertTrue(inicio.winfo_ismapped())
+        botao(self.root, 'Contas de recebimento').invoke()
+        self.root.update()
+        self.assertTrue(self.programa.janela_contas.tela.winfo_ismapped())
+        botao(self.programa.janela_contas.tela, '←  Voltar').invoke()
+        self.root.update()
+        self.assertTrue(inicio.winfo_ismapped())
+
+    def test_inicio_avisa_atrasadas_e_abre_lista_filtrada(self):
+        from test_contas import dados_rpv
+        self.assertFalse(self.programa.aviso_atrasadas_inicio.winfo_ismapped())
+        for nome in ('Primeira', 'Segunda'):
+            self.banco.salvar(dados_rpv(nome=nome, aquisicao='2020-01-01', previsao='2020-02-01'))
+        self.banco.salvar(dados_rpv(nome='Em dia', aquisicao='2020-01-01', previsao='2099-01-01'))
+        self.programa.mostrar_historico()
+        self.root.update()
+        self.programa.voltar()
+        self.root.update()
+        self.assertEqual(self.programa.texto_aviso_atrasadas.get(), '2 operações atrasadas. Clique para ver.')
+        self.assertTrue(self.programa.aviso_atrasadas_inicio.winfo_ismapped())
+        self.programa.aviso_atrasadas_inicio.event_generate('<Button-1>')
+        self.root.update()
+        self.assertTrue(self.programa.historico.winfo_ismapped())
+        self.assertEqual(self.programa.filtro.get(), 'atrasada')
+        self.assertEqual(len(self.programa.tabela.get_children()), 2)
+
+    def test_virada_do_dia_recalcula_atrasadas_com_programa_aberto(self):
+        from test_contas import dados_rpv
+        amanha = date.fromordinal(date.today().toordinal() + 1)
+        identificador = str(self.banco.salvar(dados_rpv(aquisicao='2020-01-01', previsao=date.today().isoformat())))
+        self.programa.mostrar_historico()
+        self.root.update()
+        self.assertNotIn('atrasada', self.programa.tabela.item(identificador, 'tags'))
+        dia_seguinte = type('Dia', (date,), {'today': classmethod(lambda cls: amanha)})
+        with patch('navegacao.date', dia_seguinte), patch('dados.date', dia_seguinte):
+            self.programa.vigiar_data()
+        self.root.update()
+        self.assertIn('atrasada', self.programa.tabela.item(identificador, 'tags'))
+        self.assertEqual(self.programa.botoes_filtro['atrasada'].cget('text'), 'Atrasadas  1')
 
     def test_backup_automatico_ativar_desativar_e_falha_discreta(self):
         from backup import PASTA_AUTOMATICA

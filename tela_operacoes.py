@@ -7,7 +7,7 @@ from tkinter import messagebox, ttk, font as tkfont
 from dados import moeda, data_iso, data_br, situacao
 from grafico import JanelaGrafico
 import demonstracao
-from componentes import centralizar, maximizar
+from componentes import centralizar
 from tema import cores
 from ordenacao import ordenar
 from selecao import habilitar_selecao, pressionar_linha, arrastar
@@ -16,7 +16,11 @@ from interacao import aplicar_formato, capitalizar_inicio, novo_menu, mostrar_me
 
 class OperacoesMixin:
     def criar_barra_historico(self):
-        barra = novo_menu(self.historico)
+        # A barra pertence à janela principal e só é exibida enquanto a página de operações está à frente.
+        anterior = getattr(self, 'menus', None)
+        if anterior and anterior['barra'].winfo_exists():
+            anterior['barra'].destroy()
+        barra = novo_menu(self.janela)
         arquivo = novo_menu(barra)
         arquivo.add_command(label='Nova entrada', command=self.formulario)
         arquivo.add_command(label='Contas de recebimento', command=self.mostrar_contas)
@@ -27,7 +31,7 @@ class OperacoesMixin:
         arquivo.add_command(label='Exportar para Excel', command=self.exportar_excel)
         arquivo.add_command(label='Abrir pasta dos documentos', command=self.abrir_pasta_documentos)
         arquivo.add_separator()
-        arquivo.add_command(label='Fechar operações', command=self.historico.destroy)
+        arquivo.add_command(label='Voltar ao início', command=lambda: self.historico.destroy())
         editar = novo_menu(barra)
         editar.add_command(label='Editar registro', command=self.abrir)
         editar.add_command(label='Excluir registro', command=self.excluir)
@@ -44,7 +48,6 @@ class OperacoesMixin:
         barra.add_command(label='Calculadora', command=self.abrir_calculadora)
         barra.add_cascade(label='Ajuda',menu=ajuda)
         self.menus = {'Arquivo': arquivo, 'Editar': editar, 'Exibir': exibir, 'Ajuda': ajuda, 'barra': barra}
-        self.historico.configure(menu=barra)
 
     def apagar_demonstracao(self):
         if not messagebox.askyesno('Apagar dados de demonstração',
@@ -62,27 +65,21 @@ class OperacoesMixin:
             self.janela_contas.atualizar()
 
     def mostrar_grafico(self):
+        # Reabre com os dados atuais; se o gráfico já estiver aberto, ele é substituído na mesma posição.
         if self.grafico_mensal is not None and self.grafico_mensal.tela.winfo_exists():
+            self.trazer_pagina(self.grafico_mensal.tela)
             self.grafico_mensal.tela.destroy()
         self.grafico_mensal = JanelaGrafico(self)
 
     def mostrar_historico(self):
         if self.historico is not None and self.historico.winfo_exists():
-            maximizar(self.historico)
-            self.historico.lift()
-            self.historico.focus_set()
+            self.trazer_pagina(self.historico)
             return
-        self.historico = tk.Toplevel(self.janela)
-        self.historico.withdraw()
-        self.historico.title('Minhas operações — Gestor de RPV')
-        self.historico.geometry('1100x650')
-        self.historico.minsize(850, 500)
-        self.historico.configure(bg=cores()['fundo'])
+        self.historico = ttk.Frame(self.janela)
         self.criar_barra_historico()
-        corpo = ttk.Frame(self.historico, padding=20)
+        corpo = ttk.Frame(self.historico, padding=(20,16,20,20))
         corpo.pack(fill='both', expand=True)
-        ttk.Label(corpo,text='Minhas operações',style='Titulo.TLabel').pack(anchor='w',pady=(0,4))
-        ttk.Label(corpo,text='Acompanhe cada operação, do cadastro ao recebimento.',style='Subtitulo.TLabel').pack(anchor='w',pady=(0,20))
+        self.cabecalho_pagina(corpo, 'Minhas operações', 'Acompanhe cada operação, do cadastro ao recebimento.')
         self.aviso_demonstracao = ttk.Frame(corpo,style='Demonstracao.TFrame',padding=(16,10))
         ttk.Label(self.aviso_demonstracao,style='Demonstracao.TLabel',
                   text='Você está vendo dados de demonstração, com nomes e valores fictícios.').pack(side='left')
@@ -173,14 +170,12 @@ class OperacoesMixin:
         aviso = ttk.Label(rodape,textvariable=self.texto_aviso_backup,style='BackupAviso.TLabel',cursor='hand2',wraplength=760)
         aviso.grid(row=2,column=0,sticky='w',padx=6)
         aviso.bind('<Button-1>',lambda _: self.exportar_backup())
-        self.historico.bind('<Control-f>',lambda _: entrada_busca.focus_set())
-        self.historico.bind('<Control-n>',lambda _: self.formulario())
-        self.historico.bind('<F5>',lambda _: self.atualizar())
-        self.historico.bind('<FocusIn>',self.atualizar_backup_ao_ativar,add='+')
+        # Atalhos ficam na janela principal e só agem com a página de operações à frente.
+        for sequencia, acao in (('<Control-f>', entrada_busca.focus_set), ('<Control-n>', self.formulario),
+                                ('<F5>', self.atualizar)):
+            self.janela.bind(sequencia, lambda _, a=acao: a() if self.pagina_atual() is self.historico else None)
         self.atualizar()
-        centralizar(self.historico, 1100, 650)
-        self.historico.deiconify()
-        maximizar(self.historico)
+        self.abrir_pagina(self.historico, 'Minhas operações')
 
     def organizar_resumo(self, evento):
         colunas = 4 if evento.width >= 1100 else 2
@@ -229,9 +224,10 @@ class OperacoesMixin:
         self.acoes_linhas.clear()
         self.tabela.delete(*self.tabela.get_children())
         self.tabela.tag_configure('alternada',background=cores()['linha'])
-        self.tabela.tag_configure('atrasada',foreground=cores()['vermelho'])
+        self.tabela.tag_configure('atrasada',foreground=cores()['vermelho'],background=cores()['atraso'])
         for indice,r in enumerate(registros):
-            etiquetas = (('alternada',) if indice%2 else ()) + (('atrasada',) if str(r['id']) in self.atrasadas else ())
+            # Linha atrasada inteira em vermelho; o tom alternado não se aplica a ela.
+            etiquetas = ('atrasada',) if str(r['id']) in self.atrasadas else ('alternada',) if indice%2 else ()
             self.tabela.insert('', 'end', iid=str(r['id']), tags=etiquetas, values=(
                 r['nome'], data_br(r['aquisicao']), 'R$ ' + moeda(r['custo']),
                 'R$ ' + moeda(r['comissao'] or 0),
@@ -284,15 +280,18 @@ class OperacoesMixin:
                 continue
             if linha not in self.acoes_linhas:
                 valores = self.tabela.item(linha, 'values')
-                adiada = data_iso(valores[-2]) > data_iso(valores[-3]) or linha in self.atrasadas
+                atrasada = linha in self.atrasadas
+                adiada = data_iso(valores[-2]) > data_iso(valores[-3])
                 botao = ttk.Label(self.tabela, text=valores[-2], anchor='center', cursor='hand2',
-                                  style='PrevisaoAdiada.TLabel' if adiada else 'Previsao.TLabel')
+                                  style='PrevisaoAtrasada.TLabel' if atrasada else
+                                  'PrevisaoAdiada.TLabel' if adiada else 'Previsao.TLabel')
                 data_recebimento = self.recebimentos[linha]
                 recebido = data_recebimento is not None
                 estado = tk.BooleanVar(value=recebido)
                 caixa = ttk.Checkbutton(self.tabela, variable=estado,
                     text=data_br(data_recebimento) if recebido else '',
-                    style='Recebido.TCheckbutton' if recebido else 'Operacoes.TCheckbutton',
+                    style='Recebido.TCheckbutton' if recebido else
+                    'Atrasada.Operacoes.TCheckbutton' if atrasada else 'Operacoes.TCheckbutton',
                     command=lambda i=int(linha), v=estado, atual=recebido: self.abrir_recebimento(i, v, atual))
                 caixa.estado = estado
                 for widget in (botao, caixa):

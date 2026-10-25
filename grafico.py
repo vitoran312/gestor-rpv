@@ -3,7 +3,6 @@ import tkinter as tk
 from datetime import date
 from tkinter import ttk
 
-from componentes import centralizar
 from dados import moeda
 from tema import cores
 from visual import familia_fonte
@@ -117,20 +116,13 @@ class JanelaGrafico:
         self.app = aplicativo
         registros = aplicativo.banco.listar()
         self.dados = resumo_mensal(registros)
-        pai = aplicativo.historico if aplicativo.historico is not None and aplicativo.historico.winfo_exists() else aplicativo.janela
-        self.tela = tk.Toplevel(pai)
-        self.tela.withdraw()
-        self.tela.title('Gráfico mensal')
-        self.tela.configure(bg=cores()['fundo'])
-        self.tela.minsize(760, 520)
-        corpo = ttk.Frame(self.tela, padding=24)
+        self.tela = ttk.Frame(aplicativo.janela)
+        corpo = ttk.Frame(self.tela, padding=(24, 16, 24, 24))
         corpo.pack(fill='both', expand=True)
-        ttk.Label(corpo, text='Gráfico mensal', style='Titulo.TLabel').pack(anchor='w')
         investido = sum(i for _, i, _r in self.dados)
         recebido = sum(r for _, _i, r in self.dados)
-        ttk.Label(corpo, style='Subtitulo.TLabel',
-                  text=f'Últimos 12 meses: R$ {moeda(investido)} investidos e R$ {moeda(recebido)} recebidos.'
-                  ).pack(anchor='w', pady=(4, 16))
+        aplicativo.cabecalho_pagina(corpo, 'Gráfico mensal',
+                                    f'Últimos 12 meses: R$ {moeda(investido)} investidos e R$ {moeda(recebido)} recebidos.')
         legenda = ttk.Frame(corpo)
         legenda.pack(anchor='w', pady=(0, 8))
         for texto, estilo in (('Capital investido (data de aquisição)', 'LegendaInvestido.TLabel'),
@@ -144,9 +136,7 @@ class JanelaGrafico:
         self.detalhe = tk.StringVar(value='Passe o mouse sobre um mês para ver os valores.')
         ttk.Label(corpo, textvariable=self.detalhe, style='Discreto.TLabel').pack(anchor='w', pady=(10, 0))
         self.grafico.bind('<<MesDestacado>>', self.mostrar_detalhe)
-        self.tela.bind('<Escape>', lambda _: self.tela.destroy())
-        centralizar(self.tela, 960, 620)
-        self.tela.deiconify()
+        aplicativo.abrir_pagina(self.tela, 'Gráfico mensal')
 
     def mostrar_detalhe(self, _evento=None):
         destaque = self.grafico.mes_destacado
