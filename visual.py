@@ -57,15 +57,43 @@ def _codificar_png(largura,altura,dados):
             bloco(b'IDAT',zlib.compress(bytes(dados)))+bloco(b'IEND',b''))
 
 
+def _pixels_arredondados(cor,contorno,raio,largura,altura):
+    """Linhas de pixels RGBA de uma superfície pequena, calculada amostra a amostra."""
+    rgb,borda = _rgb(cor),_rgb(contorno or cor)
+    linhas = []
+    for indice,(dentro,miolo) in enumerate(_mascara_arredondada(largura,altura,raio)):
+        if indice%largura==0: linhas.append(bytearray())
+        peso = miolo/dentro if dentro else 0
+        linhas[-1].extend((*(round(a*peso+b*(1-peso)) for a,b in zip(rgb,borda)),round(255*dentro)))
+    return linhas
+
+
 @lru_cache(maxsize=48)
 def _png_arredondado(cor,contorno=None,raio=8,largura=40,altura=36):
-    """Superfície plana: preenchimento com contorno opcional de 1 px, sem sombra."""
-    rgb,borda = _rgb(cor),_rgb(contorno or cor)
+    """Superfície plana: preenchimento com contorno opcional de 1 px, sem sombra.
+
+    Só os cantos dependem do raio; o resto repete a faixa reta central. Por isso a imagem grande é montada
+    a partir de uma pequena, sem calcular pixel a pixel — o que permite gerar superfícies do tamanho real
+    dos cartões e botões (veja aplicar_superficies).
+    """
+    lado = raio+2
+    # Em formatos de pílula (menores que dois cantos), aquela dimensão é calculada inteira, sem esticar.
+    lx = lado if largura >= 2*lado else None
+    ly = lado if altura >= 2*lado else None
+    base = _pixels_arredondados(cor,contorno,raio,2*lx if lx else largura,2*ly if ly else altura)
+    def linha(j):
+        pixels = base[j]
+        if not lx:
+            return pixels
+        return pixels[:4*lx]+pixels[4*lx:4*lx+4]*(largura-2*lx)+pixels[4*lx:]
+    if ly:
+        linhas = [linha(j) for j in range(ly)]+[linha(ly)]*(altura-2*ly)+[linha(j) for j in range(ly,2*ly)]
+    else:
+        linhas = [linha(j) for j in range(altura)]
     dados = bytearray()
-    for indice,(dentro,miolo) in enumerate(_mascara_arredondada(largura,altura,raio)):
-        if indice%largura==0: dados.append(0)
-        peso = miolo/dentro if dentro else 0
-        dados.extend((*(round(a*peso+b*(1-peso)) for a,b in zip(rgb,borda)),round(255*dentro)))
+    for pixels in linhas:
+        dados.append(0)
+        dados.extend(pixels)
     return _codificar_png(largura,altura,dados)
 
 
@@ -144,11 +172,14 @@ def aplicar_superficies(raiz):
                                   ('primario',c['primario'],None),('primario_ativo',c['primario_ativo'],None),
                                   ('primario_pressionado',c['primario_pressionado'],None),
                                   ('inativo',c['fundo'],c['borda_suave'])):
-            imagens[nome] = tk.PhotoImage(master=raiz,data=_png_arredondado(cor,contorno))
-        imagens['filtro'] = tk.PhotoImage(master=raiz,data=_png_arredondado(c['fundo'],c['borda_suave'],16,40,32))
-        imagens['filtro_ativo'] = tk.PhotoImage(master=raiz,data=_png_arredondado(c['ativo'],c['borda'],16,40,32))
-        imagens['filtro_selecionado'] = tk.PhotoImage(master=raiz,data=_png_arredondado(c['realce'],c['floresta'],16,40,32))
-        imagens['cartao'] = tk.PhotoImage(master=raiz,data=_png_arredondado(c['superficie'],c['borda_suave'],12,48,48))
+            imagens[nome] = tk.PhotoImage(master=raiz,data=_png_arredondado(cor,contorno,8,480,48))
+        # O ttk preenche o miolo repetindo a imagem como azulejos; no Windows, centenas de azulejos pequenos
+        # com transparência tornavam lenta a troca de tema. Imagens do tamanho real cobrem cada superfície
+        # com um ou dois azulejos; os tamanhos mínimos das superfícies continuam os mesmos.
+        imagens['filtro'] = tk.PhotoImage(master=raiz,data=_png_arredondado(c['fundo'],c['borda_suave'],16,240,32))
+        imagens['filtro_ativo'] = tk.PhotoImage(master=raiz,data=_png_arredondado(c['ativo'],c['borda'],16,240,32))
+        imagens['filtro_selecionado'] = tk.PhotoImage(master=raiz,data=_png_arredondado(c['realce'],c['floresta'],16,240,32))
+        imagens['cartao'] = tk.PhotoImage(master=raiz,data=_png_arredondado(c['superficie'],c['borda_suave'],12,1200,800))
         prefixo = 'Pro'+chave[1:]
         for nome,normal,hover,pressionado in (('secundario','botao','ativo','pressionado'),
                                               ('primario','primario','primario_ativo','primario_pressionado')):
