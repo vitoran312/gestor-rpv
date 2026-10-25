@@ -1,0 +1,24 @@
+name: Medir troca de tema
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  medir:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: x64
+      - name: Ajustar resolucao da tela
+        shell: pwsh
+        run: |
+          try { Set-DisplayResolution -Width 1920 -Height 1080 -Force -ErrorAction Stop } catch { Write-Host "::warning title=Resolucao::$($_.Exception.Message)" }
+      - name: Medir troca de tema
+        timeout-minutes: 5
+        run: python scripts/medir_tema.py
