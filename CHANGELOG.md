@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## 0.25.0
+
+- Fontes nítidas no Windows com escala de tela acima de 100%: o programa declara suporte a DPI e deixa
+  de ser ampliado como imagem, o que borrava e serrilhava as letras.
+- Janelas, colunas, linhas das tabelas, cartão de contas e quebras de texto acompanham a escala da tela.
+
 ## 0.24.1
 
 - Contas de recebimento voltam ao layout simples (botões, lista e aviso), agora dentro de um cartão

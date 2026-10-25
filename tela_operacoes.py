@@ -8,6 +8,7 @@ from dados import moeda, data_iso, data_br, situacao
 from grafico import JanelaGrafico
 import demonstracao
 from componentes import centralizar
+from visual import px
 from tema import cores
 from ordenacao import ordenar
 from selecao import habilitar_selecao, pressionar_linha, arrastar
@@ -116,7 +117,7 @@ class OperacoesMixin:
         for coluna, titulo in zip(colunas, titulos):
             alinhamento = alinhamentos.get(coluna, 'center')
             self.tabela.heading(coluna, text=titulo, anchor=alinhamento, command=lambda c=coluna: self.ordenar_coluna(c))
-            largura = max(280 if coluna=='nome' else 160,tkfont.Font(font=(self.fonte,18)).measure(titulo)+40)
+            largura = max(px(self.janela,280 if coluna=='nome' else 160),tkfont.Font(font=(self.fonte,18)).measure(titulo)+px(self.janela,40))
             self.tabela.column(coluna,width=largura,minwidth=100,anchor=alinhamento)
         self.acoes_linhas = {}
         self.reposicionar_pendente = False
@@ -167,7 +168,7 @@ class OperacoesMixin:
         self.botao_lixeira.grid(row=0,column=1,rowspan=3,sticky='se',padx=(16,0))
         self.texto_ultimo_backup=tk.StringVar()
         ttk.Label(rodape,textvariable=self.texto_ultimo_backup,style='Discreto.TLabel').grid(row=1,column=0,sticky='w',padx=6,pady=(8,0))
-        aviso = ttk.Label(rodape,textvariable=self.texto_aviso_backup,style='BackupAviso.TLabel',cursor='hand2',wraplength=760)
+        aviso = ttk.Label(rodape,textvariable=self.texto_aviso_backup,style='BackupAviso.TLabel',cursor='hand2',wraplength=px(rodape,760))
         aviso.grid(row=2,column=0,sticky='w',padx=6)
         aviso.bind('<Button-1>',lambda _: self.exportar_backup())
         # Atalhos ficam na janela principal e só agem com a página de operações à frente.
@@ -421,7 +422,7 @@ class OperacoesMixin:
         tela.withdraw()
         tela.title('Lixeira')
         tela.configure(bg=cores()['fundo'])
-        tela.minsize(620,350)
+        tela.minsize(px(tela,620),px(tela,350))
         corpo = ttk.Frame(tela,padding=20)
         corpo.pack(fill='both',expand=True)
         corpo.rowconfigure(0,weight=1)
@@ -429,7 +430,7 @@ class OperacoesMixin:
         tabela = ttk.Treeview(corpo,columns=('nome','data','removido'),show='headings')
         for chave,titulo in (('nome','Titular'),('data','Data de Aquisição'),('removido','Enviado à lixeira')):
             tabela.heading(chave,text=titulo)
-            tabela.column(chave,width=220,anchor='center')
+            tabela.column(chave,width=px(tabela,220),anchor='center')
         tabela.grid(row=0,column=0,sticky='nsew')
         scroll = ttk.Scrollbar(corpo,orient='vertical',command=tabela.yview)
         tabela.configure(yscrollcommand=scroll.set)

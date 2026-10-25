@@ -6,6 +6,7 @@ from tkinter import messagebox, filedialog, ttk
 
 from backup import criar_backup, BackupPreparado, aviso_backup, executar_backup_automatico, PASTA_AUTOMATICA
 from componentes import centralizar
+from visual import px
 from tema import cores
 from documentos import abrir_pasta
 from exportacao import exportar_excel, nome_sugerido
@@ -68,13 +69,13 @@ class ArquivosMixin:
         corpo = ttk.Frame(tela, padding=24)
         corpo.pack(fill='both', expand=True)
         ttk.Label(corpo, text='Backup automático', style='Titulo.TLabel').pack(anchor='w')
-        ttk.Label(corpo, wraplength=520, justify='left', style='Subtitulo.TLabel', text=(
+        ttk.Label(corpo, wraplength=px(corpo, 520), justify='left', style='Subtitulo.TLabel', text=(
             'Uma vez por semana, o programa salva sozinho uma cópia completa — dados e documentos — na pasta '
             'escolhida. Prefira uma pasta sincronizada, como OneDrive ou Google Drive, para ter uma cópia fora '
             'deste computador.')).pack(anchor='w', pady=(6, 16))
         situacao = tk.StringVar()
-        ttk.Label(corpo, textvariable=situacao, wraplength=520, justify='left').pack(anchor='w')
-        ttk.Label(corpo, wraplength=520, justify='left', style='Discreto.TLabel', text=(
+        ttk.Label(corpo, textvariable=situacao, wraplength=px(corpo, 520), justify='left').pack(anchor='w')
+        ttk.Label(corpo, wraplength=px(corpo, 520), justify='left', style='Discreto.TLabel', text=(
             'São mantidas as 10 cópias automáticas mais recentes. Backups feitos manualmente na mesma pasta '
             'não são apagados.')).pack(anchor='w', pady=(8, 20))
         botoes = ttk.Frame(corpo)

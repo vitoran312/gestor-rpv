@@ -5,6 +5,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 from componentes import centralizar, AreaRolavel
+from visual import px
 from selecao import habilitar_selecao, pressionar_linha, arrastar
 from dados import validar_cpf, ESTADOS
 from interacao import aplicar_formato, aplicar_cpf, capitalizar_inicio, formatar_cpf, novo_menu, mostrar_menu, copiar_texto
@@ -58,8 +59,8 @@ class JanelaContas:
 
     def posicionar_cartao(self, evento):
         """Metade da largura e pouco mais da metade da altura, sem ficar menor que os botões ou maior que a área."""
-        largura = min(evento.width, max(660, evento.width // 2))
-        altura = min(evento.height, max(380, int(evento.height * 0.6)))
+        largura = min(evento.width, max(px(self.cartao, 660), evento.width // 2))
+        altura = min(evento.height, max(px(self.cartao, 380), int(evento.height * 0.6)))
         self.cartao.place(relx=0.5, rely=0.45, anchor='center', width=largura, height=altura)
 
     def atualizar(self):
@@ -210,7 +211,7 @@ class JanelaContas:
             elif chave in ('identificacao', 'nome', 'endereco', 'cidade', 'banco'):
                 aplicar_formato(entrada, campos[chave], str.title if chave in ('nome', 'endereco', 'cidade') else capitalizar_inicio)
         ttk.Label(quadro, text='Alterações não modificam os dados de recebimento guardados nas RPVs antigas.',
-                  wraplength=600).grid(row=11, column=0, columnspan=2, pady=12)
+                  wraplength=px(quadro, 600)).grid(row=11, column=0, columnspan=2, pady=12)
 
         def salvar():
             try:

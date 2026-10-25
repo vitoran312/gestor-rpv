@@ -2,7 +2,7 @@
 from tkinter import font as tkfont
 
 from tema import cores
-from visual import aplicar_superficies
+from visual import aplicar_superficies, px
 
 
 def criar_estilos(janela, estilo, fonte):
@@ -70,7 +70,7 @@ def criar_estilos(janela, estilo, fonte):
     estilo.configure('LegendaInvestido.TLabel',foreground=c['floresta'],font=(fonte,12))
     estilo.configure('LegendaRecebido.TLabel',foreground=c['verde'],font=(fonte,12))
     estilo.configure('Recebido.TLabel',foreground=c['verde'],font=(fonte,10,'bold'))
-    estilo.configure('Ajuda.TLabel',font=(fonte,10),background=campo,foreground=texto,padding=12,wraplength=320,
+    estilo.configure('Ajuda.TLabel',font=(fonte,10),background=campo,foreground=texto,padding=12,wraplength=px(janela,320),
                      relief='solid',borderwidth=1,bordercolor=c['borda_suave'])
     estilo.configure('TSeparator',background=c['borda_suave'])
 
@@ -90,7 +90,7 @@ def criar_estilos(janela, estilo, fonte):
     estilo.configure('Dinheiro.TLabel',background=campo,foreground=c['secundario'])
 
     # Tabelas: linhas limpas, cabeçalho discreto e seleção em tom suave da marca.
-    estilo.configure('Treeview',background=campo,fieldbackground=campo,foreground=texto,rowheight=40,
+    estilo.configure('Treeview',background=campo,fieldbackground=campo,foreground=texto,rowheight=px(janela,40),
                      borderwidth=1,bordercolor=c['borda_suave'],lightcolor=campo,darkcolor=campo)
     estilo.map('Treeview',background=[('selected',c['selecao'])],foreground=[('selected',c['texto_selecao'])])
     estilo.configure('Treeview.Cell',padding=(14,0))
@@ -98,7 +98,7 @@ def criar_estilos(janela, estilo, fonte):
                      padding=(14,10),relief='flat',borderwidth=0,bordercolor=c['borda_suave'],
                      lightcolor=c['sage'],darkcolor=c['borda_suave'])
     estilo.map('Treeview.Heading',background=[('active',c['ativo'])],foreground=[('active',texto)])
-    estilo.configure('Operacoes.Treeview',font=(fonte,12),rowheight=max(52,tkfont.Font(font=(fonte,12)).metrics('linespace')+18))
+    estilo.configure('Operacoes.Treeview',font=(fonte,12),rowheight=max(px(janela,52),tkfont.Font(font=(fonte,12)).metrics('linespace')+px(janela,18)))
     estilo.configure('Operacoes.Treeview.Heading',font=(fonte,18))
     estilo.configure('Operacoes.TCheckbutton',font=(fonte,12),background=campo)
     estilo.map('Operacoes.TCheckbutton',background=[('active',c['ativo']),('!disabled',campo)])
@@ -111,7 +111,7 @@ def criar_estilos(janela, estilo, fonte):
     estilo.configure('PrevisaoAdiada.TLabel',background=campo,foreground=c['vermelho'],font=(fonte,12),anchor='center')
     estilo.configure('ContaSituacao.TLabel',font=(fonte,12,'bold'),background=campo)
     estilo.configure('ContaIncompleta.TLabel',font=(fonte,12,'bold'),foreground=c['vermelho'],background=campo)
-    estilo.configure('Contas.Treeview',font=(fonte,12),rowheight=44)
+    estilo.configure('Contas.Treeview',font=(fonte,12),rowheight=max(px(janela,44),tkfont.Font(font=(fonte,12)).metrics('linespace')+px(janela,16)))
     estilo.configure('Contas.Treeview.Heading',font=(fonte,11,'bold'))
 
     # Barras de rolagem finas, sem setas nem ranhuras.

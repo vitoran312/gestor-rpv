@@ -10,7 +10,7 @@ from componentes import centralizar, maximizar
 from contas import JanelaContas
 from versao import VERSAO
 from tema import cores, definir_modo, atualizar_widgets
-from visual import familia_fonte, Icone, icone_tema
+from visual import familia_fonte, Icone, icone_tema, px
 from calculadora import JanelaCalculadora
 from interacao import instalar_menu_texto
 from estilos import criar_estilos
@@ -33,7 +33,7 @@ class Aplicativo(NavegacaoMixin, OperacoesMixin, RegistroMixin, ArquivosMixin):
         janela.withdraw()
         janela.title('Gestor de RPV')
         aplicar_icone(janela)
-        janela.minsize(900, 620)
+        janela.minsize(px(janela, 900), px(janela, 620))
         janela.configure(bg=cores()['fundo'])
         self.paginas = []
         self.historico = None
@@ -95,7 +95,7 @@ class Aplicativo(NavegacaoMixin, OperacoesMixin, RegistroMixin, ArquivosMixin):
         self.aviso_atrasadas_inicio.bind('<Button-1>',lambda _: self.mostrar_atrasadas())
         self.texto_aviso_backup = tk.StringVar()
         self.aviso_backup_inicio = ttk.Label(avisos,textvariable=self.texto_aviso_backup,
-            style='BackupAviso.TLabel',cursor='hand2',wraplength=760)
+            style='BackupAviso.TLabel',cursor='hand2',wraplength=px(janela,760))
         self.aviso_backup_inicio.pack(anchor='w')
         self.aviso_backup_inicio.bind('<Button-1>',lambda _: self.exportar_backup())
         rodape_inicio = ttk.Frame(inicio)
@@ -241,7 +241,7 @@ class Aplicativo(NavegacaoMixin, OperacoesMixin, RegistroMixin, ArquivosMixin):
         corpo.pack(fill='both',expand=True)
         ttk.Label(corpo,image=self.janela._marca_vitoran).pack(pady=(0,12))
         ttk.Label(corpo,text='Gestor de RPV',style='Titulo.TLabel').pack()
-        ttk.Label(corpo,text='Organização de operações e recebimentos de RPV.',wraplength=430,
+        ttk.Label(corpo,text='Organização de operações e recebimentos de RPV.',wraplength=px(tela,430),
                   justify='center',style='Subtitulo.TLabel').pack(pady=(8,20))
         ttk.Label(corpo,text='Vitoran Tech',font=(self.fonte,13,'bold')).pack()
         ttk.Label(corpo,text='Desenvolvido por Vitor Alves Nascimento').pack(pady=(6,0))

@@ -6,6 +6,7 @@ from datetime import date, datetime
 from tkinter import messagebox, ttk, filedialog
 
 from dados import centavos, moeda, data_iso, data_br, previsao_por_prazo
+from visual import px
 from componentes import CampoMoeda, CampoData, centralizar, AreaRolavel, BalaoAjuda
 from contas import dados_para_copiar
 from tema import cores
@@ -264,8 +265,8 @@ class RegistroMixin:
             lista = ttk.Treeview(corpo,columns=('nome','situacao'),show='headings',selectmode='browse')
             lista.heading('nome',text='Documento')
             lista.heading('situacao',text='Situação')
-            lista.column('nome',width=370)
-            lista.column('situacao',width=160)
+            lista.column('nome',width=px(lista,370))
+            lista.column('situacao',width=px(lista,160))
             lista.pack(fill='both',expand=True)
             caminhos = {}
 
@@ -359,11 +360,11 @@ class RegistroMixin:
         corpo = ttk.Frame(tela, padding=20)
         corpo.pack(fill='both', expand=True)
         texto = dados_para_copiar(conta)
-        rotulo_dados = ttk.Label(corpo, text=texto, wraplength=550)
+        rotulo_dados = ttk.Label(corpo, text=texto, wraplength=px(corpo, 550))
         rotulo_dados.pack(anchor='w', pady=(0, 15))
         menu_copia(rotulo_dados, lambda: texto)
         if registro and registro['conta_id'] == conta_id:
-            ttk.Label(corpo, text='Dados preservados do cadastro desta operação.', wraplength=550).pack(anchor='w', pady=(0, 15))
+            ttk.Label(corpo, text='Dados preservados do cadastro desta operação.', wraplength=px(corpo, 550)).pack(anchor='w', pady=(0, 15))
 
         def fechar():
             tela.destroy()
@@ -461,7 +462,7 @@ class RegistroMixin:
         historico=ttk.Treeview(quadro_historico,columns=('anterior','nova','quando'),show='headings',height=4)
         for coluna,titulo in (('anterior','Previsão anterior'),('nova','Nova previsão'),('quando','Alterada em')):
             historico.heading(coluna,text=titulo)
-            historico.column(coluna,width=180,anchor='center')
+            historico.column(coluna,width=px(historico,180),anchor='center')
         historico.pack(side='left',fill='both',expand=True)
         for item in self.banco.historico_previsoes(identificador):
             historico.insert('','end',values=(data_br(item['anterior']),data_br(item['nova']),

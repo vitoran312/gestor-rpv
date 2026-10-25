@@ -5,7 +5,7 @@ from tkinter import ttk
 
 from dados import moeda
 from tema import cores
-from visual import familia_fonte
+from visual import familia_fonte, px
 
 MESES = ('jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez')
 
@@ -56,7 +56,7 @@ def escala(maximo):
 
 class GraficoMensal(tk.Canvas):
     def __init__(self, pai, dados):
-        super().__init__(pai, highlightthickness=0, bd=0, height=360)
+        super().__init__(pai, highlightthickness=0, bd=0, height=px(pai, 360))
         self.dados = dados
         self.fonte = familia_fonte(self)
         self.barras = []

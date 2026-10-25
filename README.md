@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.24.1
+# Gestor de RPV — 0.25.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -14,7 +14,7 @@ python app.py
 
 Mantenha todos os arquivos `.py` e a pasta `recursos` juntos. Essa pasta contém o ícone da Vitoran Tech.
 A tela inicial tem os botões **Nova entrada**, **Minhas operações**,
-**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.24.1**, acompanhada do emblema com 50% de opacidade,
+**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.25.0**, acompanhada do emblema com 50% de opacidade,
 aparece no canto inferior direito.
 O número é lido da versão do programa e acompanha cada atualização.
 O programa funciona em uma única janela, que abre maximizada. **Minhas operações**, **Contas de
@@ -46,6 +46,9 @@ aparência; o menu **Exibir** do histórico oferece as mesmas opções.
   Os botões não mostram retângulo tracejado após o clique; a navegação por
   teclado e a ativação pela barra de espaço continuam disponíveis.
 - Fonte Segoe UI no Windows, com alternativas locais em outros sistemas.
+- Texto nítido com a escala de tela do Windows em 125%, 150% ou mais: o programa informa ao Windows que
+  trata a escala sozinho, em vez de ser desenhado em 100% e esticado. Tamanhos de janelas, colunas,
+  linhas das tabelas e quebras de texto acompanham a escala.
 - Minhas operações com cabeçalhos de 18 pontos em tom discreto e entradas de 12 pontos,
   linhas alternadas e quatro indicadores em cartões alinhados. Nomes e contas ficam à esquerda,
   valores à direita e datas centralizadas, com margem interna nas células.

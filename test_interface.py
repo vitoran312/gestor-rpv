@@ -1450,6 +1450,24 @@ class TestInterface(unittest.TestCase):
         self.assertGreaterEqual(cartao.winfo_width(), min(660, area.winfo_width()))
         self.assertLessEqual(cartao.winfo_width(), area.winfo_width())
 
+    def test_medidas_acompanham_a_escala_da_tela(self):
+        from visual import fator_escala, px
+        for dpi, fator in ((72.0, 1.0), (96.0, 1.0), (120.0, 1.25), (144.0, 1.5)):
+            with self.subTest(dpi=dpi):
+                if hasattr(self.root, '_fator_escala'):
+                    del self.root._fator_escala
+                with patch.object(tk.Misc, 'winfo_fpixels', return_value=dpi):
+                    self.assertAlmostEqual(fator_escala(self.root), fator)
+                    self.assertEqual(px(self.root, 40), round(40 * fator))
+        del self.root._fator_escala
+        tela = tk.Toplevel(self.root)
+        with patch.object(tk.Misc, 'winfo_fpixels', return_value=144.0):
+            from componentes import centralizar
+            centralizar(tela, 400, 300)
+        self.root.update()
+        self.assertEqual((tela.winfo_width(), tela.winfo_height()), (600, 450))
+        tela.destroy()
+
     def test_outro_tema_preparado_em_segundo_plano_sem_trocar_o_visivel(self):
         estilo = ttk.Style(self.root)
         self.assertNotIn('VitoranProEscuro', estilo.theme_names())

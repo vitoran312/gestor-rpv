@@ -12,6 +12,10 @@ def centralizar(janela, largura=None, altura=None):
     if not janela.winfo_exists():
         return
     janela.update_idletasks()
+    # Medidas explícitas foram pensadas para 100% de escala; o tamanho natural já vem na escala da tela.
+    fator = max(1.0, janela.winfo_fpixels('1i') / 96)
+    largura = round(largura * fator) if largura else None
+    altura = round(altura * fator) if altura else None
     tela_largura = janela.winfo_screenwidth()
     tela_altura = janela.winfo_screenheight()
     largura = min(largura or janela.winfo_reqwidth(), max(320, tela_largura - 80))

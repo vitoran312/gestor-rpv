@@ -17,6 +17,19 @@ def familia_fonte(raiz):
     return raiz._familia_pro
 
 
+def fator_escala(widget):
+    """Quanto a tela amplia em relação a 96 DPI (1,0 em 100%, 1,5 em 150%); nunca reduz."""
+    raiz = widget._root()
+    if not hasattr(raiz, '_fator_escala'):
+        raiz._fator_escala = max(1.0, raiz.winfo_fpixels('1i') / 96)
+    return raiz._fator_escala
+
+
+def px(widget, valor):
+    """Converte uma medida pensada para 100% de escala em pixels da tela atual."""
+    return round(valor * fator_escala(widget))
+
+
 def _rgb(cor):
     return tuple(int(cor[i:i+2],16) for i in (1,3,5))
 

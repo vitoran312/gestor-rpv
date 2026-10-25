@@ -8,10 +8,21 @@ RECURSOS = Path(__file__).resolve().parent / 'recursos'
 
 
 def preparar_windows():
-    """Agrupa as janelas com a marca do aplicativo na barra de tarefas."""
+    """Agrupa as janelas na barra de tarefas e desenha o texto na resolução real da tela.
+
+    Sem declarar suporte a DPI, o Windows desenha o programa em 100% e estica a imagem quando a escala
+    da tela é 125% ou 150%, deixando as letras borradas ou serrilhadas. Precisa rodar antes de criar o Tk.
+    """
     if sys.platform == 'win32':
         import ctypes
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('VitoranTech.GestorRPV')
+        try:
+            ctypes.windll.shcore.SetProcessDpiAwareness(1)  # Escala do sistema (Windows 8.1 ou mais novo).
+        except (AttributeError, OSError):
+            try:
+                ctypes.windll.user32.SetProcessDPIAware()  # Windows mais antigo.
+            except (AttributeError, OSError):
+                pass
 
 
 def aplicar_icone(raiz):
