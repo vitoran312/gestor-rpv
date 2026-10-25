@@ -1,5 +1,10 @@
 # Histórico de versões
 
+## 0.24.1
+
+- Contas de recebimento voltam ao layout simples (botões, lista e aviso), agora dentro de um cartão
+  centralizado com cerca de metade do tamanho da área livre. O painel de detalhes da 0.24.0 foi retirado.
+
 ## 0.24.0
 
 - Contas de recebimento em lista e detalhes: a conta selecionada mostra dados bancários, situação,

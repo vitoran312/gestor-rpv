@@ -113,14 +113,6 @@ def criar_estilos(janela, estilo, fonte):
     estilo.configure('ContaIncompleta.TLabel',font=(fonte,12,'bold'),foreground=c['vermelho'],background=campo)
     estilo.configure('Contas.Treeview',font=(fonte,12),rowheight=44)
     estilo.configure('Contas.Treeview.Heading',font=(fonte,11,'bold'))
-    estilo.configure('ContaOperacoes.Treeview',font=(fonte,10),rowheight=34)
-    # Página de contas: resumo, cartão de detalhes e selos de situação.
-    estilo.configure('ContasResumo.TLabel',background=fundo,foreground=c['secundario'],font=(fonte,11))
-    for nome,tamanho,peso,cor in (('DetalheTitulo.TLabel',20,'bold',texto),('DetalheRotulo.TLabel',9,'normal',c['secundario']),
-                                  ('DetalheValor.TLabel',11,'normal',texto),('DetalheSecao.TLabel',12,'bold',texto),
-                                  ('SeloAtiva.TLabel',10,'bold',c['verde']),('SeloDesativada.TLabel',10,'bold',c['secundario']),
-                                  ('SeloIncompleta.TLabel',10,'bold',c['vermelho'])):
-        estilo.configure(nome,background=c['superficie'],foreground=cor,font=(fonte,tamanho,peso))
 
     # Barras de rolagem finas, sem setas nem ranhuras.
     for orientacao,lado in (('Vertical','ns'),('Horizontal','ew')):

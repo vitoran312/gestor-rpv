@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.24.0
+# Gestor de RPV — 0.24.1
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -14,7 +14,7 @@ python app.py
 
 Mantenha todos os arquivos `.py` e a pasta `recursos` juntos. Essa pasta contém o ícone da Vitoran Tech.
 A tela inicial tem os botões **Nova entrada**, **Minhas operações**,
-**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.24.0**, acompanhada do emblema com 50% de opacidade,
+**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.24.1**, acompanhada do emblema com 50% de opacidade,
 aparece no canto inferior direito.
 O número é lido da versão do programa e acompanha cada atualização.
 O programa funciona em uma única janela, que abre maximizada. **Minhas operações**, **Contas de
@@ -92,11 +92,8 @@ A busca continua acima da tabela. Os menus de clique direito permanecem disponí
 
 ## Contas de recebimento
 
-A página tem a lista de contas à esquerda e, à direita, os detalhes da conta selecionada: CPF,
-chave Pix, banco, agência, conta, endereço e situação, com os botões **Editar**, **Copiar dados**,
-**Desativar/Reativar** e **Remover**. Abaixo aparecem as **operações que usam a conta** — atrasadas
-primeiro, depois pendentes e por último as recebidas —, com o total a receber e o já recebido.
-No topo, um resumo mostra quantas contas existem, quantas estão ativas e quantas precisam ser completadas.
+A lista e seus botões ficam num cartão centralizado, com cerca de metade do tamanho da área livre,
+sem ocupar a tela toda. Em janelas estreitas o cartão cresce o necessário para os botões caberem.
 
 A lista usa fonte de 12 pontos, dois pontos maior que o padrão da interface,
 com altura das linhas e largura da janela ajustadas para a leitura.

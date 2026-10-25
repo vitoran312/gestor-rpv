@@ -1427,46 +1427,28 @@ class TestInterface(unittest.TestCase):
         self.assertEqual(novo.contas(), [])
         self.assertFalse(self.programa.aviso_demonstracao.winfo_ismapped())
 
-    def test_contas_lista_e_detalhes_com_operacoes_da_conta(self):
-        from test_contas import dados_conta, dados_rpv
-        principal = self.banco.salvar_conta(dados_conta())
-        recebida = self.banco.salvar(dados_rpv(nome='Recebida', conta_id=principal, aquisicao='2020-01-01', previsao='2020-02-01'))
-        self.banco.registrar_recebimento(recebida, '2020-03-01')
-        self.banco.salvar(dados_rpv(nome='Pendente', conta_id=principal, aquisicao='2020-01-01', previsao='2099-01-01'))
-        self.banco.salvar(dados_rpv(nome='Atrasada', conta_id=principal, aquisicao='2020-01-01', previsao='2020-02-01'))
+    def test_contas_em_cartao_centralizado_com_metade_da_area(self):
+        self.root.geometry('1600x900')
         self.programa.mostrar_contas()
         self.root.update()
         janela = self.programa.janela_contas
-        self.assertEqual(janela.texto_resumo.get(), '3 contas · 3 ativas · 2 a completar')
-        primeira = janela.tabela.get_children()[0]
-        self.assertEqual(janela.tabela.selection(), (primeira,))
-        janela.tabela.selection_set(str(principal))
+        area, cartao = janela.area, janela.cartao
+        self.assertEqual(cartao.winfo_manager(), 'place')
+        self.assertEqual(str(cartao.cget('style')), 'Cartao.TFrame')
+        self.assertAlmostEqual(cartao.winfo_width(), area.winfo_width() // 2, delta=2)
+        self.assertLess(cartao.winfo_height(), area.winfo_height())
+        centro_cartao = cartao.winfo_rootx() + cartao.winfo_width() / 2
+        centro_area = area.winfo_rootx() + area.winfo_width() / 2
+        self.assertLessEqual(abs(centro_cartao - centro_area), 2)
+        for texto in ('Cadastrar nova conta', 'Ver / Editar', 'Desativar / Reativar', 'Remover'):
+            item = botao(cartao, texto)
+            self.assertTrue(item.winfo_ismapped())
+            self.assertLessEqual(item.winfo_rootx() + item.winfo_width(), cartao.winfo_rootx() + cartao.winfo_width())
+        self.assertIs(janela.tabela.master, cartao)
+        self.root.geometry('900x620')
         self.root.update()
-        textos = [w.cget('text') for w in filhos(janela.detalhe) if isinstance(w, ttk.Label)]
-        for esperado in ('Conta teste', 'Titular De Teste', '529.982.247-25', 'teste@example.com', '● Ativa',
-                         'Operações nesta conta (3)'):
-            self.assertIn(esperado, textos)
-        lista = next(w for w in filhos(janela.detalhe) if isinstance(w, ttk.Treeview))
-        self.assertEqual([lista.item(i, 'values')[0] for i in lista.get_children()], ['Atrasada', 'Pendente', 'Recebida'])
-        self.assertEqual(list(lista.item(lista.get_children()[0], 'tags')), ['atrasada'])
-        botao(janela.detalhe, 'Copiar dados').invoke()
-        self.assertIn('CPF: 529.982.247-25', self.root.clipboard_get())
-        self.assertEqual(botao(janela.detalhe, 'Copiado ✓').cget('text'), 'Copiado ✓')
-        incompleta = next(i for i in janela.tabela.get_children() if i != str(principal))
-        janela.tabela.selection_set(incompleta)
-        self.root.update()
-        textos = [w.cget('text') for w in filhos(janela.detalhe) if isinstance(w, ttk.Label)]
-        self.assertIn('⚠ Completar cadastro', textos)
-        self.assertIn('Nenhuma operação usa esta conta.', textos)
-        janela.tabela.selection_set(str(principal))
-        janela.atualizar()
-        self.assertEqual(janela.tabela.selection(), (str(principal),))
-        self.banco.remover_contas([int(i) for i in janela.tabela.get_children()])
-        janela.atualizar()
-        self.root.update()
-        self.assertEqual(janela.texto_resumo.get(), 'Nenhuma conta cadastrada.')
-        textos = [w.cget('text') for w in filhos(janela.detalhe) if isinstance(w, ttk.Label)]
-        self.assertEqual(textos, ['Cadastre a primeira conta para receber suas operações.'])
+        self.assertGreaterEqual(cartao.winfo_width(), min(660, area.winfo_width()))
+        self.assertLessEqual(cartao.winfo_width(), area.winfo_width())
 
     def test_outro_tema_preparado_em_segundo_plano_sem_trocar_o_visivel(self):
         estilo = ttk.Style(self.root)

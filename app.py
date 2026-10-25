@@ -288,7 +288,6 @@ class Aplicativo(NavegacaoMixin, OperacoesMixin, RegistroMixin, ArquivosMixin):
             self.tabela.tag_configure('atrasada',foreground=c['vermelho'],background=c['atraso'])
         if self.janela_contas is not None and self.janela_contas.tela.winfo_exists():
             self.janela_contas.atualizar_situacoes()
-            self.janela_contas.mostrar_detalhe()
 
 
 if __name__ == '__main__':
