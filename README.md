@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.29.1
+# Gestor de RPV — 0.29.2
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -14,7 +14,7 @@ python app.py
 
 Mantenha todos os arquivos `.py` e a pasta `recursos` juntos. Essa pasta contém o ícone da Vitoran Tech.
 A tela inicial tem os botões **Nova entrada**, **Minhas operações**,
-**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.29.1**, acompanhada do emblema com 50% de opacidade,
+**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.29.2**, acompanhada do emblema com 50% de opacidade,
 aparece no canto inferior direito.
 O número é lido da versão do programa e acompanha cada atualização.
 O programa funciona em uma única janela, que abre maximizada. **Minhas operações**, **Contas de

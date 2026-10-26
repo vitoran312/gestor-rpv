@@ -199,7 +199,7 @@ class InicioMixin:
         tela.itemconfigure(self.janelas_inicio['sobre'], anchor='ne')
         topo_cabecalho = p(78)
         tela.coords(self.emblema_inicio, margem - p(16), topo_cabecalho + p(52))
-        texto_x = margem + p(112)
+        texto_x = margem + p(120)
         tela.coords(self.titulo_inicio, texto_x, topo_cabecalho + p(56))
         tela.coords(self.subtitulo_inicio, texto_x, topo_cabecalho + p(66))
         rodape = altura - p(24)

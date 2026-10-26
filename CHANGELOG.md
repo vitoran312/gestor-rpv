@@ -1,5 +1,9 @@
 # Histórico de versões
 
+## 0.29.2
+
+- Tela inicial: título afastado 8 px do emblema; no Windows, a imagem do emblema encostava no texto.
+
 ## 0.29.1
 
 - Operações recebidas com a linha inteira em verde (antes azul), nos dois temas. Contraste WCAG AA:
