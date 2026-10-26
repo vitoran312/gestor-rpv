@@ -62,6 +62,14 @@ def criar_estilos(janela, estilo, fonte):
     for tipo in ('TEntry','TCombobox'):
         estilo.configure('Form.'+tipo,padding=(13,9),arrowsize=17)
 
+    # Tela inicial: cartão em destaque, avisos em cartões e botão principal ampliado.
+    estilo.configure('DestaqueTitulo.TLabel',background=c['superficie'],foreground=texto,font=(fonte,28,'bold'))
+    estilo.configure('DestaqueTexto.TLabel',background=c['superficie'],foreground=c['secundario'],font=(fonte,13))
+    estilo.configure('Destaque.Principal.TButton',background=c['superficie'],font=(fonte,13,'bold'),padding=(20,13))
+    estilo.map('Destaque.Principal.TButton',background=[('disabled',c['superficie']),('!disabled',c['superficie'])])
+    estilo.configure('InicioAtrasadas.TLabel',background=c['superficie'],foreground=c['vermelho'],font=(fonte,11,'bold'))
+    estilo.configure('InicioBackup.TLabel',background=c['superficie'],foreground=c['vermelho'],font=(fonte,10))
+
     # Tipografia: títulos neutros e firmes; a cor da marca fica reservada às ações.
     for nome,tamanho,peso,cor in (
         ('InicioTitulo.TLabel',34,'bold',texto),

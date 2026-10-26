@@ -1,5 +1,19 @@
 # Histórico de versões
 
+## 0.28.0
+
+- Tela inicial reorganizada para ocupar a tela cheia sem espaços vazios: cabeçalho com o emblema à
+  esquerda do título, cartão Uma nova operação grande à esquerda (cerca de 56% da largura), os cartões
+  Tudo sob controle e Contas de recebimento empilhados à direita e o aviso de atrasadas ou de backup
+  logo abaixo deles. Em janelas estreitas, os cartões passam para baixo do cartão principal.
+- Entrada das placas de vidro mais longa, cerca de 4 segundos. Depois dela, as placas continuam
+  flutuando devagar, poucos pixels, sem parar.
+- Luzes de fundo translúcidas em pêssego e carmim que derivam lentamente atrás de toda a tela inicial,
+  nas cores de cada tema. Trocar de tema só troca as cores: o movimento continua de onde estava.
+- A animação pausa fora da tela inicial e com a janela minimizada. Uso de CPU medido (um núcleo):
+  ~19% durante a entrada, ~9% parado na tela inicial, ~1% nas outras páginas.
+- Textos, botões, navegação, banco de dados e regras de negócio permanecem inalterados.
+
 ## 0.27.0
 
 - Arte de placas de vidro translúcidas atrás do conteúdo do cartão Uma nova operação, com animação de

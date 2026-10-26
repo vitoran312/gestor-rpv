@@ -5,24 +5,24 @@ from datetime import date
 from tkinter import ttk
 
 import demonstracao
-from dados import Banco, situacao
+from dados import Banco
 from componentes import centralizar, maximizar
 from contas import JanelaContas
 from versao import VERSAO
 from tema import cores, definir_modo, atualizar_widgets
-from visual import familia_fonte, Icone, icone_tema, px
+from visual import familia_fonte, icone_tema, px
 from calculadora import JanelaCalculadora
 from interacao import instalar_menu_texto
 from estilos import criar_estilos
 from identidade import aplicar_icone, preparar_windows
-from arte_inicio import ArteVidro
+from tela_inicio import InicioMixin
 from navegacao import NavegacaoMixin
 from tela_operacoes import OperacoesMixin
 from tela_registro import RegistroMixin
 from tela_arquivos import ArquivosMixin
 
 
-class Aplicativo(NavegacaoMixin, OperacoesMixin, RegistroMixin, ArquivosMixin):
+class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, ArquivosMixin):
     def __init__(self, janela):
         self.janela = janela
         self.banco = Banco()
@@ -48,73 +48,7 @@ class Aplicativo(NavegacaoMixin, OperacoesMixin, RegistroMixin, ArquivosMixin):
         instalar_menu_texto(janela)
         janela.bind_all('<Map>', self.tematizar_novo_widget, add='+')
 
-        inicio = self.inicio = ttk.Frame(janela,padding=(40,24))
-        inicio.pack(fill='both',expand=True)
-        topo = ttk.Frame(inicio)
-        topo.grid(row=0,column=0,sticky='ew')
-        self.texto_alternar_tema = tk.StringVar()
-        self.botao_alternar_tema=ttk.Button(topo,textvariable=self.texto_alternar_tema,command=self.alternar_tema,width=15,compound='left')
-        self.botao_alternar_tema.pack(side='right')
-        ttk.Button(topo,text='Sobre',command=self.mostrar_sobre).pack(side='right',padx=(0,10))
-        # O emblema fica centralizado no espaço livre entre o topo e o título, que recebe
-        # a maior parte da sobra vertical. Por usar place, ele não aumenta a janela; em telas
-        # baixas é ocultado para não empurrar o rodapé.
-        inicio.columnconfigure(0,weight=1)
-        inicio.rowconfigure(1,weight=3)
-        inicio.rowconfigure(4,weight=1)
-        espaco_emblema = ttk.Frame(inicio)
-        espaco_emblema.grid(row=1,column=0,sticky='nsew')
-        self.emblema_inicio = ttk.Label(espaco_emblema,image=janela._marca_cabecalho)
-        espaco_emblema.bind('<Configure>',self.posicionar_emblema)
-        cabecalho = ttk.Frame(inicio)
-        cabecalho.grid(row=2,column=0,sticky='ew',pady=(24,24))
-        ttk.Label(cabecalho,text='Gestor de RPV',style='InicioTitulo.TLabel').pack(anchor='w')
-        ttk.Label(cabecalho,text='Registros, recebimentos e documentos. Tudo no seu lugar.',style='Subtitulo.TLabel').pack(anchor='w',pady=(10,0))
-        self.grade_inicio = ttk.Frame(inicio)
-        self.grade_inicio.grid(row=3,column=0,sticky='ew')
-        self.cartoes_inicio = []
-        self.partes_inicio = {}
-        for icone,titulo,descricao,rotulo,acao in (
-            ('entrada','Uma nova operação','Cadastre sua próxima aquisição\ne reúna os documentos da entrada.','Nova entrada',self.formulario),
-            ('historico','Tudo sob controle','Consulte valores, acompanhe prazos\ne confirme seus recebimentos.','Minhas operações',self.mostrar_historico),
-            ('contas','Contas de recebimento','Mantenha seus dados bancários\norganizados e sempre à mão.','Contas de recebimento',self.mostrar_contas)):
-            cartao = ttk.Frame(self.grade_inicio,style='Cartao.TFrame',padding=(26,24))
-            faixa = ttk.Frame(cartao,style='Superficie.TFrame')
-            faixa.pack(fill='x')
-            Icone(faixa,icone).pack(side='left')
-            rotulo_titulo = ttk.Label(cartao,text=titulo,style='CartaoTitulo.TLabel')
-            rotulo_titulo.pack(anchor='w',pady=(14,8))
-            rotulo_descricao = ttk.Label(cartao,text=descricao,style='CartaoTexto.TLabel',justify='left')
-            rotulo_descricao.pack(anchor='w')
-            botao_cartao = ttk.Button(cartao,text=rotulo,style='Inicio.Principal.TButton' if icone=='entrada' else 'Inicio.TButton',command=acao)
-            botao_cartao.pack(side='bottom',fill='x',pady=(20,8))
-            self.partes_inicio[cartao] = (faixa,rotulo_titulo,rotulo_descricao,botao_cartao)
-            if icone=='entrada':
-                # Arte de vidro atrás do conteúdo: criada depois, mas rebaixada abaixo dos demais elementos do cartão.
-                self.arte_inicio = ArteVidro(cartao)
-                self.arte_inicio.tk.call('lower', self.arte_inicio._w)  # No Canvas, lower() moveria desenhos, não o widget.
-                cartao.bind('<Configure>',lambda _: self.janela.after_idle(self.posicionar_arte),add='+')
-            self.cartoes_inicio.append(cartao)
-        self.colunas_inicio = None
-        self.grade_inicio.bind('<Configure>',self.organizar_inicio)
-        ttk.Frame(inicio).grid(row=4,column=0,sticky='nsew')
-        avisos = ttk.Frame(inicio)
-        avisos.grid(row=5,column=0,sticky='w',pady=(10,0))
-        self.texto_aviso_atrasadas = tk.StringVar()
-        self.aviso_atrasadas_inicio = ttk.Label(avisos,textvariable=self.texto_aviso_atrasadas,
-            style='AtrasadasAviso.TLabel',cursor='hand2')
-        self.aviso_atrasadas_inicio.bind('<Button-1>',lambda _: self.mostrar_atrasadas())
-        self.texto_aviso_backup = tk.StringVar()
-        self.aviso_backup_inicio = ttk.Label(avisos,textvariable=self.texto_aviso_backup,
-            style='BackupAviso.TLabel',cursor='hand2',wraplength=px(janela,760))
-        self.aviso_backup_inicio.pack(anchor='w')
-        self.aviso_backup_inicio.bind('<Button-1>',lambda _: self.exportar_backup())
-        rodape_inicio = ttk.Frame(inicio)
-        rodape_inicio.grid(row=6,column=0,sticky='ew',pady=(22,0))
-        ttk.Button(rodape_inicio,text='Sair',command=janela.destroy,width=12).pack(side='left')
-        self.assinatura_inicio = ttk.Label(rodape_inicio,text=f'Vitoran Tech · v{VERSAO}',image=janela._marca_rodape,
-                                           compound='left',style='Discreto.TLabel')
-        self.assinatura_inicio.pack(side='right')
+        self.construir_inicio(janela)
         self.atualizar_alternador_tema()
         self.atualizar_ultimo_backup()
         self.atualizar_aviso_atrasadas()
@@ -128,16 +62,11 @@ class Aplicativo(NavegacaoMixin, OperacoesMixin, RegistroMixin, ArquivosMixin):
         janela.bind('<Destroy>',self.cancelar_agendamento_backup,add='+')
         centralizar(janela, 1480, 980)
         janela.deiconify()
-        # A arte de vidro entra uma única vez, logo depois que a janela aparece.
+        # As placas de vidro entram logo depois que a janela aparece; o relógio mantém tudo flutuando.
         self.agendamento_arte = janela.after(250,self.arte_inicio.animar)
+        self.relogio_inicio.iniciar()
         # As páginas (operações, contas, gráfico) usam a mesma janela; maximizada, a tabela tem o espaço de antes.
         maximizar(janela)
-
-    def posicionar_emblema(self,evento):
-        if evento.height >= self.emblema_inicio.winfo_reqheight():
-            self.emblema_inicio.place(relx=0.5,rely=0.5,anchor='center')
-        else:
-            self.emblema_inicio.place_forget()
 
     def alternar_tema(self):
         self.modo_tema.set('escuro' if self.modo_tema.get()=='claro' else 'claro')
@@ -163,6 +92,8 @@ class Aplicativo(NavegacaoMixin, OperacoesMixin, RegistroMixin, ArquivosMixin):
                 self.janela.deletecommand(comando)
         finally:
             definir_modo(atual)
+        # As superfícies da tela inicial no outro tema também ficam prontas antes da primeira troca.
+        self.preparar_superficies_inicio(outro)
 
     def salvar_tema(self, modo):
         try:
@@ -175,68 +106,6 @@ class Aplicativo(NavegacaoMixin, OperacoesMixin, RegistroMixin, ArquivosMixin):
         if hasattr(self,'texto_alternar_tema'):
             self.texto_alternar_tema.set('Modo escuro' if self.modo_tema.get()=='claro' else 'Modo claro')
             self.botao_alternar_tema.configure(image=icone_tema(self.janela,self.modo_tema.get()))
-
-    def organizar_inicio(self,evento):
-        colunas = 3 if evento.width>=1050 else 1
-        if colunas == self.colunas_inicio:
-            return
-        self.colunas_inicio = colunas
-        for i in range(3):
-            self.grade_inicio.columnconfigure(i,weight=1 if i<colunas else 0,
-                                               uniform='inicio' if i<colunas else '')
-            self.grade_inicio.rowconfigure(i,weight=1 if colunas==1 or i==0 else 0)
-        for i,cartao in enumerate(self.cartoes_inicio):
-            faixa,titulo,descricao,botao = self.partes_inicio[cartao]
-            for filho in (faixa,titulo,descricao,botao):
-                filho.pack_forget()
-                filho.grid_forget()
-            cartao.configure(padding=(26,24) if colunas==3 else (18,12))
-            for coluna in range(3):
-                cartao.columnconfigure(coluna,weight=1 if coluna==(0 if colunas==3 else 1) else 0)
-            if colunas==3:
-                # Só o ícone ocupa a faixa, para não cobrir a arte de vidro à direita.
-                faixa.grid(row=0,column=0,sticky='w')
-                titulo.grid(row=1,column=0,sticky='w',pady=(14,8))
-                descricao.grid(row=2,column=0,sticky='w')
-                botao.grid(row=3,column=0,sticky='ew',pady=(20,8))
-            else:
-                faixa.grid(row=0,column=0,rowspan=2,sticky='w',padx=(0,18))
-                titulo.grid(row=0,column=1,sticky='w')
-                descricao.grid(row=1,column=1,sticky='w',pady=(4,0))
-                botao.grid(row=0,column=2,rowspan=2,sticky='e',padx=(18,0))
-            cartao.grid(row=i//colunas,column=i%colunas,sticky='nsew',padx=(4,4),pady=4)
-        self.janela.after_idle(self.posicionar_arte)
-
-    def posicionar_arte(self):
-        """A arte ocupa só o espaço livre do cartão Nova entrada: à direita dos textos, acima do botão."""
-        arte = self.arte_inicio
-        if not arte.winfo_exists():
-            return
-        cartao = arte.master
-        _faixa,titulo,descricao,botao = self.partes_inicio[cartao]
-        esquerda = max(titulo.winfo_x()+titulo.winfo_reqwidth(),descricao.winfo_x()+descricao.winfo_reqwidth())+px(cartao,16)
-        topo, direita = px(cartao,14), cartao.winfo_width()-px(cartao,14)
-        base = botao.winfo_y()-px(cartao,10)
-        # No layout em linha (janelas estreitas) ou sem espaço suficiente, a arte sai de cena.
-        if self.colunas_inicio!=3 or direita-esquerda<px(cartao,90) or base-topo<px(cartao,80):
-            arte.place_forget()
-        else:
-            # bordermode='outside': as medidas partem da borda externa do cartão, sem somar o padding.
-            arte.place(x=esquerda,y=topo,width=direita-esquerda,height=base-topo,bordermode='outside')
-
-    def atualizar_aviso_atrasadas(self):
-        """Varre as previsões atuais ao abrir e ao voltar ao início; nada depende de abrir a lista."""
-        try:
-            total = sum(situacao(r) == 'atrasada' for r in self.banco.listar())
-        except sqlite3.Error:
-            total = 0
-        self.texto_aviso_atrasadas.set(
-            '' if not total else f'{total} operação atrasada. Clique para ver.' if total == 1
-            else f'{total} operações atrasadas. Clique para ver.')
-        if total:
-            self.aviso_atrasadas_inicio.pack(anchor='w',pady=(0,6),before=self.aviso_backup_inicio)
-        else:
-            self.aviso_atrasadas_inicio.pack_forget()
 
     def mostrar_atrasadas(self):
         self.mostrar_historico()

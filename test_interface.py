@@ -934,8 +934,7 @@ class TestInterface(unittest.TestCase):
         form = self.formulario()
         opcoes = [w for w in filhos(form) if isinstance(w,ttk.Radiobutton)]
         self.assertEqual(len(opcoes),2)
-        assinatura = [w.cget('text') for w in filhos(self.root) if isinstance(w,ttk.Label)]
-        self.assertIn(f'Vitoran Tech · v{app.VERSAO}',assinatura)
+        self.assertEqual(self.programa.inicio.itemcget(self.programa.assinatura_inicio,'text'),f'Vitoran Tech · v{app.VERSAO}')
         def luminancia(cor):
             canais = [n/65535 for n in self.root.winfo_rgb(cor)]
             canais = [n/12.92 if n<=0.04045 else ((n+0.055)/1.055)**2.4 for n in canais]
@@ -972,10 +971,11 @@ class TestInterface(unittest.TestCase):
     def test_inicio_pro_acoes_visiveis_e_temas_sem_recriar_imagens(self):
         self.assertEqual(self.programa.modo_tema.get(),'claro')
         self.assertEqual([w for w in filhos(self.root) if isinstance(w,ttk.Entry)],[])
-        for largura,colunas in ((1286,3),(944,1)):
+        for largura,largo in ((1286,True),(944,False)):
             self.root.geometry(f'{largura}x668')
             self.root.update()
-            self.assertEqual(self.programa.colunas_inicio,colunas)
+            self.root.update()
+            self.assertEqual(self.programa.layout_largo_inicio,largo)
             for texto in ('Nova entrada','Minhas operações','Contas de recebimento','Sair'):
                 b=botao(self.root,texto)
                 self.assertTrue(b.winfo_ismapped())
@@ -1297,21 +1297,42 @@ class TestInterface(unittest.TestCase):
         self.root.update()
         self.assertEqual(self.banco.configuracao('tema'), 'claro')
 
-    def test_emblema_no_inicio_e_assinatura_com_icone(self):
-        self.assertEqual([str(i) for i in self.programa.emblema_inicio.cget('image')], [str(self.root._marca_cabecalho)])
+    def test_inicio_cabecalho_destaque_atalhos_e_avisos(self):
+        tela = self.programa.inicio
+        self.root.geometry('1420x900')
         self.root.update()
-        emblema = self.programa.emblema_inicio
-        centro_emblema = emblema.winfo_rootx() + emblema.winfo_width() / 2
-        centro_janela = self.root.winfo_rootx() + self.root.winfo_width() / 2
-        self.assertLessEqual(abs(centro_emblema - centro_janela), 2)
-        self.programa.posicionar_emblema(SimpleNamespace(height=emblema.winfo_reqheight() - 1))
-        self.assertFalse(emblema.winfo_manager())
-        self.programa.posicionar_emblema(SimpleNamespace(height=emblema.winfo_reqheight()))
-        self.assertEqual(emblema.winfo_manager(), 'place')
-        assinatura = self.programa.assinatura_inicio
-        self.assertEqual(assinatura.cget('text'), f'Vitoran Tech · v{app.VERSAO}')
-        self.assertEqual([str(i) for i in assinatura.cget('image')], [str(self.root._marca_rodape)])
-        self.assertEqual(str(assinatura.cget('compound')), 'left')
+        self.root.update()
+        # Emblema à esquerda do título; título, subtítulo e assinatura são textos do Canvas, sem caixas de fundo.
+        self.assertEqual(tela.itemcget(self.programa.emblema_inicio, 'image'), str(self.root._marca_vitoran))
+        self.assertLess(tela.bbox(self.programa.emblema_inicio)[2], tela.bbox(self.programa.titulo_inicio)[0])
+        self.assertEqual(tela.itemcget(self.programa.titulo_inicio, 'text'), 'Gestor de RPV')
+        self.assertEqual(tela.itemcget(self.programa.subtitulo_inicio, 'text'),
+                         'Registros, recebimentos e documentos. Tudo no seu lugar.')
+        self.assertEqual(tela.itemcget(self.programa.assinatura_inicio, 'text'), f'Vitoran Tech · v{app.VERSAO}')
+        self.assertEqual(tela.itemcget(self.programa.marca_assinatura, 'image'), str(self.root._marca_rodape))
+        # Cartão em destaque à esquerda, com cerca de 56% da largura; atalhos empilhados à direita.
+        entrada, historico, contas = self.programa.cartoes_inicio
+        self.assertTrue(self.programa.layout_largo_inicio)
+        largura_util = tela.winfo_width() - 2 * 40
+        self.assertAlmostEqual(entrada.winfo_width() + 2 * 18, largura_util * 0.56, delta=8)
+        self.assertLess(entrada.winfo_x() + entrada.winfo_width(), historico.winfo_x())
+        self.assertEqual(historico.winfo_x(), contas.winfo_x())
+        self.assertLess(historico.winfo_y() + historico.winfo_height(), contas.winfo_y())
+        self.assertGreater(entrada.winfo_height(), historico.winfo_height())
+        # Textos e botões dos cartões continuam os mesmos.
+        textos = [[w.cget('text') for w in self.programa.partes_inicio[cartao][1:]] for cartao in self.programa.cartoes_inicio]
+        self.assertEqual(textos, [
+            ['Uma nova operação', 'Cadastre sua próxima aquisição\ne reúna os documentos da entrada.', 'Nova entrada'],
+            ['Tudo sob controle', 'Consulte valores, acompanhe prazos\ne confirme seus recebimentos.', 'Minhas operações'],
+            ['Contas de recebimento', 'Mantenha seus dados bancários\norganizados e sempre à mão.', 'Contas de recebimento']])
+        # Avisos viram cartões abaixo dos atalhos, só quando há o que avisar.
+        aviso_backup = self.programa.pecas_inicio['backup'][0]
+        self.assertTrue(aviso_backup.winfo_ismapped())
+        self.assertGreater(aviso_backup.winfo_y(), contas.winfo_y() + contas.winfo_height())
+        self.assertFalse(self.programa.pecas_inicio['atrasadas'][0].winfo_ismapped())
+        self.programa.texto_aviso_backup.set('')
+        self.root.update()
+        self.assertFalse(aviso_backup.winfo_ismapped())
 
     def test_exportar_excel_pelo_menu(self):
         from test_contas import dados_rpv
@@ -1468,57 +1489,80 @@ class TestInterface(unittest.TestCase):
         self.assertEqual((tela.winfo_width(), tela.winfo_height()), (600, 450))
         tela.destroy()
 
-    def test_arte_de_vidro_anima_uma_vez_atras_do_conteudo_e_para(self):
+    def test_arte_entra_em_quatro_segundos_e_depois_flutua_sem_parar(self):
         import time
         import arte_inicio
         self.root.geometry('1600x900')
         self.root.update()
+        self.root.update()
         arte = self.programa.arte_inicio
         cartao = arte.master
-        faixa, titulo, descricao, botao_entrada = self.programa.partes_inicio[cartao]
-        # Textos e botão do cartão continuam os mesmos.
-        self.assertEqual(titulo.cget('text'), 'Uma nova operação')
-        self.assertEqual(descricao.cget('text'), 'Cadastre sua próxima aquisição\ne reúna os documentos da entrada.')
-        self.assertEqual(botao_entrada.cget('text'), 'Nova entrada')
+        _faixa, titulo, descricao, botao_entrada = self.programa.partes_inicio[cartao]
+        self.assertAlmostEqual(arte_inicio.duracao_total(), 4.0, delta=0.4)
         # A arte é o elemento mais baixo do cartão e fica fora da área dos textos e do botão.
         self.assertEqual(self.root.tk.call('winfo', 'children', str(cartao))[0], str(arte))
         self.assertEqual(arte.winfo_manager(), 'place')
         self.assertGreaterEqual(arte.winfo_x(), descricao.winfo_x() + descricao.winfo_width())
         self.assertLessEqual(arte.winfo_y() + arte.winfo_height(), botao_entrada.winfo_y())
-        self.assertLessEqual(arte.winfo_x() + arte.winfo_width(), cartao.winfo_width())
-        # Durante a animação, as placas surgem; ao fim do tempo, a animação para sozinha.
-        arte.cancelar()
-        arte.inicio, arte.concluida = time.monotonic() - 0.3, False
-        arte.quadro()
-        self.assertIsNotNone(arte.agendamento)
+        # No começo da entrada, a primeira placa já aparece e a última ainda não.
+        arte.inicio = time.monotonic() - 0.4
+        arte.desenhar()
         estados = [arte.itemcget(vidro, 'state') for _brilho, vidro in arte.itens]
-        self.assertEqual(estados[0], 'normal')
-        self.assertEqual(estados[-1], 'hidden')
-        arte.inicio = time.monotonic() - arte_inicio.duracao_total() - 0.1
-        arte.quadro()
-        self.assertTrue(arte.concluida)
-        self.assertIsNone(arte.agendamento)
+        self.assertEqual((estados[0], estados[-1]), ('normal', 'hidden'))
+        # Depois da entrada, todas ficam no nível máximo e seguem se movendo, poucos pixels.
+        arte.inicio = time.monotonic() - arte_inicio.duracao_total() - 2.0
+        arte.desenhar()
         finais = {arte.itemcget(item, 'image') for par in arte.itens for item in par}
         esperadas = {str(arte.imagens[i, camada, arte_inicio.NIVEIS - 1]) for i in range(len(arte.itens)) for camada in (0, 1)}
         self.assertEqual(finais, esperadas)
-        posicoes = [arte.coords(item) for par in arte.itens for item in par]
-        arte.animar()
-        self.root.update()
-        self.assertIsNone(arte.agendamento)
-        self.assertEqual([arte.coords(item) for par in arte.itens for item in par], posicoes)
-        # A troca de tema mantém a arte parada e passa para as imagens do outro tema.
+        antes = [arte.coords(vidro) for _brilho, vidro in arte.itens]
+        arte.inicio -= 2.5
+        arte.desenhar()
+        depois = [arte.coords(vidro) for _brilho, vidro in arte.itens]
+        self.assertNotEqual(antes, depois)
+        self.assertTrue(all(abs(a - b) <= 12 for p, q in zip(antes, depois) for a, b in zip(p, q)))
+        # O relógio continua ativo enquanto a tela inicial está à vista.
+        self.assertIsNotNone(self.programa.relogio_inicio.agendamento)
+        # Trocar de tema só troca as imagens: não reinicia a animação.
+        inicio = arte.inicio
         self.programa.alternar_tema()
         self.root.update()
-        self.assertIsNone(arte.agendamento)
+        self.assertEqual(arte.inicio, inicio)
         self.assertEqual(arte.cget('bg'), PALETAS['escuro']['superficie'])
         self.assertIn(arte.itemcget(arte.itens[-1][1], 'image'),
                       {str(imagem) for imagem in arte_inicio.imagens_vidro(self.root, 'escuro').values()})
-        # Em janelas estreitas (cartões em linha), a arte sai de cena.
-        self.root.geometry('980x700')
+        luzes = self.programa.luzes_inicio
+        self.assertEqual({self.programa.inicio.itemcget(i, 'image') for i in luzes.itens},
+                         {str(imagem) for imagem in arte_inicio.imagens_luz(self.root, 'escuro')})
+
+    def test_animacao_pausa_fora_da_tela_inicial(self):
+        relogio = self.programa.relogio_inicio
+        desenhos = []
+        relogio.animados = (SimpleNamespace(desenhar=lambda: desenhos.append(1)),)
+        relogio.parar()
+        relogio.quadro()
+        self.assertEqual(len(desenhos), 1)
+        self.programa.mostrar_historico()
         self.root.update()
+        relogio.parar()
+        relogio.quadro()
+        self.assertEqual(len(desenhos), 1)
+        self.assertIsNotNone(relogio.agendamento)
+        self.programa.voltar()
         self.root.update()
-        self.assertEqual(self.programa.colunas_inicio, 1)
-        self.assertEqual(arte.winfo_manager(), '')
+        relogio.parar()
+        relogio.quadro()
+        self.assertEqual(len(desenhos), 2)
+
+    def test_luzes_de_fundo_ficam_atras_de_tudo_e_derivam(self):
+        import time
+        tela = self.programa.inicio
+        luzes = self.programa.luzes_inicio
+        self.assertEqual(tela.find_all()[:len(luzes.itens)], tuple(luzes.itens))
+        antes = [tela.coords(i) for i in luzes.itens]
+        luzes.inicio = time.monotonic() - 10
+        luzes.desenhar()
+        self.assertNotEqual([tela.coords(i) for i in luzes.itens], antes)
 
     def test_arte_de_vidro_comeca_sozinha_ao_abrir(self):
         arte = self.programa.arte_inicio

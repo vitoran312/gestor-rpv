@@ -1,19 +1,21 @@
-"""Gera as folhas de imagens das placas de vidro da tela inicial (recursos/vidro-claro.png e vidro-escuro.png).
+"""Gera as imagens da tela inicial: placas de vidro (recursos/vidro-*.png) e luzes de fundo (recursos/luz-*.png).
 
 Só é usado no desenvolvimento, com Pillow; o programa apenas lê os PNGs prontos. Cada folha tem, por placa,
 uma linha de vidro (preenchimento e borda fina) e uma linha de brilho (borda desfocada), em NIVEIS colunas
 de opacidade crescente. O fade-in troca de coluna; o deslocamento move as imagens no Canvas.
+As luzes são manchas radiais suaves, uma por cor, que derivam devagar atrás de toda a tela inicial.
 Uso: python scripts/gerar_arte_vidro.py
 """
+import math
 from pathlib import Path
 
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 RAIZ = Path(__file__).resolve().parent.parent
-LARGURA, ALTURA = 136, 164  # Célula de cada placa, com margem para o brilho desfocado.
+LARGURA, ALTURA = 230, 280  # Célula de cada placa, com margem para o brilho desfocado.
 NIVEIS = 6
 AMOSTRAGEM = 4             # Desenho em 4x e redução, para bordas suaves.
-MARGEM = 14
+MARGEM = 20
 
 # Do fundo para a frente: inclinação, opacidade do vidro (topo, base), opacidade da borda e do brilho.
 PLACAS = (
@@ -74,6 +76,27 @@ def com_opacidade(imagem, fracao):
     return copia
 
 
+LUZ = 520  # Lado de cada mancha de luz.
+# Por tema: (cor, opacidade no centro) de cada mancha. No claro, tons mais leves para não sujar o fundo.
+LUZES = {'escuro': (((255, 165, 134), 0.16), ((181, 26, 43), 0.24)),
+         'claro': (((140, 29, 52), 0.07), ((255, 165, 134), 0.22))}
+
+
+def luz(cor, opacidade):
+    """Mancha radial com queda gaussiana até zero na borda: sem contorno visível."""
+    alfa = Image.new('L', (LUZ, LUZ), 0)
+    centro = (LUZ - 1) / 2
+    pixels = alfa.load()
+    for y in range(LUZ):
+        for x in range(LUZ):
+            r = math.hypot(x - centro, y - centro) / centro
+            if r < 1:
+                pixels[x, y] = round(255 * opacidade * math.exp(-4.5 * r * r) * (1 - r) ** 0.5)
+    imagem = Image.new('RGBA', (LUZ, LUZ), cor + (0,))
+    imagem.putalpha(alfa)
+    return imagem
+
+
 def gerar():
     for tema, cor in CORES.items():
         folha = Image.new('RGBA', (LARGURA * NIVEIS, ALTURA * 2 * len(PLACAS)), (0, 0, 0, 0))
@@ -84,6 +107,12 @@ def gerar():
                                 (nivel * LARGURA, (indice * 2 + camada) * ALTURA))
         destino = RAIZ / 'recursos' / f'vidro-{tema}.png'
         folha.save(destino, optimize=True)
+        print(destino, destino.stat().st_size, 'bytes')
+        luzes = Image.new('RGBA', (LUZ * len(LUZES[tema]), LUZ), (0, 0, 0, 0))
+        for indice, (cor_luz, opacidade) in enumerate(LUZES[tema]):
+            luzes.paste(luz(cor_luz, opacidade), (indice * LUZ, 0))
+        destino = RAIZ / 'recursos' / f'luz-{tema}.png'
+        luzes.save(destino, optimize=True)
         print(destino, destino.stat().st_size, 'bytes')
 
 

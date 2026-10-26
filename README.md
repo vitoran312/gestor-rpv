@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.27.0
+# Gestor de RPV — 0.28.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -14,7 +14,7 @@ python app.py
 
 Mantenha todos os arquivos `.py` e a pasta `recursos` juntos. Essa pasta contém o ícone da Vitoran Tech.
 A tela inicial tem os botões **Nova entrada**, **Minhas operações**,
-**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.27.0**, acompanhada do emblema com 50% de opacidade,
+**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.28.0**, acompanhada do emblema com 50% de opacidade,
 aparece no canto inferior direito.
 O número é lido da versão do programa e acompanha cada atualização.
 O programa funciona em uma única janela, que abre maximizada. **Minhas operações**, **Contas de
@@ -31,14 +31,18 @@ Títulos ficam em tons neutros; a cor da marca é reservada às ações principa
 Recebimentos e lucro realizado continuam em verde. Todos os pares de texto e fundo atendem ao contraste WCAG AA. O botão **Modo escuro / Modo claro**, com ícones de lua e sol, alterna a
 aparência; o menu **Exibir** do histórico oferece as mesmas opções.
 
-- Tela inicial com três cartões de ações e ícones desenhados em Python, sem numeração.
-  O emblema Vitoran Tech fica centralizado no espaço acima do título,
-  e uma versão discreta, com 50% de opacidade, acompanha a assinatura no rodapé.
+- Tela inicial em tela cheia: emblema Vitoran Tech à esquerda do título, cartão **Uma nova operação**
+  grande à esquerda, **Tudo sob controle** e **Contas de recebimento** empilhados à direita e o aviso de
+  atrasadas ou de backup logo abaixo. Em janelas estreitas, os cartões menores descem para baixo do principal.
+  Uma versão discreta do emblema, com 50% de opacidade, acompanha a assinatura no rodapé.
 - Arte de placas de vidro translúcidas no cartão **Uma nova operação**, no espaço livre à direita dos textos.
-  Ao abrir o programa, as placas surgem em sequência, com leve deslocamento e bordas que acendem em pêssego
-  (carmim no tema claro). A animação dura cerca de 2,5 segundos, roda uma única vez e termina parada.
-  As placas são imagens prontas em `recursos/vidro-claro.png` e `recursos/vidro-escuro.png`, geradas por
-  `scripts/gerar_arte_vidro.py` (Pillow, só no desenvolvimento). Em janelas estreitas, a arte é ocultada.
+  Ao abrir o programa, as placas surgem em sequência durante cerca de 4 segundos, com leve deslocamento e
+  bordas que acendem em pêssego (carmim no tema claro); depois continuam flutuando devagar, sem parar.
+  Atrás de toda a tela inicial, duas luzes translúcidas derivam lentamente nas cores do tema.
+  Trocar de tema só troca as cores, sem reiniciar o movimento. A animação pausa fora da tela inicial
+  e com a janela minimizada.
+  As imagens ficam em `recursos/vidro-*.png` e `recursos/luz-*.png`, geradas por
+  `scripts/gerar_arte_vidro.py` (Pillow, só no desenvolvimento). Em janelas muito estreitas, as placas são ocultadas.
 - Emblema Vitoran Tech com V em pêssego sobre vinho, aplicado às janelas e ao executável.
 - **Sobre**, na tela inicial, e **Ajuda → Sobre o Gestor de RPV**, em Minhas operações,
   mostram a marca, o autor e a versão atual. O número acompanha automaticamente `versao.py`.
