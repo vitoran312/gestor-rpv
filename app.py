@@ -1,6 +1,7 @@
 """Gestor de RPV: interface desktop em Python."""
 import sqlite3
 import tkinter as tk
+import webbrowser
 from datetime import date
 from tkinter import ttk
 
@@ -8,7 +9,7 @@ import demonstracao
 from dados import Banco
 from componentes import centralizar, maximizar
 from contas import JanelaContas
-from versao import VERSAO
+from versao import CONTATO, VERSAO
 from tema import cores, definir_modo, atualizar_widgets
 from visual import familia_fonte, icone_tema, px
 from calculadora import JanelaCalculadora
@@ -146,7 +147,11 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
                   justify='center',style='Subtitulo.TLabel').pack(pady=(8,20))
         ttk.Label(corpo,text='Vitoran Tech',font=(self.fonte,13,'bold')).pack()
         ttk.Label(corpo,text='Desenvolvido por Vitor Alves Nascimento').pack(pady=(6,0))
-        ttk.Label(corpo,text=f'Versão {VERSAO}',style='Discreto.TLabel').pack(pady=(8,20))
+        ttk.Label(corpo,text=f'Versão {VERSAO}',style='Discreto.TLabel').pack(pady=(8,16))
+        ttk.Label(corpo,text='Sugestões ou dúvidas:',style='Discreto.TLabel').pack()
+        contato = ttk.Label(corpo,text=CONTATO,style='Contato.TLabel',cursor='hand2')
+        contato.pack(pady=(2,20))
+        contato.bind('<Button-1>',lambda _: webbrowser.open(f'mailto:{CONTATO}'))
         ttk.Button(corpo,text='Fechar',command=tela.destroy).pack()
         tela.bind('<Escape>',lambda _: tela.destroy())
         tela.bind('<Return>',lambda _: tela.destroy())
@@ -187,6 +192,7 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
         if hasattr(self,'tabela') and self.tabela.winfo_exists():
             self.tabela.tag_configure('alternada',background=c['linha'])
             self.tabela.tag_configure('atrasada',foreground=c['vermelho'],background=c['atraso'])
+            self.tabela.tag_configure('recebida',foreground=c['azul'],background=c['recebida'])
         if self.janela_contas is not None and self.janela_contas.tela.winfo_exists():
             self.janela_contas.atualizar_situacoes()
 

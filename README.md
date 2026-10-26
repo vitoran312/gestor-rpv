@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.28.1
+# Gestor de RPV — 0.29.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -14,7 +14,7 @@ python app.py
 
 Mantenha todos os arquivos `.py` e a pasta `recursos` juntos. Essa pasta contém o ícone da Vitoran Tech.
 A tela inicial tem os botões **Nova entrada**, **Minhas operações**,
-**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.28.1**, acompanhada do emblema com 50% de opacidade,
+**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.29.0**, acompanhada do emblema com 50% de opacidade,
 aparece no canto inferior direito.
 O número é lido da versão do programa e acompanha cada atualização.
 O programa funciona em uma única janela, que abre maximizada. **Minhas operações**, **Contas de
@@ -44,7 +44,8 @@ aparência; o menu **Exibir** do histórico oferece as mesmas opções.
   `scripts/gerar_arte_vidro.py` (Pillow, só no desenvolvimento). Em janelas muito estreitas, as placas são ocultadas.
 - Emblema Vitoran Tech com V em pêssego sobre vinho, aplicado às janelas e ao executável.
 - **Sobre**, na tela inicial, e **Ajuda → Sobre o Gestor de RPV**, em Minhas operações,
-  mostram a marca, o autor e a versão atual. O número acompanha automaticamente `versao.py`.
+  mostram a marca, o autor, a versão atual e o contato para sugestões ou dúvidas (vitoran312@gmail.com;
+  clicar abre o programa de e-mail). O número acompanha automaticamente `versao.py`.
 - Temas e fontes reutilizados; as superfícies são geradas uma vez por tema para agilizar a alternância.
   O tema ainda não usado é preparado em segundo plano logo após a abertura, e a preferência é gravada
   depois do redesenho. Cartões, botões e filtros usam imagens do tamanho real das superfícies, que o
@@ -92,8 +93,9 @@ aparência; o menu **Exibir** do histórico oferece as mesmas opções.
   ativas (sem as da lixeira), na ordem exibida na tabela. Valores em R$, datas reconhecidas
   pelo Excel, cabeçalho fixo e filtro em cada coluna. Não exige o Excel nem pacotes extras.
 - **Editar → Editar registro / Excluir registro**: edita uma linha ou envia as selecionadas à lixeira.
-- **Exibir → Gráfico mensal**: barras dos últimos 12 meses com o capital investido (pela data de
-  aquisição) e o valor recebido (pela data do recebimento). Passe o mouse sobre um mês para ver os valores.
+- **Exibir → Gráfico mensal**: barras em 3D dos últimos 12 meses com a quantidade de entradas (pela data
+  de aquisição, em tom neutro) e de recebidas (pela data do recebimento, em verde). Cada barra mostra o
+  número no topo; passe o mouse sobre um mês para ver os dois totais.
 - **Exibir → Tema claro / Tema escuro**: muda o tema de todas as janelas,
   inclusive formulários, calendários, menus de contexto e calculadora.
   A escolha é lembrada e o aplicativo volta a abrir no último tema usado.
@@ -180,6 +182,8 @@ com altura das linhas e largura da janela ajustadas para a leitura.
   pela data do computador: ao abrir o programa, ao voltar a cada página e na virada do dia, mesmo com
   o programa aberto. A **linha inteira** fica com fundo e texto vermelhos, a tela inicial avisa quantas
   operações estão atrasadas (clique no aviso para ver só elas) e o filtro Atrasadas também fica vermelho.
+  Do lado oposto, a linha de uma operação **recebida** fica inteira azul, com fundo e texto azuis.
+  No tema claro, os títulos das colunas ficam em negrito.
 - Clique nos cabeçalhos para ordenar: valores e datas começam do maior/mais recente
   para o menor; nomes e contas começam em ordem alfabética. O segundo clique inverte
   a direção e o terceiro retorna à ordem original. A ordenação continua funcionando

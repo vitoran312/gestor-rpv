@@ -1,7 +1,7 @@
 """Estilos ttk dos temas claro e escuro, criados uma única vez por modo."""
 from tkinter import font as tkfont
 
-from tema import cores
+from tema import PALETAS, cores
 from visual import aplicar_superficies, px
 
 
@@ -87,7 +87,8 @@ def criar_estilos(janela, estilo, fonte):
     estilo.configure('AtrasadasAviso.TLabel',background=fundo,foreground=c['vermelho'],font=(fonte,10,'bold'))
     estilo.configure('Voltar.TButton',padding=(12,5),font=(fonte,10))
     estilo.configure('BackupAviso.TLabel',background=fundo,foreground=c['vermelho'],font=(fonte,9))
-    estilo.configure('LegendaInvestido.TLabel',foreground=c['floresta'],font=(fonte,12))
+    estilo.configure('Contato.TLabel',foreground=c['floresta'],font=(fonte,11,'underline'))
+    estilo.configure('LegendaInvestido.TLabel',foreground=c['secundario'],font=(fonte,12))
     estilo.configure('LegendaRecebido.TLabel',foreground=c['verde'],font=(fonte,12))
     estilo.configure('Recebido.TLabel',foreground=c['verde'],font=(fonte,10,'bold'))
     estilo.configure('Ajuda.TLabel',font=(fonte,10),background=campo,foreground=texto,padding=12,wraplength=px(janela,320),
@@ -119,7 +120,8 @@ def criar_estilos(janela, estilo, fonte):
                      lightcolor=c['sage'],darkcolor=c['borda_suave'])
     estilo.map('Treeview.Heading',background=[('active',c['ativo'])],foreground=[('active',texto)])
     estilo.configure('Operacoes.Treeview',font=(fonte,12),rowheight=max(px(janela,52),tkfont.Font(font=(fonte,12)).metrics('linespace')+px(janela,18)))
-    estilo.configure('Operacoes.Treeview.Heading',font=(fonte,18))
+    # No claro, o cabeçalho cinza-claro precisa do negrito para se destacar das linhas.
+    estilo.configure('Operacoes.Treeview.Heading',font=(fonte,18,'bold') if c is PALETAS['claro'] else (fonte,18))
     estilo.configure('Operacoes.TCheckbutton',font=(fonte,12),background=campo)
     estilo.map('Operacoes.TCheckbutton',background=[('active',c['ativo']),('!disabled',campo)])
     estilo.configure('Recebido.TCheckbutton',foreground=c['verde'],font=(fonte,12,'bold'),background=campo)
@@ -128,6 +130,11 @@ def criar_estilos(janela, estilo, fonte):
     estilo.configure('PrevisaoAtrasada.TLabel',background=c['atraso'],foreground=c['vermelho'],font=(fonte,12,'bold'),anchor='center')
     estilo.configure('Atrasada.Operacoes.TCheckbutton',background=c['atraso'])
     estilo.map('Atrasada.Operacoes.TCheckbutton',background=[('active',c['atraso']),('!disabled',c['atraso'])])
+    # Recebida: a linha inteira em azul, o inverso do vermelho das atrasadas.
+    estilo.configure('PrevisaoRecebida.TLabel',background=c['recebida'],foreground=c['azul'],font=(fonte,12,'bold'),anchor='center')
+    estilo.configure('Recebida.Recebido.TCheckbutton',foreground=c['azul'],background=c['recebida'])
+    estilo.map('Recebida.Recebido.TCheckbutton',foreground=[('!disabled',c['azul'])],
+               background=[('active',c['recebida']),('!disabled',c['recebida'])])
     estilo.configure('PrevisaoAdiada.TLabel',background=campo,foreground=c['vermelho'],font=(fonte,12),anchor='center')
     estilo.configure('ContaSituacao.TLabel',font=(fonte,12,'bold'),background=campo)
     estilo.configure('ContaIncompleta.TLabel',font=(fonte,12,'bold'),foreground=c['vermelho'],background=campo)

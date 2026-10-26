@@ -2,7 +2,7 @@ import unittest
 from datetime import date
 
 from dados import situacao
-from grafico import escala, resumo_mensal, rotulo_mes, valor_curto
+from grafico import escala, quantidade, resumo_mensal, rotulo_mes
 
 
 def registro(aquisicao, custo, previsto, recebimento=None, previsao_atual='2026-12-01'):
@@ -11,7 +11,7 @@ def registro(aquisicao, custo, previsto, recebimento=None, previsao_atual='2026-
 
 
 class TestGrafico(unittest.TestCase):
-    def test_resumo_mensal_agrupa_aquisicao_e_recebimento_nos_ultimos_doze_meses(self):
+    def test_resumo_mensal_conta_aquisicao_e_recebimento_nos_ultimos_doze_meses(self):
         registros = [registro('2026-03-10', 300000, 500000, '2026-06-08'),
                      registro('2026-03-25', 100000, 150000),
                      registro('2025-10-31', 999900, 999900, '2026-10-01'),
@@ -20,10 +20,10 @@ class TestGrafico(unittest.TestCase):
         self.assertEqual(len(meses), 12)
         self.assertEqual(meses[0][0], '2025-11')
         self.assertEqual(meses[-1][0], '2026-10')
-        totais = {chave: (investido, recebido) for chave, investido, recebido in meses}
-        self.assertEqual(totais['2026-03'], (400000, 0))
-        self.assertEqual(totais['2026-06'], (0, 500000))
-        self.assertEqual(totais['2026-10'], (200000, 999900 + 260000))
+        totais = {chave: (entradas, recebidas) for chave, entradas, recebidas in meses}
+        self.assertEqual(totais['2026-03'], (2, 0))
+        self.assertEqual(totais['2026-06'], (0, 1))
+        self.assertEqual(totais['2026-10'], (1, 2))
         self.assertNotIn('2025-10', totais)
 
     def test_resumo_mensal_atravessa_a_virada_do_ano(self):
@@ -31,14 +31,14 @@ class TestGrafico(unittest.TestCase):
         self.assertEqual([m[0] for m in meses], ['2026-11', '2026-12', '2027-01'])
 
     def test_escala_e_rotulos(self):
-        self.assertEqual(escala(0), 100000)
-        self.assertEqual(escala(4860000), 6000000)
-        self.assertEqual(escala(4000000), 4000000)
-        self.assertEqual(escala(120000000), 200000000)
-        self.assertEqual(valor_curto(1500000), 'R$ 15 mil')
-        self.assertEqual(valor_curto(1250000), 'R$ 12,5 mil')
-        self.assertEqual(valor_curto(150000000), 'R$ 1,5 mi')
-        self.assertEqual(valor_curto(25000), 'R$ 250')
+        self.assertEqual(escala(0), 4)
+        self.assertEqual(escala(3), 4)
+        self.assertEqual(escala(5), 8)
+        self.assertEqual(escala(9), 20)
+        self.assertEqual(escala(37), 40)
+        self.assertEqual(escala(41), 80)
+        self.assertEqual(quantidade(1, 'entrada', 'entradas'), '1 entrada')
+        self.assertEqual(quantidade(3, 'entrada', 'entradas'), '3 entradas')
         self.assertEqual(rotulo_mes('2026-03'), 'mar/26')
 
     def test_situacao_recebida_atrasada_ou_pendente(self):

@@ -226,9 +226,11 @@ class OperacoesMixin:
         self.tabela.delete(*self.tabela.get_children())
         self.tabela.tag_configure('alternada',background=cores()['linha'])
         self.tabela.tag_configure('atrasada',foreground=cores()['vermelho'],background=cores()['atraso'])
+        self.tabela.tag_configure('recebida',foreground=cores()['azul'],background=cores()['recebida'])
         for indice,r in enumerate(registros):
-            # Linha atrasada inteira em vermelho; o tom alternado não se aplica a ela.
-            etiquetas = ('atrasada',) if str(r['id']) in self.atrasadas else ('alternada',) if indice%2 else ()
+            # Linha atrasada inteira em vermelho e recebida inteira em azul; o tom alternado não se aplica a elas.
+            etiquetas = (('atrasada',) if str(r['id']) in self.atrasadas else ('recebida',) if r['recebimento']
+                         else ('alternada',) if indice%2 else ())
             self.tabela.insert('', 'end', iid=str(r['id']), tags=etiquetas, values=(
                 r['nome'], data_br(r['aquisicao']), 'R$ ' + moeda(r['custo']),
                 'R$ ' + moeda(r['comissao'] or 0),
@@ -285,13 +287,14 @@ class OperacoesMixin:
                 adiada = data_iso(valores[-2]) > data_iso(valores[-3])
                 botao = ttk.Label(self.tabela, text=valores[-2], anchor='center', cursor='hand2',
                                   style='PrevisaoAtrasada.TLabel' if atrasada else
+                                  'PrevisaoRecebida.TLabel' if self.recebimentos[linha] else
                                   'PrevisaoAdiada.TLabel' if adiada else 'Previsao.TLabel')
                 data_recebimento = self.recebimentos[linha]
                 recebido = data_recebimento is not None
                 estado = tk.BooleanVar(value=recebido)
                 caixa = ttk.Checkbutton(self.tabela, variable=estado,
                     text=data_br(data_recebimento) if recebido else '',
-                    style='Recebido.TCheckbutton' if recebido else
+                    style='Recebida.Recebido.TCheckbutton' if recebido else
                     'Atrasada.Operacoes.TCheckbutton' if atrasada else 'Operacoes.TCheckbutton',
                     command=lambda i=int(linha), v=estado, atual=recebido: self.abrir_recebimento(i, v, atual))
                 caixa.estado = estado

@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## 0.29.0
+
+- Minhas operações: no tema claro, os títulos das colunas ficam em negrito.
+- Operações recebidas com a linha inteira em azul (fundo e texto), nos dois temas, o oposto do vermelho
+  das atrasadas. Contraste WCAG AA: 5,5:1 no claro e 7,7:1 no escuro.
+- Gráfico mensal refeito: quantidade de entradas (pela data de aquisição) e de recebidas (pela data do
+  recebimento) por mês, em vez de valores. Barras em 3D mais grossas, com face, topo e lateral
+  sombreados, número no topo de cada barra e grade em perspectiva. Recebidas em verde; entradas em tom
+  neutro. Área do gráfico limitada a 1000 px de largura.
+- Janela Sobre com o contato vitoran312@gmail.com para sugestões ou dúvidas; clicar abre o e-mail.
+
 ## 0.28.1
 
 - Tela inicial com tamanho máximo de 1420 × 900 (na escala de 100%), centralizada: em telas grandes os

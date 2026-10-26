@@ -394,10 +394,14 @@ class TestInterface(unittest.TestCase):
         x, y, largura, altura = tabela.bbox(str(identificador), 'recebido')
         self.assertLessEqual(abs((caixa.winfo_x() + caixa.winfo_width()/2) - (x + largura/2)), 1)
         self.assertEqual(caixa.cget('text'), '22/10/2026')
-        self.assertEqual(caixa.cget('style'), 'Recebido.TCheckbutton')
+        self.assertEqual(caixa.cget('style'), 'Recebida.Recebido.TCheckbutton')
         estilo = ttk.Style()
-        self.assertEqual(str(estilo.lookup('Recebido.TCheckbutton', 'foreground')), cores()['verde'])
-        self.assertIn('bold', str(estilo.lookup('Recebido.TCheckbutton', 'font')))
+        self.assertEqual(str(estilo.lookup('Recebida.Recebido.TCheckbutton', 'foreground')), cores()['azul'])
+        self.assertIn('bold', str(estilo.lookup('Recebida.Recebido.TCheckbutton', 'font')))
+        # Recebida: a linha inteira fica azul, como a atrasada fica vermelha.
+        self.assertEqual(tabela.item(str(identificador), 'tags'), ('recebida',))
+        self.assertEqual(str(tabela.tag_configure('recebida', 'background')), cores()['recebida'])
+        self.assertEqual(self.programa.acoes_linhas[str(identificador)][0].cget('style'), 'PrevisaoRecebida.TLabel')
         caixa.invoke()
         self.root.update()
         tela = next(w for w in self.programa.historico.winfo_children() if isinstance(w, tk.Toplevel))
@@ -1188,7 +1192,7 @@ class TestInterface(unittest.TestCase):
         self.root.update()
         tela=self.programa.sobre
         textos=[w.cget('text') for w in filhos(tela) if isinstance(w,ttk.Label)]
-        for texto in ('Gestor de RPV','Vitoran Tech','Desenvolvido por Vitor Alves Nascimento',f'Versão {app.VERSAO}'):
+        for texto in ('Gestor de RPV','Vitoran Tech','Desenvolvido por Vitor Alves Nascimento',f'Versão {app.VERSAO}','Sugestões ou dúvidas:','vitoran312@gmail.com'):
             self.assertIn(texto,textos)
         fechar=botao(tela,'Fechar')
         self.assertTrue(fechar.winfo_ismapped())
@@ -1417,13 +1421,13 @@ class TestInterface(unittest.TestCase):
         self.root.update()
         janela = self.programa.grafico_mensal
         self.assertTrue(janela.tela.winfo_viewable())
-        self.assertEqual(janela.dados[-1][1:], (150000, 200000))
+        self.assertEqual(janela.dados[-1][1:], (1, 1))
         self.assertTrue(janela.grafico.find_all())
         grafico = janela.grafico
         inicio, fim = grafico.barras[-1][:2]
         grafico.event_generate('<Motion>', x=int((inicio + fim) / 2), y=50)
         self.root.update()
-        self.assertIn('R$ 1.500,00 investidos', janela.detalhe.get())
+        self.assertIn('1 entrada · 1 recebida', janela.detalhe.get())
         grafico.event_generate('<Leave>')
         self.root.update()
         self.assertIn('Passe o mouse', janela.detalhe.get())
