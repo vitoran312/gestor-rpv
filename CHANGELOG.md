@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## 0.28.1
+
+- Tela inicial com tamanho máximo de 1420 × 900 (na escala de 100%), centralizada: em telas grandes os
+  cartões não esticam mais, mantendo as proporções da referência, e o fundo sobra ao redor.
+- Placas de vidro e luzes de fundo ficam paradas depois da animação de entrada (cerca de 4 s); o laço
+  de animação termina sozinho, sem uso de CPU depois disso.
+
 ## 0.28.0
 
 - Tela inicial reorganizada para ocupar a tela cheia sem espaços vazios: cabeçalho com o emblema à

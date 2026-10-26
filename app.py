@@ -62,7 +62,7 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
         janela.bind('<Destroy>',self.cancelar_agendamento_backup,add='+')
         centralizar(janela, 1480, 980)
         janela.deiconify()
-        # As placas de vidro entram logo depois que a janela aparece; o relógio mantém tudo flutuando.
+        # As placas de vidro entram logo depois que a janela aparece e ficam paradas ao fim da entrada.
         self.agendamento_arte = janela.after(250,self.arte_inicio.animar)
         self.relogio_inicio.iniciar()
         # As páginas (operações, contas, gráfico) usam a mesma janela; maximizada, a tabela tem o espaço de antes.

@@ -4,11 +4,10 @@ As placas e as luzes são imagens PNG com transparência (recursos/vidro-*.png e
 scripts/gerar_arte_vidro.py). O Canvas do Tk sobrepõe essas imagens respeitando o canal alfa, então a
 translucidez é real, sem depender de transparência da janela.
 
-Ao abrir, as placas entram em sequência (cerca de 4 s); depois flutuam devagar, poucos pixels, sem parar.
-As luzes de fundo derivam em ciclos longos. Um único relógio move tudo e fica em pausa quando a tela
-inicial não está visível; trocar de tema só troca as imagens, sem reiniciar o movimento.
+Ao abrir, as placas entram em sequência (cerca de 4 s) e depois ficam paradas. As luzes de fundo são fixas.
+O relógio da entrada fica em pausa quando a tela inicial não está visível e para de vez quando a entrada
+termina; trocar de tema só troca as imagens, sem reiniciar a animação.
 """
-import math
 import time
 import tkinter as tk
 
@@ -23,18 +22,10 @@ INTERVALO = 0.38      # Segundos entre o início de uma placa e o da seguinte.
 DURACAO = 2.1         # Segundos de entrada de cada placa.
 ATRASO_BRILHO = 0.5   # A borda acende depois que o vidro já começou a aparecer.
 DESLOCAMENTO = (60, 18)  # Pixels de onde cada placa parte, à direita e abaixo da posição final.
-# Flutuação depois da entrada: amplitude (x, y) em pixels e período (x, y) em segundos, por placa.
-FLUTUACAO = (((3, 4), (9.0, 11.0)), ((4, 3), (10.5, 8.0)), ((3, 5), (8.5, 12.5)), ((5, 4), (11.5, 9.5)))
 LUZ = 520             # Lado de cada mancha de luz.
-# Luzes de fundo: centro em frações da tela, amplitude da deriva em pixels e período em segundos.
-LUZES = (((0.16, 0.10), (50, 30), (37.0, 29.0)), ((0.82, 0.94), (60, 34), (43.0, 33.0)))
-# Ritmo de cada animação, em milissegundos: a entrada das placas é fluida; a flutuação e a deriva das luzes,
-# lentíssimas, avançam menos de 1 px por quadro e não precisam de mais quadros. Luzes grandes custam caro
-# para redesenhar, então só mudam de lugar 5 vezes por segundo.
-QUADRO_ENTRADA_MS = 40
-QUADRO_FLUTUACAO_MS = 80
-QUADRO_LUZES_MS = 200
-QUADRO_MS = 40        # Batida do relógio: cada animação decide se é a sua vez.
+# Luzes de fundo: centro de cada mancha, em frações da tela.
+LUZES = ((0.16, 0.10), (0.82, 0.94))
+QUADRO_MS = 40        # Um quadro a cada 40 ms durante a entrada.
 PAUSA_MS = 400        # Fora da tela inicial, só confere de vez em quando se ela voltou.
 
 
@@ -80,13 +71,8 @@ def imagens_luz(raiz, modo):
     return cache[modo]
 
 
-def flutuacao(indice, segundos):
-    (ax, ay), (px, py) = FLUTUACAO[indice]
-    return ax * math.sin(2 * math.pi * segundos / px), ay * math.sin(2 * math.pi * segundos / py + 1.3)
-
-
 class ArteVidro(tk.Canvas):
-    """Placas de vidro em leque: entrada em sequência e, depois, flutuação contínua e mínima."""
+    """Placas de vidro em leque: entrada em sequência e, depois, paradas na posição final."""
 
     def __init__(self, pai):
         super().__init__(pai, highlightthickness=0, bd=0)
@@ -104,9 +90,6 @@ class ArteVidro(tk.Canvas):
         self.aplicado.clear()
         self.desenhar()
 
-    def intervalo(self):
-        return QUADRO_ENTRADA_MS if self.tempo() < duracao_total() else QUADRO_FLUTUACAO_MS
-
     def animar(self):
         """Começa a entrada das placas; chamar de novo não reinicia."""
         if self.inicio is None:
@@ -115,12 +98,14 @@ class ArteVidro(tk.Canvas):
     def tempo(self):
         return 0.0 if self.inicio is None else time.monotonic() - self.inicio
 
+    def terminou(self):
+        return self.inicio is not None and self.tempo() >= duracao_total()
+
     def desenhar(self):
         largura, altura = self.winfo_width(), self.winfo_height()
         if largura < 20 or altura < 20:
             return
         agora = self.tempo()
-        depois = max(0.0, agora - duracao_total())
         conjunto = (CELULA[0] + max(x for x, _ in POSICOES), CELULA[1] + max(y for _, y in POSICOES))
         base_x = max(0, (largura - conjunto[0]) // 2)
         base_y = (altura - conjunto[1]) // 2
@@ -129,9 +114,8 @@ class ArteVidro(tk.Canvas):
             acender = suavizar((agora - indice * INTERVALO - ATRASO_BRILHO) / DURACAO)
             # Placas do fundo se deslocam menos, reforçando a sensação de profundidade.
             profundidade = 0.55 + 0.45 * indice / (len(POSICOES) - 1)
-            ox, oy = flutuacao(indice, depois)
-            x = base_x + fx + DESLOCAMENTO[0] * profundidade * (1 - entrada) + ox
-            y = base_y + fy + DESLOCAMENTO[1] * profundidade * (1 - entrada) + oy
+            x = base_x + fx + DESLOCAMENTO[0] * profundidade * (1 - entrada)
+            y = base_y + fy + DESLOCAMENTO[1] * profundidade * (1 - entrada)
             for item, camada, progresso in ((vidro, 0, entrada), (brilho, 1, acender)):
                 coluna = nivel(progresso)
                 estado = (round(x), round(y), coluna)
@@ -146,18 +130,14 @@ class ArteVidro(tk.Canvas):
 
 
 class LuzesFundo:
-    """Manchas de luz translúcidas no Canvas da tela inicial, abaixo de todo o resto, em deriva lenta."""
+    """Manchas de luz translúcidas e fixas no Canvas da tela inicial, abaixo de todo o resto."""
 
     def __init__(self, canvas):
         self.canvas = canvas
-        self.inicio = time.monotonic()
         self.itens = [canvas.create_image(0, 0, anchor='center', tags='luz') for _ in LUZES]
         canvas.tag_lower('luz')
-        self.aplicado = {}
+        self.area = None
         self.atualizar_tema()
-
-    def intervalo(self):
-        return QUADRO_LUZES_MS
 
     def atualizar_tema(self):
         imagens = imagens_luz(self.canvas._root(), modo_atual())
@@ -165,26 +145,21 @@ class LuzesFundo:
             self.canvas.itemconfigure(item, image=imagem)
         self.desenhar()
 
-    def desenhar(self):
-        largura, altura = self.canvas.winfo_width(), self.canvas.winfo_height()
-        segundos = time.monotonic() - self.inicio
-        for item, ((fx, fy), (ax, ay), (px, py)) in zip(self.itens, LUZES):
-            x = fx * largura + ax * math.sin(2 * math.pi * segundos / px)
-            y = fy * altura + ay * math.sin(2 * math.pi * segundos / py + 0.7)
-            posicao = (round(x), round(y))
-            if self.aplicado.get(item) != posicao:
-                self.aplicado[item] = posicao
-                self.canvas.coords(item, *posicao)
+    def desenhar(self, area=None):
+        """Posiciona as luzes na área (x, y, largura, altura) da composição; sem área, no Canvas inteiro."""
+        self.area = area or self.area or (0, 0, self.canvas.winfo_width(), self.canvas.winfo_height())
+        x, y, largura, altura = self.area
+        for item, (fx, fy) in zip(self.itens, LUZES):
+            self.canvas.coords(item, round(x + fx * largura), round(y + fy * altura))
 
 
 class Relogio:
-    """Um único laço de animação para a tela inicial, em pausa quando ela não está à vista."""
+    """Laço da animação de entrada: em pausa fora da tela inicial e encerrado quando tudo termina."""
 
     def __init__(self, canvas, *animados):
         self.canvas = canvas
         self.animados = animados
         self.agendamento = None
-        self.proximos = {}  # Quando cada animação deve desenhar de novo (relógio monotônico).
         canvas.bind('<Destroy>', lambda e: self.parar() if e.widget is canvas else None, add='+')
 
     def iniciar(self):
@@ -202,10 +177,9 @@ class Relogio:
             return
         visivel = self.canvas.winfo_viewable() and self.canvas.winfo_toplevel().state() != 'iconic'
         if visivel:
-            agora = time.monotonic()
             for animado in self.animados:
-                if agora >= self.proximos.get(id(animado), 0):
-                    animado.desenhar()
-                    intervalo = getattr(animado, 'intervalo', lambda: QUADRO_MS)()
-                    self.proximos[id(animado)] = agora + intervalo / 1000 - 0.005
+                animado.desenhar()
+            # Depois do último quadro, tudo fica parado: o laço não volta a rodar.
+            if all(getattr(animado, 'terminou', lambda: False)() for animado in self.animados):
+                return
         self.agendamento = self.canvas.after(QUADRO_MS if visivel else PAUSA_MS, self.quadro)

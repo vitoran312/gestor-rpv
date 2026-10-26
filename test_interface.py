@@ -1315,6 +1315,16 @@ class TestInterface(unittest.TestCase):
         self.assertTrue(self.programa.layout_largo_inicio)
         largura_util = tela.winfo_width() - 2 * 40
         self.assertAlmostEqual(entrada.winfo_width() + 2 * 18, largura_util * 0.56, delta=8)
+        # Em telas maiores, a composição não estica: mantém o tamanho e fica centralizada.
+        medidas = []
+        for geometria in ('1700x1100', '2000x1200'):
+            self.root.geometry(geometria)
+            self.root.update()
+            self.root.update()
+            medidas.append((entrada.winfo_width(), entrada.winfo_height(),
+                            entrada.winfo_x() - (tela.winfo_width() - 1420) // 2,
+                            entrada.winfo_y() - (tela.winfo_height() - 900) // 2))
+        self.assertEqual(medidas[0], medidas[1])
         self.assertLess(entrada.winfo_x() + entrada.winfo_width(), historico.winfo_x())
         self.assertEqual(historico.winfo_x(), contas.winfo_x())
         self.assertLess(historico.winfo_y() + historico.winfo_height(), contas.winfo_y())
@@ -1489,7 +1499,7 @@ class TestInterface(unittest.TestCase):
         self.assertEqual((tela.winfo_width(), tela.winfo_height()), (600, 450))
         tela.destroy()
 
-    def test_arte_entra_em_quatro_segundos_e_depois_flutua_sem_parar(self):
+    def test_arte_entra_em_quatro_segundos_e_depois_fica_parada(self):
         import time
         import arte_inicio
         self.root.geometry('1600x900')
@@ -1509,7 +1519,7 @@ class TestInterface(unittest.TestCase):
         arte.desenhar()
         estados = [arte.itemcget(vidro, 'state') for _brilho, vidro in arte.itens]
         self.assertEqual((estados[0], estados[-1]), ('normal', 'hidden'))
-        # Depois da entrada, todas ficam no nível máximo e seguem se movendo, poucos pixels.
+        # Depois da entrada, todas ficam no nível máximo e paradas.
         arte.inicio = time.monotonic() - arte_inicio.duracao_total() - 2.0
         arte.desenhar()
         finais = {arte.itemcget(item, 'image') for par in arte.itens for item in par}
@@ -1519,10 +1529,13 @@ class TestInterface(unittest.TestCase):
         arte.inicio -= 2.5
         arte.desenhar()
         depois = [arte.coords(vidro) for _brilho, vidro in arte.itens]
-        self.assertNotEqual(antes, depois)
-        self.assertTrue(all(abs(a - b) <= 12 for p, q in zip(antes, depois) for a, b in zip(p, q)))
-        # O relógio continua ativo enquanto a tela inicial está à vista.
-        self.assertIsNotNone(self.programa.relogio_inicio.agendamento)
+        self.assertEqual(antes, depois)
+        # Terminada a entrada, o relógio encerra o laço.
+        self.assertTrue(arte.terminou())
+        relogio = self.programa.relogio_inicio
+        relogio.parar()
+        relogio.quadro()
+        self.assertIsNone(relogio.agendamento)
         # Trocar de tema só troca as imagens: não reinicia a animação.
         inicio = arte.inicio
         self.programa.alternar_tema()
@@ -1554,15 +1567,13 @@ class TestInterface(unittest.TestCase):
         relogio.quadro()
         self.assertEqual(len(desenhos), 2)
 
-    def test_luzes_de_fundo_ficam_atras_de_tudo_e_derivam(self):
-        import time
+    def test_luzes_de_fundo_ficam_atras_de_tudo_e_paradas(self):
         tela = self.programa.inicio
         luzes = self.programa.luzes_inicio
         self.assertEqual(tela.find_all()[:len(luzes.itens)], tuple(luzes.itens))
         antes = [tela.coords(i) for i in luzes.itens]
-        luzes.inicio = time.monotonic() - 10
         luzes.desenhar()
-        self.assertNotEqual([tela.coords(i) for i in luzes.itens], antes)
+        self.assertEqual([tela.coords(i) for i in luzes.itens], antes)
 
     def test_arte_de_vidro_comeca_sozinha_ao_abrir(self):
         arte = self.programa.arte_inicio

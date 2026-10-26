@@ -14,6 +14,9 @@ from tema import cores, modo_atual, PALETAS
 from versao import VERSAO
 from visual import Icone, _png_arredondado, px
 
+# Tamanho máximo da composição da tela inicial (em pixels a 100% de escala), nas proporções de referência.
+COMPOSICAO = (1420, 900)
+
 ATALHOS = (
     ('entrada', 'Uma nova operação', 'Cadastre sua próxima aquisição\ne reúna os documentos da entrada.', 'Nova entrada'),
     ('historico', 'Tudo sob controle', 'Consulte valores, acompanhe prazos\ne confirme seus recebimentos.', 'Minhas operações'),
@@ -144,7 +147,7 @@ class InicioMixin:
             ('sobre', self.botao_sobre), ('tema', self.botao_alternar_tema), ('sair', self.botao_sair),
             *((chave, peca) for chave, (peca, _tipo) in self.pecas_inicio.items()))}
         self.desenhos_inicio = {chave: tela.create_image(0, 0, anchor='nw') for chave in self.pecas_inicio}
-        self.relogio_inicio = Relogio(tela, self.luzes_inicio, self.arte_inicio)
+        self.relogio_inicio = Relogio(tela, self.arte_inicio)
         tela.bind('<Configure>', lambda _: self.organizar_inicio())
         self.tematizar_inicio()
 
@@ -184,6 +187,11 @@ class InicioMixin:
         if largura < 50 or altura < 50:
             return
         p = lambda v: px(tela, v)
+        # A composição tem tamanho máximo e fica centralizada: em telas grandes, sobra fundo ao redor,
+        # em vez de esticar os cartões. Daqui para baixo, largura e altura são as da composição.
+        janela_largura, janela_altura = largura, altura
+        largura, altura = min(largura, p(COMPOSICAO[0])), min(altura, p(COMPOSICAO[1]))
+        ox, oy = (janela_largura - largura) // 2, (janela_altura - altura) // 2
         margem, espaco = p(40), p(22)
         tela.coords(self.janelas_inicio['tema'], largura - margem, p(22))
         tela.itemconfigure(self.janelas_inicio['tema'], anchor='ne')
@@ -259,6 +267,15 @@ class InicioMixin:
                   if chave in self.medidas_inicio}
         for chave in [k for k in self.superficies_inicio if k[1:] not in em_uso]:
             del self.superficies_inicio[chave]
+        # Desloca tudo o que foi posicionado para a composição centralizada.
+        visiveis = [chave for chave in self.pecas_inicio if chave in retangulos]
+        itens = [self.janelas_inicio[nome] for nome in ('sobre', 'tema', 'sair', *visiveis)]
+        itens += [self.desenhos_inicio[chave] for chave in visiveis]
+        itens += [self.emblema_inicio, self.titulo_inicio, self.subtitulo_inicio,
+                  self.assinatura_inicio, self.marca_assinatura]
+        for item in itens:
+            tela.move(item, ox, oy)
+        self.luzes_inicio.desenhar((ox, oy, largura, altura))
         self.janela.after_idle(self.posicionar_arte)
 
     def posicionar_arte(self):
