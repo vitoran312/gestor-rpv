@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## 0.29.1
+
+- Operações recebidas com a linha inteira em verde (antes azul), nos dois temas. Contraste WCAG AA:
+  4,7:1 no claro e 8,4:1 no escuro.
+- Página do gráfico mensal centralizada na janela.
+
 ## 0.29.0
 
 - Minhas operações: no tema claro, os títulos das colunas ficam em negrito.

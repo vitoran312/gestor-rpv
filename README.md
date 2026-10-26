@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.29.0
+# Gestor de RPV — 0.29.1
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -14,7 +14,7 @@ python app.py
 
 Mantenha todos os arquivos `.py` e a pasta `recursos` juntos. Essa pasta contém o ícone da Vitoran Tech.
 A tela inicial tem os botões **Nova entrada**, **Minhas operações**,
-**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.29.0**, acompanhada do emblema com 50% de opacidade,
+**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.29.1**, acompanhada do emblema com 50% de opacidade,
 aparece no canto inferior direito.
 O número é lido da versão do programa e acompanha cada atualização.
 O programa funciona em uma única janela, que abre maximizada. **Minhas operações**, **Contas de
@@ -95,7 +95,7 @@ aparência; o menu **Exibir** do histórico oferece as mesmas opções.
 - **Editar → Editar registro / Excluir registro**: edita uma linha ou envia as selecionadas à lixeira.
 - **Exibir → Gráfico mensal**: barras em 3D dos últimos 12 meses com a quantidade de entradas (pela data
   de aquisição, em tom neutro) e de recebidas (pela data do recebimento, em verde). Cada barra mostra o
-  número no topo; passe o mouse sobre um mês para ver os dois totais.
+  número no topo; passe o mouse sobre um mês para ver os dois totais. A página fica centralizada na janela.
 - **Exibir → Tema claro / Tema escuro**: muda o tema de todas as janelas,
   inclusive formulários, calendários, menus de contexto e calculadora.
   A escolha é lembrada e o aplicativo volta a abrir no último tema usado.
@@ -182,7 +182,7 @@ com altura das linhas e largura da janela ajustadas para a leitura.
   pela data do computador: ao abrir o programa, ao voltar a cada página e na virada do dia, mesmo com
   o programa aberto. A **linha inteira** fica com fundo e texto vermelhos, a tela inicial avisa quantas
   operações estão atrasadas (clique no aviso para ver só elas) e o filtro Atrasadas também fica vermelho.
-  Do lado oposto, a linha de uma operação **recebida** fica inteira azul, com fundo e texto azuis.
+  Do lado oposto, a linha de uma operação **recebida** fica inteira verde, com fundo e texto verdes.
   No tema claro, os títulos das colunas ficam em negrito.
 - Clique nos cabeçalhos para ordenar: valores e datas começam do maior/mais recente
   para o menor; nomes e contas começam em ordem alfabética. O segundo clique inverte

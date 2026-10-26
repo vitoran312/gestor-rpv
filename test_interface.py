@@ -396,9 +396,9 @@ class TestInterface(unittest.TestCase):
         self.assertEqual(caixa.cget('text'), '22/10/2026')
         self.assertEqual(caixa.cget('style'), 'Recebida.Recebido.TCheckbutton')
         estilo = ttk.Style()
-        self.assertEqual(str(estilo.lookup('Recebida.Recebido.TCheckbutton', 'foreground')), cores()['azul'])
+        self.assertEqual(str(estilo.lookup('Recebida.Recebido.TCheckbutton', 'foreground')), cores()['verde'])
         self.assertIn('bold', str(estilo.lookup('Recebida.Recebido.TCheckbutton', 'font')))
-        # Recebida: a linha inteira fica azul, como a atrasada fica vermelha.
+        # Recebida: a linha inteira fica verde, como a atrasada fica vermelha.
         self.assertEqual(tabela.item(str(identificador), 'tags'), ('recebida',))
         self.assertEqual(str(tabela.tag_configure('recebida', 'background')), cores()['recebida'])
         self.assertEqual(self.programa.acoes_linhas[str(identificador)][0].cget('style'), 'PrevisaoRecebida.TLabel')

@@ -130,10 +130,10 @@ def criar_estilos(janela, estilo, fonte):
     estilo.configure('PrevisaoAtrasada.TLabel',background=c['atraso'],foreground=c['vermelho'],font=(fonte,12,'bold'),anchor='center')
     estilo.configure('Atrasada.Operacoes.TCheckbutton',background=c['atraso'])
     estilo.map('Atrasada.Operacoes.TCheckbutton',background=[('active',c['atraso']),('!disabled',c['atraso'])])
-    # Recebida: a linha inteira em azul, o inverso do vermelho das atrasadas.
-    estilo.configure('PrevisaoRecebida.TLabel',background=c['recebida'],foreground=c['azul'],font=(fonte,12,'bold'),anchor='center')
-    estilo.configure('Recebida.Recebido.TCheckbutton',foreground=c['azul'],background=c['recebida'])
-    estilo.map('Recebida.Recebido.TCheckbutton',foreground=[('!disabled',c['azul'])],
+    # Recebida: a linha inteira em verde, o inverso do vermelho das atrasadas.
+    estilo.configure('PrevisaoRecebida.TLabel',background=c['recebida'],foreground=c['verde'],font=(fonte,12,'bold'),anchor='center')
+    estilo.configure('Recebida.Recebido.TCheckbutton',foreground=c['verde'],background=c['recebida'])
+    estilo.map('Recebida.Recebido.TCheckbutton',foreground=[('!disabled',c['verde'])],
                background=[('active',c['recebida']),('!disabled',c['recebida'])])
     estilo.configure('PrevisaoAdiada.TLabel',background=campo,foreground=c['vermelho'],font=(fonte,12),anchor='center')
     estilo.configure('ContaSituacao.TLabel',font=(fonte,12,'bold'),background=campo)

@@ -192,7 +192,7 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
         if hasattr(self,'tabela') and self.tabela.winfo_exists():
             self.tabela.tag_configure('alternada',background=c['linha'])
             self.tabela.tag_configure('atrasada',foreground=c['vermelho'],background=c['atraso'])
-            self.tabela.tag_configure('recebida',foreground=c['azul'],background=c['recebida'])
+            self.tabela.tag_configure('recebida',foreground=c['verde'],background=c['recebida'])
         if self.janela_contas is not None and self.janela_contas.tela.winfo_exists():
             self.janela_contas.atualizar_situacoes()
 

@@ -155,18 +155,21 @@ class JanelaGrafico:
         self.tela = ttk.Frame(aplicativo.janela)
         corpo = ttk.Frame(self.tela, padding=(24, 16, 24, 24))
         corpo.pack(fill='both', expand=True)
+        # Toda a página (cabeçalho, legenda, gráfico e detalhe) fica numa coluna centralizada na janela.
+        coluna = ttk.Frame(corpo)
+        coluna.pack(expand=True)
         entradas = sum(e for _, e, _r in self.dados)
         recebidas = sum(r for _, _e, r in self.dados)
-        aplicativo.cabecalho_pagina(corpo, 'Gráfico mensal',
+        aplicativo.cabecalho_pagina(coluna, 'Gráfico mensal',
                                     f'Últimos 12 meses: {quantidade(entradas, "entrada", "entradas")} e '
                                     f'{quantidade(recebidas, "recebida", "recebidas")}.')
-        legenda = ttk.Frame(corpo)
+        legenda = ttk.Frame(coluna)
         legenda.pack(anchor='w', pady=(0, 8))
         for texto, estilo in (('Entradas (data de aquisição)', 'LegendaInvestido.TLabel'),
                               ('Recebidas (data do recebimento)', 'LegendaRecebido.TLabel')):
             ttk.Label(legenda, text='■', style=estilo).pack(side='left', padx=(0, 6))
             ttk.Label(legenda, text=texto).pack(side='left', padx=(0, 20))
-        cartao = ttk.Frame(corpo, style='Cartao.TFrame', padding=16)
+        cartao = ttk.Frame(coluna, style='Cartao.TFrame', padding=16)
         cartao.pack(anchor='w')
         self.grafico = GraficoMensal(cartao, self.dados)
         self.grafico.pack()
@@ -174,7 +177,7 @@ class JanelaGrafico:
         corpo.bind('<Configure>', lambda e: self.grafico.configure(
             width=max(px(corpo, 500), min(px(corpo, LARGURA_MAXIMA), e.width - px(corpo, 80)))), add='+')
         self.detalhe = tk.StringVar(value='Passe o mouse sobre um mês para ver os valores.')
-        ttk.Label(corpo, textvariable=self.detalhe, style='Discreto.TLabel').pack(anchor='w', pady=(10, 0))
+        ttk.Label(coluna, textvariable=self.detalhe, style='Discreto.TLabel').pack(anchor='w', pady=(10, 0))
         self.grafico.bind('<<MesDestacado>>', self.mostrar_detalhe)
         aplicativo.abrir_pagina(self.tela, 'Gráfico mensal')
 

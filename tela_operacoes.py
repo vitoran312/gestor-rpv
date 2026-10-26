@@ -226,9 +226,9 @@ class OperacoesMixin:
         self.tabela.delete(*self.tabela.get_children())
         self.tabela.tag_configure('alternada',background=cores()['linha'])
         self.tabela.tag_configure('atrasada',foreground=cores()['vermelho'],background=cores()['atraso'])
-        self.tabela.tag_configure('recebida',foreground=cores()['azul'],background=cores()['recebida'])
+        self.tabela.tag_configure('recebida',foreground=cores()['verde'],background=cores()['recebida'])
         for indice,r in enumerate(registros):
-            # Linha atrasada inteira em vermelho e recebida inteira em azul; o tom alternado não se aplica a elas.
+            # Linha atrasada inteira em vermelho e recebida inteira em verde; o tom alternado não se aplica a elas.
             etiquetas = (('atrasada',) if str(r['id']) in self.atrasadas else ('recebida',) if r['recebimento']
                          else ('alternada',) if indice%2 else ())
             self.tabela.insert('', 'end', iid=str(r['id']), tags=etiquetas, values=(
