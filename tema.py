@@ -31,6 +31,10 @@ def cores():
     return PALETAS[_modo]
 
 
+def modo_atual():
+    return _modo
+
+
 def atualizar_widgets(widget):
     c = cores()
     if isinstance(widget, (tk.Tk, tk.Toplevel)):

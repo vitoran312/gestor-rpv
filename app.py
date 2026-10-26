@@ -15,6 +15,7 @@ from calculadora import JanelaCalculadora
 from interacao import instalar_menu_texto
 from estilos import criar_estilos
 from identidade import aplicar_icone, preparar_windows
+from arte_inicio import ArteVidro
 from navegacao import NavegacaoMixin
 from tela_operacoes import OperacoesMixin
 from tela_registro import RegistroMixin
@@ -72,6 +73,7 @@ class Aplicativo(NavegacaoMixin, OperacoesMixin, RegistroMixin, ArquivosMixin):
         self.grade_inicio = ttk.Frame(inicio)
         self.grade_inicio.grid(row=3,column=0,sticky='ew')
         self.cartoes_inicio = []
+        self.partes_inicio = {}
         for icone,titulo,descricao,rotulo,acao in (
             ('entrada','Uma nova operação','Cadastre sua próxima aquisição\ne reúna os documentos da entrada.','Nova entrada',self.formulario),
             ('historico','Tudo sob controle','Consulte valores, acompanhe prazos\ne confirme seus recebimentos.','Minhas operações',self.mostrar_historico),
@@ -80,9 +82,18 @@ class Aplicativo(NavegacaoMixin, OperacoesMixin, RegistroMixin, ArquivosMixin):
             faixa = ttk.Frame(cartao,style='Superficie.TFrame')
             faixa.pack(fill='x')
             Icone(faixa,icone).pack(side='left')
-            ttk.Label(cartao,text=titulo,style='CartaoTitulo.TLabel').pack(anchor='w',pady=(14,8))
-            ttk.Label(cartao,text=descricao,style='CartaoTexto.TLabel',justify='left').pack(anchor='w')
-            ttk.Button(cartao,text=rotulo,style='Inicio.Principal.TButton' if icone=='entrada' else 'Inicio.TButton',command=acao).pack(side='bottom',fill='x',pady=(20,8))
+            rotulo_titulo = ttk.Label(cartao,text=titulo,style='CartaoTitulo.TLabel')
+            rotulo_titulo.pack(anchor='w',pady=(14,8))
+            rotulo_descricao = ttk.Label(cartao,text=descricao,style='CartaoTexto.TLabel',justify='left')
+            rotulo_descricao.pack(anchor='w')
+            botao_cartao = ttk.Button(cartao,text=rotulo,style='Inicio.Principal.TButton' if icone=='entrada' else 'Inicio.TButton',command=acao)
+            botao_cartao.pack(side='bottom',fill='x',pady=(20,8))
+            self.partes_inicio[cartao] = (faixa,rotulo_titulo,rotulo_descricao,botao_cartao)
+            if icone=='entrada':
+                # Arte de vidro atrás do conteúdo: criada depois, mas rebaixada abaixo dos demais elementos do cartão.
+                self.arte_inicio = ArteVidro(cartao)
+                self.arte_inicio.tk.call('lower', self.arte_inicio._w)  # No Canvas, lower() moveria desenhos, não o widget.
+                cartao.bind('<Configure>',lambda _: self.janela.after_idle(self.posicionar_arte),add='+')
             self.cartoes_inicio.append(cartao)
         self.colunas_inicio = None
         self.grade_inicio.bind('<Configure>',self.organizar_inicio)
@@ -117,6 +128,8 @@ class Aplicativo(NavegacaoMixin, OperacoesMixin, RegistroMixin, ArquivosMixin):
         janela.bind('<Destroy>',self.cancelar_agendamento_backup,add='+')
         centralizar(janela, 1480, 980)
         janela.deiconify()
+        # A arte de vidro entra uma única vez, logo depois que a janela aparece.
+        self.agendamento_arte = janela.after(250,self.arte_inicio.animar)
         # As páginas (operações, contas, gráfico) usam a mesma janela; maximizada, a tabela tem o espaço de antes.
         maximizar(janela)
 
@@ -173,7 +186,7 @@ class Aplicativo(NavegacaoMixin, OperacoesMixin, RegistroMixin, ArquivosMixin):
                                                uniform='inicio' if i<colunas else '')
             self.grade_inicio.rowconfigure(i,weight=1 if colunas==1 or i==0 else 0)
         for i,cartao in enumerate(self.cartoes_inicio):
-            faixa,titulo,descricao,botao = cartao.winfo_children()
+            faixa,titulo,descricao,botao = self.partes_inicio[cartao]
             for filho in (faixa,titulo,descricao,botao):
                 filho.pack_forget()
                 filho.grid_forget()
@@ -181,7 +194,8 @@ class Aplicativo(NavegacaoMixin, OperacoesMixin, RegistroMixin, ArquivosMixin):
             for coluna in range(3):
                 cartao.columnconfigure(coluna,weight=1 if coluna==(0 if colunas==3 else 1) else 0)
             if colunas==3:
-                faixa.grid(row=0,column=0,sticky='ew')
+                # Só o ícone ocupa a faixa, para não cobrir a arte de vidro à direita.
+                faixa.grid(row=0,column=0,sticky='w')
                 titulo.grid(row=1,column=0,sticky='w',pady=(14,8))
                 descricao.grid(row=2,column=0,sticky='w')
                 botao.grid(row=3,column=0,sticky='ew',pady=(20,8))
@@ -191,6 +205,24 @@ class Aplicativo(NavegacaoMixin, OperacoesMixin, RegistroMixin, ArquivosMixin):
                 descricao.grid(row=1,column=1,sticky='w',pady=(4,0))
                 botao.grid(row=0,column=2,rowspan=2,sticky='e',padx=(18,0))
             cartao.grid(row=i//colunas,column=i%colunas,sticky='nsew',padx=(4,4),pady=4)
+        self.janela.after_idle(self.posicionar_arte)
+
+    def posicionar_arte(self):
+        """A arte ocupa só o espaço livre do cartão Nova entrada: à direita dos textos, acima do botão."""
+        arte = self.arte_inicio
+        if not arte.winfo_exists():
+            return
+        cartao = arte.master
+        _faixa,titulo,descricao,botao = self.partes_inicio[cartao]
+        esquerda = max(titulo.winfo_x()+titulo.winfo_reqwidth(),descricao.winfo_x()+descricao.winfo_reqwidth())+px(cartao,16)
+        topo, direita = px(cartao,14), cartao.winfo_width()-px(cartao,14)
+        base = botao.winfo_y()-px(cartao,10)
+        # No layout em linha (janelas estreitas) ou sem espaço suficiente, a arte sai de cena.
+        if self.colunas_inicio!=3 or direita-esquerda<px(cartao,90) or base-topo<px(cartao,80):
+            arte.place_forget()
+        else:
+            # bordermode='outside': as medidas partem da borda externa do cartão, sem somar o padding.
+            arte.place(x=esquerda,y=topo,width=direita-esquerda,height=base-topo,bordermode='outside')
 
     def atualizar_aviso_atrasadas(self):
         """Varre as previsões atuais ao abrir e ao voltar ao início; nada depende de abrir a lista."""

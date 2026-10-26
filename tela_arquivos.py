@@ -53,7 +53,7 @@ class ArquivosMixin:
     def cancelar_agendamento_backup(self, evento):
         if evento.widget is not self.janela:
             return
-        for nome in ('agendamento_backup', 'agendamento_data', 'agendamento_tema'):
+        for nome in ('agendamento_backup', 'agendamento_data', 'agendamento_tema', 'agendamento_arte'):
             if getattr(self, nome, None):
                 self.janela.after_cancel(getattr(self, nome))
                 setattr(self, nome, None)

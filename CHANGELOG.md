@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## 0.27.0
+
+- Arte de placas de vidro translúcidas atrás do conteúdo do cartão Uma nova operação, com animação de
+  abertura única: as placas surgem em sequência, deslizam até a posição final e as bordas acendem em
+  pêssego (carmim no tema claro). Dura cerca de 2,5 segundos e termina parada.
+- Transparência por composição de imagens PNG no Canvas, sem transparência de janela; cada quadro custa
+  cerca de 2 ms. Textos, botões, navegação e dados permanecem inalterados.
+
 ## 0.26.0
 
 - Janela de nova entrada e edição de registro cerca de 30% maior: fontes de 10 para 13 pontos, campos,

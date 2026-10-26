@@ -1468,6 +1468,66 @@ class TestInterface(unittest.TestCase):
         self.assertEqual((tela.winfo_width(), tela.winfo_height()), (600, 450))
         tela.destroy()
 
+    def test_arte_de_vidro_anima_uma_vez_atras_do_conteudo_e_para(self):
+        import time
+        import arte_inicio
+        self.root.geometry('1600x900')
+        self.root.update()
+        arte = self.programa.arte_inicio
+        cartao = arte.master
+        faixa, titulo, descricao, botao_entrada = self.programa.partes_inicio[cartao]
+        # Textos e botão do cartão continuam os mesmos.
+        self.assertEqual(titulo.cget('text'), 'Uma nova operação')
+        self.assertEqual(descricao.cget('text'), 'Cadastre sua próxima aquisição\ne reúna os documentos da entrada.')
+        self.assertEqual(botao_entrada.cget('text'), 'Nova entrada')
+        # A arte é o elemento mais baixo do cartão e fica fora da área dos textos e do botão.
+        self.assertEqual(self.root.tk.call('winfo', 'children', str(cartao))[0], str(arte))
+        self.assertEqual(arte.winfo_manager(), 'place')
+        self.assertGreaterEqual(arte.winfo_x(), descricao.winfo_x() + descricao.winfo_width())
+        self.assertLessEqual(arte.winfo_y() + arte.winfo_height(), botao_entrada.winfo_y())
+        self.assertLessEqual(arte.winfo_x() + arte.winfo_width(), cartao.winfo_width())
+        # Durante a animação, as placas surgem; ao fim do tempo, a animação para sozinha.
+        arte.cancelar()
+        arte.inicio, arte.concluida = time.monotonic() - 0.3, False
+        arte.quadro()
+        self.assertIsNotNone(arte.agendamento)
+        estados = [arte.itemcget(vidro, 'state') for _brilho, vidro in arte.itens]
+        self.assertEqual(estados[0], 'normal')
+        self.assertEqual(estados[-1], 'hidden')
+        arte.inicio = time.monotonic() - arte_inicio.duracao_total() - 0.1
+        arte.quadro()
+        self.assertTrue(arte.concluida)
+        self.assertIsNone(arte.agendamento)
+        finais = {arte.itemcget(item, 'image') for par in arte.itens for item in par}
+        esperadas = {str(arte.imagens[i, camada, arte_inicio.NIVEIS - 1]) for i in range(len(arte.itens)) for camada in (0, 1)}
+        self.assertEqual(finais, esperadas)
+        posicoes = [arte.coords(item) for par in arte.itens for item in par]
+        arte.animar()
+        self.root.update()
+        self.assertIsNone(arte.agendamento)
+        self.assertEqual([arte.coords(item) for par in arte.itens for item in par], posicoes)
+        # A troca de tema mantém a arte parada e passa para as imagens do outro tema.
+        self.programa.alternar_tema()
+        self.root.update()
+        self.assertIsNone(arte.agendamento)
+        self.assertEqual(arte.cget('bg'), PALETAS['escuro']['superficie'])
+        self.assertIn(arte.itemcget(arte.itens[-1][1], 'image'),
+                      {str(imagem) for imagem in arte_inicio.imagens_vidro(self.root, 'escuro').values()})
+        # Em janelas estreitas (cartões em linha), a arte sai de cena.
+        self.root.geometry('980x700')
+        self.root.update()
+        self.root.update()
+        self.assertEqual(self.programa.colunas_inicio, 1)
+        self.assertEqual(arte.winfo_manager(), '')
+
+    def test_arte_de_vidro_comeca_sozinha_ao_abrir(self):
+        arte = self.programa.arte_inicio
+        self.root.after(400, lambda: None)
+        fim = self.root.tk.call('clock', 'milliseconds') + 600
+        while self.root.tk.call('clock', 'milliseconds') < fim:
+            self.root.update()
+        self.assertIsNotNone(arte.inicio)
+
     def test_outro_tema_preparado_em_segundo_plano_sem_trocar_o_visivel(self):
         estilo = ttk.Style(self.root)
         self.assertNotIn('VitoranProEscuro', estilo.theme_names())
