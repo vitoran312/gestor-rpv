@@ -74,5 +74,20 @@ def verificar(exe):
                 processo.wait(timeout=20)
 
 
+def verificar_cifra(exe):
+    """O .exe precisa levar a biblioteca de criptografia: sem ela, nenhum backup com senha é criado ou aberto."""
+    with tempfile.TemporaryDirectory(prefix='gestor-exe-cifra-') as pasta:
+        resultado = Path(pasta) / 'resultado.txt'
+        ambiente = dict(os.environ, LOCALAPPDATA=pasta, GESTOR_RPV_AUTOTESTE_CIFRA=str(resultado))
+        ambiente['PATH'] = str(Path(os.environ['SystemRoot']) / 'System32')
+        codigo = subprocess.run([str(exe)], env=ambiente, timeout=120).returncode
+        texto = resultado.read_text(encoding='utf-8') if resultado.exists() else '(sem resultado)'
+        if codigo != 0 or texto != 'ok':
+            raise RuntimeError(f'Criptografia não funciona no executável (código {codigo}):\n{texto}')
+    print('Executável cifra e decifra backups.')
+
+
 if __name__ == '__main__':
-    verificar(Path(sys.argv[1]).resolve())
+    exe = Path(sys.argv[1]).resolve()
+    verificar_cifra(exe)
+    verificar(exe)

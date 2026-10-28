@@ -13,6 +13,8 @@ import sys
 import unicodedata
 from pathlib import Path
 
+from diario import log
+
 MAGICO = b'GRPVCIF1'
 TAMANHO_SAL = 16
 TAMANHO_PREFIXO = 7   # Mais 4 bytes do número do bloco e 1 do marcador de último bloco: nonce de 12 bytes.
@@ -35,6 +37,7 @@ def _aesgcm(chave):
     try:
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     except ImportError as erro:  # Só acontece rodando o código-fonte sem as dependências instaladas.
+        log.error('Biblioteca de criptografia não carregou.', exc_info=True)
         raise ValueError('Instale o pacote "cryptography" para criar ou abrir backups com senha.') from erro
     return AESGCM(chave)
 
@@ -180,3 +183,20 @@ def _decifrar(origem, destino, senha):
                 if ultimo:
                     return
                 indice, atual = indice + 1, seguinte
+
+
+def autoteste(resultado):
+    """Usado pelo CI no .exe gerado: cifra e decifra um arquivo pequeno e grava "ok" ou o erro em `resultado`."""
+    import tempfile
+    import traceback
+    try:
+        with tempfile.TemporaryDirectory() as pasta:
+            original, cifrado_, volta = (Path(pasta) / nome for nome in ('a', 'b', 'c'))
+            original.write_bytes(os.urandom(BLOCO + 123))
+            cifrar_arquivo(original, cifrado_, 'autoteste do executavel')
+            decifrar_arquivo(cifrado_, volta, 'autoteste do executavel')
+            texto = 'ok' if volta.read_bytes() == original.read_bytes() else 'conteúdo diferente'
+    except BaseException:
+        texto = traceback.format_exc()
+    Path(resultado).write_text(texto, encoding='utf-8')
+    return 0 if texto == 'ok' else 1

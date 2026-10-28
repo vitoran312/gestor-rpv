@@ -1,10 +1,12 @@
 """Gestor de RPV: interface desktop em Python."""
+import os
 import sqlite3
 import tkinter as tk
 import webbrowser
 from datetime import date
 from tkinter import messagebox, ttk
 
+import cifra
 import demonstracao
 import instancia
 from backup import limpar_temporarios, recuperar_interrompidas
@@ -212,6 +214,9 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
 
 
 if __name__ == '__main__':
+    if os.environ.get('GESTOR_RPV_AUTOTESTE_CIFRA'):
+        # Só o CI usa: confere, no .exe já empacotado, que a criptografia dos backups foi incluída.
+        raise SystemExit(cifra.autoteste(os.environ['GESTOR_RPV_AUTOTESTE_CIFRA']))
     preparar_windows()
     diario.ativar(pasta_dados())
     janela = tk.Tk()
