@@ -63,6 +63,31 @@ class TestDemonstracao(unittest.TestCase):
         demonstracao.remover(banco)
         self.assertEqual(len(banco.listar()), 1)
 
+    def test_remover_nao_apaga_cadastro_que_reaproveitou_o_numero_de_um_ficticio(self):
+        banco = Banco(self.caminho)
+        demonstracao.carregar(banco)
+        ultima_operacao = max(r['id'] for r in banco.listar())
+        ultima_conta = max(c['id'] for c in banco.contas())
+        # A pessoa exclui de vez a última operação e a última conta fictícias...
+        banco.excluir(ultima_operacao)
+        banco.excluir_permanentemente([ultima_operacao])
+        banco.remover_contas([ultima_conta])
+        # ...e o SQLite dá os mesmos números aos cadastros dela.
+        conta = banco.salvar_conta(dados_conta(identificacao='Minha conta', cpf='11144477735',
+                                               numero='55555-5', pix='minha@exemplo.com'))
+        propria = banco.salvar(dados_rpv(nome='Cliente Real', conta_id=conta))
+        self.assertEqual((propria, conta), (ultima_operacao, ultima_conta))
+        anexo = Path(self.temp.name) / 'contrato.pdf'
+        anexo.write_bytes(b'%PDF-ficticio')
+        ficticia = banco.listar()[-1]['id']
+        banco.salvar(dict(banco.obter(ficticia)), ficticia, anexos=[anexo])
+        arquivo = banco.caminho_documento(banco.documentos(ficticia)[0]['id'])
+        demonstracao.remover(banco)
+        self.assertEqual([r['nome'] for r in banco.listar()], ['Cliente Real'])
+        self.assertEqual(banco.obter(propria)['conta_id'], conta)
+        self.assertEqual([c['identificacao'] for c in banco.contas()], ['Minha conta'])
+        self.assertFalse(arquivo.exists())
+
 
 if __name__ == '__main__':
     unittest.main()

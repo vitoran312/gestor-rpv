@@ -70,6 +70,9 @@ def ativa(banco):
 def remover(banco):
     """Apaga só o que a demonstração criou; operações cadastradas pela pessoa continuam intactas.
 
+    Os números guardados na carga não bastam: depois de uma exclusão definitiva, o SQLite pode dar o mesmo
+    número a um cadastro novo. Por isso só sai o registro que ainda tem o nome fictício (operações) ou o CPF
+    fictício (contas) da demonstração. Os anexos das operações apagadas saem junto.
     Se uma operação própria usar uma conta de demonstração, ela preserva a cópia dos dados bancários,
     como em qualquer conta removida.
     """
@@ -77,10 +80,17 @@ def remover(banco):
     if not registro:
         return
     ids = json.loads(registro)
-    with banco.conectar() as con:
+    nomes = {operacao[0] for operacao in OPERACOES}
+    cpfs = {conta['cpf'] for conta in CONTAS}
+    with banco.arquivos_para_excluir() as preparar, banco.conectar() as con:
         con.execute('BEGIN IMMEDIATE')
-        con.executemany('DELETE FROM rpvs WHERE id=?', [(i,) for i in ids['operacoes']])
-        con.executemany('UPDATE rpvs SET conta_id=NULL WHERE conta_id=?', [(i,) for i in ids['contas']])
-        con.executemany('DELETE FROM contas WHERE id=?', [(i,) for i in ids['contas']])
+        operacoes = [i for i in ids['operacoes']
+                     if (linha := con.execute('SELECT nome FROM rpvs WHERE id=?', (i,)).fetchone()) and linha['nome'] in nomes]
+        contas = [i for i in ids['contas']
+                  if (linha := con.execute('SELECT cpf FROM contas WHERE id=?', (i,)).fetchone()) and linha['cpf'] in cpfs]
+        for identificador in operacoes:
+            preparar(con.execute('SELECT * FROM documentos WHERE rpv_id=?', (identificador,)).fetchall())
+        con.executemany('DELETE FROM rpvs WHERE id=?', [(i,) for i in operacoes])
+        con.executemany('UPDATE rpvs SET conta_id=NULL WHERE conta_id=?', [(i,) for i in contas])
+        con.executemany('DELETE FROM contas WHERE id=?', [(i,) for i in contas])
         con.execute('DELETE FROM configuracoes WHERE chave=?', (CHAVE,))
-
