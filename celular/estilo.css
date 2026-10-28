@@ -202,9 +202,16 @@ dl.campos dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
 
 .grafico { width: 100%; height: auto; display: block; }
 .grafico text { fill: var(--secundario); font-size: 10px; }
+.grafico text.ano { font-size: 8px; }
+.grafico text.escala { font-size: 9px; }
 .grafico .entradas { fill: var(--neutro); }
 .grafico .recebidas { fill: var(--verde); }
 .grafico .eixo { stroke: var(--borda); }
+.grafico .grade { stroke: var(--borda-suave); stroke-dasharray: 2 3; }
+.grafico .fundo-mes { fill: transparent; }
+.grafico .mes { cursor: pointer; }
+.grafico .mes.escolhido .fundo-mes { fill: var(--realce); }
+.grafico .mes.escolhido text { fill: var(--texto); font-weight: 700; }
 .legenda { display: flex; gap: 16px; font-size: 0.85rem; margin-bottom: 8px; }
 .legenda span::before { content: "■ "; }
 .legenda .entradas::before { color: var(--neutro); }
@@ -213,3 +220,16 @@ dl.campos dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
 .documento { display: grid; gap: 12px; }
 .documento-imagem { width: 100%; height: auto; border-radius: 10px; background: var(--superficie); }
 .documento-pdf { width: 100%; height: 70vh; border: 1px solid var(--borda-suave); border-radius: 10px; background: #fff; }
+
+button.secundario { background: var(--superficie); color: var(--texto); }
+.botoes { display: flex; gap: 8px; margin-top: 8px; }
+.botoes button { margin-top: 0; }
+#abrir-faceid { margin: 12px 0; }
+#fonte { margin-bottom: 4px; }
+
+details.conta summary { list-style: none; display: grid; gap: 2px; cursor: pointer; }
+details.conta summary::-webkit-details-marker { display: none; }
+details.conta .mostrar { color: var(--marca); }
+details.conta[open] .mostrar { display: none; }
+details.conta[open] summary { margin-bottom: 10px; }
+.rotulo-conta { margin: 0 4px 6px; }

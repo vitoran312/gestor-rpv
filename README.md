@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.38.0
+# Gestor de RPV — 0.39.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -458,7 +458,14 @@ que abrem na tela — PDF ou imagem — e podem ser compartilhados ou salvos pel
 recebimento, Lixeira, Gráfico mensal e dados do backup aberto. "Fechar dados" apaga
 tudo da memória do celular. O endereço é https://vitoran312.github.io/gestor-rpv/; no Safari do iPhone,
 **Compartilhar → Adicionar à Tela de Início** instala o app com ícone e em tela cheia. O service worker
-(`celular/sw.js`) guarda só o código do app, para abrir também sem internet; os dados nunca são guardados.
+(`celular/sw.js`) guarda só o código do app, para abrir também sem internet.
+
+O último backup aberto fica guardado no aparelho (`celular/guarda.js`) exatamente como saiu do computador,
+trancado pela senha: nas próximas vezes não é preciso escolher o arquivo, e "Trocar por um backup mais novo"
+substitui o guardado. Com o Face ID ativado (`celular/faceid.js`, iOS 18 ou mais novo), o app abre com o rosto:
+uma chave de acesso do site, com a extensão PRF, tranca no aparelho a senha e a chave já calculada do backup,
+então a abertura também pula a conferência demorada da senha. Depois de 5 minutos em segundo plano o app
+tranca sozinho. Os dados bancários das contas aparecem recolhidos: só o nome do titular, até um toque.
 
 `celular/leitor.js` abre o backup e `celular/dados.js` repete as regras de `dados.py` e `grafico.py`
 (situação, valores, busca, indicadores e resumo mensal). `test_celular.py` grava backups com o Python, abre-os

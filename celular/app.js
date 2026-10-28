@@ -1,5 +1,5 @@
-// Telas do app (só consulta). Os dados ficam só na memória desta página: fechar o app ou tocar em
-// "Fechar dados" apaga tudo, e a próxima consulta abre o backup de novo.
+// Telas do app (só consulta). O backup fica guardado no aparelho como saiu do computador (trancado pela
+// senha); os dados abertos ficam só na memória desta página e somem ao trancar ou fechar o app.
 //
 // Todo texto vindo do backup entra na página por textContent (nunca como HTML).
 'use strict';
@@ -42,6 +42,17 @@
       .map(([rotulo, valor, classe]) => [el('dt', { texto: rotulo }), el('dd', { texto: String(valor), class: classe })]));
   }
 
+  // Conta bancária: aparece só o nome do titular; CPF, endereço, banco e Pix só depois de um toque.
+  function contaRecolhida(identificacao, conta) {
+    const detalhes = Object.entries(D.TITULOS_CONTA).filter(([chave]) => !['identificacao', 'nome'].includes(chave))
+      .map(([chave, rotulo]) => [rotulo, chave === 'cpf' ? D.cpf(conta[chave]) : conta[chave]]);
+    return el('details', { class: 'cartao conta' },
+      el('summary', {}, el('span', { class: 'nome', texto: conta.nome || identificacao || 'Conta removida' }),
+        el('span', { class: 'discreto pequeno', texto: identificacao && conta.nome ? identificacao : '' }),
+        el('span', { class: 'mostrar discreto pequeno', texto: 'Toque para ver os dados' })),
+      campos(detalhes));
+  }
+
   function cartao(...filhos) {
     return el('div', { class: 'cartao' }, ...filhos);
   }
@@ -51,21 +62,64 @@
   }
 
   // ---- Abertura do backup ------------------------------------------------------------------------------
+  // `fonte` é o backup que será aberto: o guardado neste aparelho ou um escolhido agora (novo). Depois de aberto
+  // com sucesso, um backup novo passa a ser o guardado.
+  const BLOQUEIO_MS = 5 * 60 * 1000;  // Em segundo plano por mais tempo que isso, o app tranca de novo.
+  let fonte = null;
+  let senhaRecente = null;  // Só até a pessoa responder se quer ativar o Face ID; nunca é gravada.
+  let escondidoEm = null;
+
   function mostrarAndamento(texto, fracao) {
     $('andamento').hidden = false;
     $('andamento-texto').textContent = texto;
     $('andamento-barra').style.width = `${Math.round(fracao * 100)}%`;
   }
 
-  $('formulario').addEventListener('submit', async (evento) => {
-    evento.preventDefault();
-    const arquivo = $('arquivo').files[0];
-    $('erro').hidden = true;
+  function mostrarErro(texto) {
+    $('andamento').hidden = true;
+    $('erro').textContent = texto;
+    $('erro').hidden = !texto;
+  }
+
+  async function prepararAbertura() {
+    const guardado = await Guarda.ler('backup').catch(() => null);
+    if (!fonte || !fonte.novo) {
+      fonte = guardado ? { ...guardado, novo: false } : null;
+    }
+    const faceId = fonte && await FaceId.ativo().catch(() => false);
+    $('fonte').hidden = !fonte;
+    if (fonte) {
+      $('fonte-titulo').textContent = fonte.novo ? 'Backup escolhido agora' : 'Backup guardado neste aparelho';
+      $('fonte-detalhe').textContent = fonte.criado_em ? `De ${D.dataHora(fonte.criado_em)}` : fonte.nome;
+    }
+    $('rotulo-arquivo').textContent = guardado ? 'Trocar por um backup mais novo (opcional)' : 'Backup (.rpvbackup)';
+    faceIdAtivo = Boolean(faceId);
+    $('abrir-faceid').hidden = !faceId;
+    $('abrir').textContent = faceId ? 'Abrir com a senha' : 'Abrir';
+    return faceId;
+  }
+
+  let faceIdAtivo = false;
+
+  async function abrirFonte({ senha = '', faceId = false, automatico = false }) {
+    mostrarErro('');
     $('abrir').disabled = true;
+    $('abrir-faceid').disabled = true;
     try {
-      mostrarAndamento('Lendo o arquivo…', 0);
-      const bytes = new Uint8Array(await arquivo.arrayBuffer());
-      const leitura = await LeitorBackup.ler(bytes, $('senha').value, {
+      if (!fonte) {
+        throw new LeitorBackup.ErroBackup('Escolha o arquivo do backup.');
+      }
+      let liberado = null;
+      if (faceId) {
+        mostrarAndamento('Aguardando o Face ID…', 0);
+        liberado = await FaceId.abrir();
+        senha = liberado.segredo.senha;
+      }
+      const chave = liberado && liberado.segredo.sal
+        ? { sal: FaceId.deB64(liberado.segredo.sal), bruta: FaceId.deB64(liberado.segredo.bruta) } : null;
+      mostrarAndamento('Abrindo o backup…', 0.05);
+      const leitura = await LeitorBackup.ler(new Uint8Array(fonte.bytes), senha, {
+        chave,
         // A senha leva alguns segundos de propósito (é o que impede tentativas em massa); a barra mostra o andamento.
         aoProgredir: (etapa, fracao) => mostrarAndamento(`${ETAPAS[etapa]}…`, etapa === 'senha' ? fracao * 0.9 : 0.9 + fracao * 0.1),
       });
@@ -74,9 +128,25 @@
       } finally {
         leitura.db.close();
       }
-      info = { arquivo: arquivo.name, tamanho: arquivo.size, manifesto: leitura.manifesto, cifrado: leitura.cifrado,
+      info = { arquivo: fonte.nome, tamanho: fonte.tamanho, manifesto: leitura.manifesto, cifrado: leitura.cifrado,
         tempos: leitura.tempos, extrair: leitura.extrair };
-      $('senha').value = '';
+      if (fonte.novo) {
+        // O arquivo é guardado como veio do computador: continua trancado pela senha.
+        fonte = { bytes: fonte.bytes, nome: fonte.nome, tamanho: fonte.tamanho, criado_em: leitura.manifesto.criado_em,
+          guardado_em: new Date().toISOString(), novo: false };
+        await Guarda.gravar('backup', { ...fonte, novo: undefined }).catch(() => {
+          info.naoGuardado = true;  // Sem espaço ou sem permissão: funciona agora, mas precisará escolher de novo.
+        });
+        Guarda.persistir();
+      }
+      if (liberado && leitura.chave && liberado.segredo.sal !== FaceId.paraB64(leitura.chave.sal)) {
+        // Backup novo, com outra chave: o mesmo Face ID passa a guardar a chave dele (a próxima abertura é rápida).
+        await liberado.atualizar(segredoDe(senha, leitura.chave)).catch(() => {});
+      }
+      senhaRecente = !faceId && leitura.cifrado ? { senha, chave: leitura.chave } : null;
+      if (senhaRecente) {
+        senhaRecente.oferecer = !faceIdAtivo && await FaceId.possivel() && !localStorageLer('faceid_recusado');
+      }
       $('formulario').reset();
       $('andamento').hidden = true;
       $('abertura').hidden = true;
@@ -87,14 +157,83 @@
         location.hash = '#inicio';
       }
     } catch (erro) {
-      $('andamento').hidden = true;
-      $('erro').textContent = erro instanceof LeitorBackup.ErroBackup ? erro.message
-        : 'Não foi possível abrir o backup neste aparelho: ' + (erro && erro.message ? erro.message : erro);
-      $('erro').hidden = false;
+      const cancelado = erro && (erro.name === 'NotAllowedError' || erro.name === 'AbortError');
+      if (automatico && cancelado) {
+        mostrarErro('');  // O iPhone pode exigir um toque antes do Face ID: o botão continua ali.
+        return;
+      }
+      mostrarErro(cancelado ? 'Face ID cancelado. Toque em "Abrir com Face ID" para tentar de novo, ou use a senha.'
+        : erro instanceof LeitorBackup.SenhaIncorreta && faceId
+          ? 'A senha guardada no Face ID não abre este backup (a senha dos backups foi trocada no computador?). Digite a senha nova.'
+          : erro instanceof LeitorBackup.ErroBackup || erro instanceof FaceId.FaceIdIndisponivel ? erro.message
+            : 'Não foi possível abrir o backup neste aparelho: ' + (erro && erro.message ? erro.message : erro));
     } finally {
       $('abrir').disabled = false;
+      $('abrir-faceid').disabled = false;
     }
+  }
+
+  function segredoDe(senha, chave) {
+    return { senha, sal: FaceId.paraB64(chave.sal), bruta: FaceId.paraB64(chave.bruta) };
+  }
+
+  $('arquivo').addEventListener('change', async () => {
+    const arquivo = $('arquivo').files[0];
+    if (!arquivo) {
+      return;
+    }
+    fonte = { bytes: await arquivo.arrayBuffer(), nome: arquivo.name, tamanho: arquivo.size, novo: true };
+    await prepararAbertura();
   });
+
+  $('formulario').addEventListener('submit', (evento) => {
+    evento.preventDefault();
+    abrirFonte({ senha: $('senha').value });
+  });
+
+  $('abrir-faceid').addEventListener('click', () => abrirFonte({ faceId: true }));
+
+  function localStorageLer(chave) {
+    try {
+      return localStorage.getItem(chave);
+    } catch (erro) {
+      return null;
+    }
+  }
+
+  function localStorageGravar(chave, valor) {
+    try {
+      localStorage.setItem(chave, valor);
+    } catch (erro) {
+      // Só serve para não perguntar de novo; sem ele, a pergunta volta.
+    }
+  }
+
+  async function ativarFaceId(aviso) {
+    if (!senhaRecente) {
+      return;
+    }
+    const pronto = () => {
+      senhaRecente = null;
+      faceIdAtivo = true;
+      aviso.replaceChildren(el('div', { texto: 'Pronto: nas próximas vezes, o app abre com o Face ID.' }));
+    };
+    try {
+      const completar = await FaceId.ativar(segredoDe(senhaRecente.senha, senhaRecente.chave));
+      if (!completar) {
+        pronto();
+        return;
+      }
+      aviso.replaceChildren(el('div', { texto: 'Falta confirmar uma vez com o Face ID.' }),
+        el('div', { class: 'botoes' }, el('button', { type: 'button', class: 'primario', texto: 'Confirmar com Face ID',
+          onclick: () => completar().then(pronto).catch(() => aviso.replaceChildren(
+            el('div', { texto: 'Face ID não foi ativado. Tente de novo pelo menu Mais.' }))) })));
+    } catch (erro) {
+      const cancelado = erro && (erro.name === 'NotAllowedError' || erro.name === 'AbortError');
+      aviso.replaceChildren(el('div', { texto: cancelado ? 'Face ID não foi ativado.' : erro instanceof FaceId.FaceIdIndisponivel
+        ? erro.message : 'Não foi possível ativar o Face ID neste aparelho.' }));
+    }
+  }
 
   function liberarDocumento() {
     if (enderecoAberto) {
@@ -103,17 +242,44 @@
     }
   }
 
-  function fecharDados() {
+  // Tranca: apaga os dados da memória e volta à abertura. O backup guardado continua no aparelho, trancado.
+  async function fecharDados() {
     liberarDocumento();
     dados = null;
     info = null;
+    senhaRecente = null;
     estado.busca = '';
     estado.filtro = 'todas';
     $('tela').replaceChildren();
     $('aplicativo').hidden = true;
     $('abertura').hidden = false;
     history.replaceState(null, '', location.pathname);
+    window.scrollTo(0, 0);
+    return prepararAbertura();
   }
+
+  async function esquecerBackup() {
+    if (!confirm('Apagar o backup guardado neste aparelho e desativar o Face ID do app? O backup no computador e no Google Drive não muda.')) {
+      return;
+    }
+    await Promise.all([Guarda.apagar('backup'), FaceId.desativar()]).catch(() => {});
+    fonte = null;
+    fecharDados();
+  }
+
+  // Ao voltar depois de muito tempo em segundo plano, o app tranca; com Face ID, já pede o rosto.
+  document.addEventListener('visibilitychange', async () => {
+    if (document.hidden) {
+      escondidoEm = Date.now();
+      return;
+    }
+    if (dados && escondidoEm && Date.now() - escondidoEm > BLOQUEIO_MS) {
+      if (await fecharDados()) {
+        abrirFonte({ faceId: true });
+      }
+    }
+    escondidoEm = null;
+  });
 
   // ---- Telas ---------------------------------------------------------------------------------------------
   function idadeDoBackup() {
@@ -137,7 +303,18 @@
       estado.busca = '';
     } }, el('div', { class: 'numero ' + (classe || ''), texto: String(totais[chave]) }),
     el('div', { class: 'discreto pequeno', texto: rotulo }));
+    const oferta = senhaRecente && senhaRecente.oferecer && el('div', { class: 'aviso' },
+      el('div', { texto: 'Abrir com Face ID nas próximas vezes, sem digitar a senha?' }),
+      el('div', { class: 'botoes' },
+        el('button', { type: 'button', class: 'primario', texto: 'Ativar Face ID', onclick: (e) => ativarFaceId(e.target.closest('.aviso')) }),
+        el('button', { type: 'button', class: 'secundario', texto: 'Agora não', onclick: (e) => {
+          senhaRecente.oferecer = false;
+          localStorageGravar('faceid_recusado', '1');
+          e.target.closest('.aviso').remove();
+        } })));
     return [
+      oferta,
+      info.naoGuardado && el('p', { class: 'aviso', texto: 'Não foi possível guardar o backup neste aparelho (falta de espaço?). Na próxima vez, escolha o arquivo de novo.' }),
       dados.demonstracao && el('p', { class: 'aviso', texto: 'Este backup tem dados de demonstração, com nomes e valores fictícios.' }),
       el('p', { class: 'discreto pequeno', texto: `Dados do backup de ${D.dataHora(info.manifesto.criado_em)}${idade}.` }),
       dias !== null && dias > 7 && el('p', { class: 'aviso', texto: 'Este backup tem mais de uma semana. Faça um backup novo no computador para ver os dados atuais.' }),
@@ -219,9 +396,7 @@
         ['Recebido em', r.recebimento ? D.dataBr(r.recebimento) : 'Não recebido'],
       ])),
       el('h2', { texto: 'Conta de destino' }),
-      cartao(campos([['Conta', r.conta], ...Object.entries(D.TITULOS_CONTA)
-        .filter(([chave]) => chave !== 'identificacao')
-        .map(([chave, rotulo]) => [rotulo, chave === 'cpf' ? D.cpf(conta[chave]) : conta[chave]])])),
+      contaRecolhida(r.conta, conta),
       r.observacoes && [el('h2', { texto: 'Observações' }), cartao(el('div', { class: 'observacoes', texto: r.observacoes }))],
       el('h2', { texto: 'Histórico da previsão' }),
       historico.length || prorrogacoes.length
@@ -290,12 +465,11 @@
     }
     return [el('div', { class: 'lista' }, dados.contas.map((c) => {
       const usos = dados.operacoes.filter((r) => r.conta_id === c.id).length;
-      return cartao(
-        el('div', { class: 'linha1' }, el('span', { class: 'nome', texto: c.identificacao }),
-          el('span', { class: 'selo ' + (c.ativa ? 'recebida' : 'pendente'), texto: c.ativa ? 'Ativa' : 'Desativada' })),
-        el('p', { class: 'discreto pequeno', texto: usos === 1 ? '1 operação usa esta conta.' : `${usos} operações usam esta conta.` }),
-        campos(Object.entries(D.TITULOS_CONTA).filter(([chave]) => chave !== 'identificacao')
-          .map(([chave, rotulo]) => [rotulo, chave === 'cpf' ? D.cpf(c[chave]) : c[chave]])));
+      return el('div', {},
+        el('div', { class: 'linha1 rotulo-conta' }, el('span', { class: 'discreto pequeno', texto: usos === 1
+          ? '1 operação usa esta conta' : `${usos} operações usam esta conta` }),
+        el('span', { class: 'selo ' + (c.ativa ? 'recebida' : 'pendente'), texto: c.ativa ? 'Ativa' : 'Desativada' })),
+        contaRecolhida(c.identificacao, c));
     }))];
   }
 
@@ -307,39 +481,54 @@
       el('div', { class: 'lista' }, dados.lixeira.map((r) => itemOperacao(r, `#operacao/${r.id}`)))];
   }
 
-  function grafico(resumo) {
+  // Gráfico de barras em SVG: entradas (neutro) e recebidas (verde) por mês, com grade e escala. Tocar num mês
+  // o destaca e mostra os números dele embaixo.
+  function grafico(resumo, aoEscolher, escolhido) {
+    const SVG = 'http://www.w3.org/2000/svg';
     const largura = 360;
-    const altura = 200;
-    const base = 170;
-    const topo = 20;
-    const maior = Math.max(1, ...resumo.flatMap(([, e, r]) => [e, r]));
-    const grupo = largura / resumo.length;
-    const barra = Math.min(12, grupo * 0.32);
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const altura = 230;
+    const esquerda = 26;
+    const base = 196;
+    const topo = 14;
+    const topoEixo = D.escala(Math.max(1, ...resumo.flatMap(([, e, r]) => [e, r])));
+    const grupo = (largura - esquerda) / resumo.length;
+    const barra = Math.min(11, grupo * 0.3);
+    const svg = document.createElementNS(SVG, 'svg');
     const novo = (tag, atributos, texto) => {
-      const elemento = document.createElementNS('http://www.w3.org/2000/svg', tag);
+      const elemento = document.createElementNS(SVG, tag);
       Object.entries(atributos).forEach(([n, v]) => elemento.setAttribute(n, v));
       if (texto !== undefined) {
         elemento.textContent = texto;
       }
       return elemento;
     };
+    const y = (valor) => base - (base - topo) * valor / topoEixo;
     svg.setAttribute('viewBox', `0 0 ${largura} ${altura}`);
     svg.setAttribute('class', 'grafico');
     svg.setAttribute('role', 'img');
     svg.setAttribute('aria-label', 'Entradas e recebimentos dos últimos 12 meses');
-    svg.append(novo('line', { x1: 0, x2: largura, y1: base, y2: base, class: 'eixo' }));
+    for (let passo = 0; passo <= 4; passo += 1) {
+      const valor = topoEixo * passo / 4;
+      svg.append(novo('line', { x1: esquerda, x2: largura, y1: y(valor), y2: y(valor), class: passo ? 'grade' : 'eixo' }));
+      svg.append(novo('text', { x: esquerda - 6, y: y(valor) + 3, 'text-anchor': 'end', class: 'escala' }, String(valor)));
+    }
     resumo.forEach(([chave, entradas, recebidas], i) => {
-      const centro = grupo * (i + 0.5);
+      const inicio = esquerda + grupo * i;
+      const centro = inicio + grupo / 2;
+      const alvo = novo('g', { class: 'mes' + (chave === escolhido ? ' escolhido' : '') });
+      alvo.append(novo('rect', { x: inicio + 1, y: topo - 6, width: grupo - 2, height: base - topo + 26, rx: 6, class: 'fundo-mes' }));
       [[entradas, 'entradas', -barra - 1], [recebidas, 'recebidas', 1]].forEach(([valor, classe, deslocamento]) => {
-        if (!valor) {
-          return;
+        if (valor) {
+          alvo.append(novo('rect', { x: centro + deslocamento, y: y(valor), width: barra, height: base - y(valor), rx: 2, class: classe }));
         }
-        const h = (base - topo) * valor / maior;
-        svg.append(novo('rect', { x: centro + deslocamento, y: base - h, width: barra, height: h, rx: 2, class: classe }));
-        svg.append(novo('text', { x: centro + deslocamento + barra / 2, y: base - h - 4, 'text-anchor': 'middle' }, String(valor)));
       });
-      svg.append(novo('text', { x: centro, y: base + 16, 'text-anchor': 'middle' }, D.rotuloMes(chave).split('/')[0]));
+      const [mes, ano] = D.rotuloMes(chave).split('/');
+      alvo.append(novo('text', { x: centro, y: base + 14, 'text-anchor': 'middle' }, mes));
+      if (i === 0 || mes === 'jan') {
+        alvo.append(novo('text', { x: centro, y: base + 26, 'text-anchor': 'middle', class: 'ano' }, ano));
+      }
+      alvo.addEventListener('click', () => aoEscolher(chave));
+      svg.append(alvo);
     });
     return svg;
   }
@@ -348,14 +537,38 @@
     const resumo = D.resumoMensal(dados.operacoes);
     const entradas = resumo.reduce((t, [, e]) => t + e, 0);
     const recebidas = resumo.reduce((t, [, , r]) => t + r, 0);
+    const area = el('div', { class: 'cartao' });
+    const detalhe = el('div', { class: 'cartao' });
+    const escolher = (chave) => {
+      const [, e, r] = resumo.find(([c]) => c === chave);
+      const valores = D.valoresDoMes(dados.operacoes, chave);
+      area.replaceChildren(grafico(resumo, escolher, chave));
+      detalhe.replaceChildren(el('div', { class: 'nome', texto: D.rotuloMes(chave) }), campos([
+        ['Entradas', D.quantidade(e, 'operação', 'operações')],
+        ['Investido', D.reais(valores.investido)],
+        ['Recebidas', D.quantidade(r, 'operação', 'operações')],
+        ['Recebido', D.reais(valores.recebido), 'verde'],
+        ['Lucro realizado', D.reais(valores.lucro), 'verde'],
+      ]));
+    };
+    escolher(resumo[resumo.length - 1][0]);
+    const movimentados = resumo.filter(([, e, r]) => e || r).reverse();
     return [
-      el('p', { class: 'discreto', texto: `Últimos 12 meses: ${D.quantidade(entradas, 'entrada', 'entradas')} e ${D.quantidade(recebidas, 'recebida', 'recebidas')}.` }),
+      el('p', { class: 'discreto', texto: `Últimos 12 meses: ${D.quantidade(entradas, 'entrada', 'entradas')} e ${D.quantidade(recebidas, 'recebida', 'recebidas')}. Toque num mês para ver os números.` }),
       el('div', { class: 'legenda' }, el('span', { class: 'entradas', texto: 'Entradas (aquisição)' }),
         el('span', { class: 'recebidas', texto: 'Recebidas' })),
-      cartao(grafico(resumo)),
-      el('h2', { texto: 'Mês a mês' }),
-      cartao(campos(resumo.slice().reverse().map(([chave, e, r]) => [D.rotuloMes(chave),
-        `${D.quantidade(e, 'entrada', 'entradas')} · ${D.quantidade(r, 'recebida', 'recebidas')}`]))),
+      area,
+      el('h2', { texto: 'Mês escolhido' }),
+      detalhe,
+      el('h2', { texto: 'Meses com movimento' }),
+      movimentados.length
+        ? el('div', { class: 'menu' }, movimentados.map(([chave, e, r]) => el('a', { class: 'cartao', href: '#', onclick: (ev) => {
+          ev.preventDefault();
+          escolher(chave);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } }, el('div', { class: 'linha1' }, el('span', { class: 'nome', texto: D.rotuloMes(chave) }),
+          el('span', { class: 'discreto pequeno', texto: `${D.quantidade(e, 'entrada', 'entradas')} · ${D.quantidade(r, 'recebida', 'recebidas')}` })))))
+        : vazio('Nenhuma entrada ou recebimento nos últimos 12 meses.'),
     ];
   }
 
@@ -366,8 +579,22 @@
       opcao('#grafico', 'Gráfico mensal', 'Entradas e recebimentos dos últimos 12 meses'),
       opcao('#lixeira', `Lixeira (${dados.lixeira.length})`, 'Operações excluídas, só para consulta'),
       opcao('#backup', 'Sobre este backup', 'Arquivo, data e versão do programa'),
-      el('button', { type: 'button', class: 'primario', texto: 'Fechar dados', onclick: fecharDados }),
-      el('p', { class: 'discreto pequeno', texto: 'Fechar apaga os dados da memória do celular. Para ver de novo, abra o backup.' }))];
+      senhaRecente && !faceIdAtivo && el('div', { class: 'cartao' },
+        el('div', { texto: 'Ativar o Face ID' }), el('div', { class: 'discreto pequeno', texto: 'Abrir o app com o rosto, sem digitar a senha' }),
+        el('div', { class: 'botoes' }, el('button', { type: 'button', class: 'primario', texto: 'Ativar',
+          onclick: (e) => ativarFaceId(e.target.closest('.cartao')) }))),
+      faceIdAtivo && el('a', { class: 'cartao', href: '#', onclick: async (e) => {
+        e.preventDefault();
+        if (confirm('Desativar o Face ID do app? A próxima abertura pedirá a senha dos backups.')) {
+          await FaceId.desativar().catch(() => {});
+          faceIdAtivo = false;
+          localStorageGravar('faceid_recusado', '1');
+          desenhar();
+        }
+      } }, el('div', { texto: 'Desativar o Face ID' }), el('div', { class: 'discreto pequeno', texto: 'Voltar a abrir só com a senha' })),
+      el('button', { type: 'button', class: 'primario', texto: 'Trancar agora', onclick: fecharDados }),
+      el('p', { class: 'discreto pequeno', texto: 'Trancar apaga os dados da memória; o backup guardado continua trancado no aparelho. O app também tranca sozinho depois de 5 minutos em segundo plano.' }),
+      el('button', { type: 'button', class: 'secundario', texto: 'Apagar o backup guardado neste aparelho', onclick: esquecerBackup }))];
   }
 
   function telaBackup() {
@@ -418,6 +645,13 @@
 
   $('voltar').addEventListener('click', () => history.back());
   window.addEventListener('hashchange', desenhar);
+
+  // ---- Abertura do app: com Face ID ativo, já pede o rosto ------------------------------------------------
+  prepararAbertura().then((faceId) => {
+    if (faceId) {
+      abrirFonte({ faceId: true, automatico: true });
+    }
+  });
 
   // ---- App na Tela de Início -----------------------------------------------------------------------------
   const instalado = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;

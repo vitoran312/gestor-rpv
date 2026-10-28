@@ -23,23 +23,28 @@
   <link rel="stylesheet" href="estilo.css">
 </head>
 <body>
-  <!-- Tela de abertura: escolher o backup e digitar a senha. -->
+  <!-- Tela de abertura: o backup guardado neste aparelho (ou um escolhido agora), aberto com Face ID ou senha. -->
   <main id="abertura" class="abertura">
     <h1>Gestor de RPV</h1>
-    <p class="discreto">Consulta dos seus dados a partir de um backup do programa. O backup é aberto neste aparelho;
-      nada é enviado para a internet.</p>
+    <div id="fonte" class="cartao" hidden>
+      <div id="fonte-titulo" class="discreto pequeno"></div>
+      <div id="fonte-detalhe" class="nome"></div>
+    </div>
+    <button id="abrir-faceid" class="primario" type="button" hidden>Abrir com Face ID</button>
     <form id="formulario" class="cartao formulario" autocomplete="off">
-      <label for="arquivo">Backup (.rpvbackup)</label>
-      <input id="arquivo" type="file" required>
+      <label id="rotulo-arquivo" for="arquivo">Backup (.rpvbackup)</label>
+      <input id="arquivo" type="file">
       <label for="senha">Senha dos backups</label>
       <input id="senha" type="password" autocomplete="off" autocapitalize="off" spellcheck="false">
-      <button id="abrir" class="primario" type="submit">Abrir backup</button>
+      <button id="abrir" class="primario" type="submit">Abrir com a senha</button>
     </form>
     <div id="andamento" class="andamento" hidden>
       <p id="andamento-texto" aria-live="polite"></p>
       <div class="barra"><div id="andamento-barra"></div></div>
     </div>
     <p id="erro" class="erro" role="alert" hidden></p>
+    <p class="discreto pequeno">O backup fica guardado neste aparelho como saiu do computador, trancado pela senha;
+      nada é enviado para a internet.</p>
     <p id="instalar" class="aviso pequeno" hidden>Para usar como app: no Safari, toque em <strong>Compartilhar</strong>
       e depois em <strong>Adicionar à Tela de Início</strong>.</p>
   </main>
@@ -62,6 +67,8 @@
   <script src="vendor/scrypt.js"></script>
   <script src="vendor/fflate.js"></script>
   <script src="vendor/sql-wasm.js"></script>
+  <script src="guarda.js"></script>
+  <script src="faceid.js"></script>
   <script src="leitor.js"></script>
   <script src="dados.js"></script>
   <script src="app.js"></script>

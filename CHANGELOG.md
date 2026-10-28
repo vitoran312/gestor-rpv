@@ -1,5 +1,18 @@
 # Histórico de versões
 
+## 0.39.0
+
+App do celular:
+- Guarda o último backup no aparelho (como saiu do computador, trancado pela senha): não é mais preciso
+  escolher o arquivo a cada abertura. "Trocar por um backup mais novo" substitui o guardado.
+- Abrir com Face ID (iOS 18 ou mais novo): depois de ativado, o app pede o rosto ao abrir e mostra os dados
+  na hora, sem digitar a senha e sem os segundos de conferência dela. Ativar e desativar em Mais.
+- Tranca sozinho depois de 5 minutos em segundo plano; "Trancar agora" em Mais.
+- Dados bancários recolhidos no detalhe da operação e em Contas: aparece só o nome do titular; CPF,
+  endereço, banco e Pix só depois de um toque.
+- Gráfico mensal com grade e escala; tocar num mês mostra entradas, valor investido, recebido e lucro
+  realizado dele; a lista mostra só os meses com movimento.
+
 ## 0.38.0
 
 - App do celular abre os anexos: no detalhe da operação, cada documento e comprovante abre na tela (PDF ou

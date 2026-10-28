@@ -109,7 +109,7 @@ const { chromium } = require('playwright');
     }
     await pagina.evaluate(() => { location.hash = '#mais'; });
     resultados.blob_liberado = await pagina.evaluate(() => !document.querySelector('.documento'));
-    await pagina.getByText('Fechar dados').click();
+    await pagina.getByText('Trancar agora').click();
     resultados.fechado = await pagina.evaluate(() => ({
       abertura: !document.getElementById('abertura').hidden,
       tela_vazia: document.getElementById('tela').childElementCount === 0,

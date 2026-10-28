@@ -55,10 +55,16 @@ class TestAppDoCelular(unittest.TestCase):
                 ['node', str(RAIZ / 'celular' / 'testes' / 'navegador.cjs'),
                  f'http://127.0.0.1:{servidor.server_address[1]}', json.dumps(entrada)],
                 capture_output=True, text=True, timeout=300, check=True).stdout
+            faceid = subprocess.run(
+                # Chave de acesso exige um nome de site (localhost), não um endereço IP.
+                ['node', str(RAIZ / 'celular' / 'testes' / 'faceid.cjs'),
+                 f'http://localhost:{servidor.server_address[1]}', json.dumps(cls.entrada_faceid)],
+                capture_output=True, text=True, timeout=300, check=True).stdout
         finally:
             servidor.shutdown()
             servidor.server_close()
         cls.resultados = json.loads(saida)
+        cls.faceid = json.loads(faceid)
 
     @classmethod
     def tearDownClass(cls):
@@ -111,6 +117,10 @@ class TestAppDoCelular(unittest.TestCase):
         cls.endereco_pdf, cls.endereco_png = (f'#documento/{documentos[n]}' for n in ('contrato.pdf', 'comprovante.png'))
         telas = {'arquivo': str(cifrado), 'senha': SENHA_TESTE, 'enderecos': TELAS + [f'#operacao/{cls.antiga}'],
                  'documentos': [cls.endereco_pdf, cls.endereco_png]}
+        outro = banco_com_contas(cls.pasta / 'outro' / 'gestor.sqlite3')
+        outro.salvar(dados_rpv(nome='Só No Segundo Backup'))
+        segundo = criar_backup(outro, cls.pasta / 'segundo')
+        cls.entrada_faceid = {'primeiro': str(cifrado), 'segundo': str(segundo), 'senha': SENHA_TESTE}
         return {'casos': casos, 'regras': regras, 'telas': telas}
 
     # ---- Leitura do backup ------------------------------------------------------------------------------
@@ -208,10 +218,36 @@ class TestAppDoCelular(unittest.TestCase):
         detalhe = self.resultados['telas'][f'#operacao/{self.antiga}']
         self.assertIn('Linha 2 <b>sem HTML</b>', detalhe)  # Nada do backup vira HTML na página.
         self.assertIn('30/11/2026', detalhe)              # Prorrogação antiga define a previsão atual.
+        # Dados bancários recolhidos: só o titular aparece até a pessoa tocar.
+        self.assertIn('Toque para ver os dados', detalhe)
+        self.assertNotIn('Chave Pix', detalhe)
+        self.assertNotIn('Chave Pix', self.resultados['telas']['#contas'])
 
     def test_service_worker_guarda_o_app_para_abrir_sem_internet(self):
         self.assertTrue(self.resultados['service_worker'])
         self.assertTrue(self.resultados['sem_internet'])
+
+    # ---- Backup guardado e Face ID (autenticador virtual com PRF) --------------------------------------------
+    def test_face_id_abre_sem_senha_e_sem_escolher_arquivo(self):
+        f = self.faceid
+        self.assertEqual(f['erros'], [])
+        self.assertEqual(f['inicial'], {'app': False, 'faceid_visivel': False, 'fonte': '', 'erro': ''})
+        self.assertTrue(f['ativado'])
+        self.assertEqual(f['trancado'], {'app': False, 'faceid_visivel': True, 'fonte': 'Backup guardado neste aparelho',
+                                         'erro': ''})
+        self.assertTrue(f['faceid_abriu'])
+        # Ao abrir o app de novo, o Face ID é pedido sozinho e os dados aparecem, sem escolher arquivo.
+        self.assertTrue(f['reabriu_sozinho']['app'])
+        self.assertIn('Tempo para abrir\n0 s', f['tempo_com_faceid'])  # Com a chave guardada, sem o scrypt.
+
+    def test_backup_novo_aberto_pelo_face_id_passa_a_ser_o_guardado(self):
+        self.assertIn('Só No Segundo Backup', self.faceid['segundo_nomes'])
+        self.assertIn('Só No Segundo Backup', self.faceid['segundo_guardado'])
+
+    def test_senha_errada_e_apagar_o_backup_guardado(self):
+        self.assertFalse(self.faceid['senha_errada']['app'])
+        self.assertIn('Senha incorreta', self.faceid['senha_errada']['erro'])
+        self.assertEqual(self.faceid['apagado'], {'app': False, 'faceid_visivel': False, 'fonte': '', 'erro': ''})
 
     def test_fechar_dados_limpa_a_tela(self):
         self.assertEqual(self.resultados['fechado'], {'abertura': True, 'tela_vazia': True, 'senha_vazia': True})

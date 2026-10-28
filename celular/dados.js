@@ -123,6 +123,28 @@ const GestorDados = (() => {
     return chaves.map((c) => [c, ...totais.get(c)]);
   }
 
+  // Topo do eixo em quatro passos inteiros e redondos (1, 2 ou 5 × 10ⁿ), como grafico.escala.
+  function escala(maximo) {
+    for (let potencia = 1; ; potencia *= 10) {
+      for (const fator of [1, 2, 5]) {
+        if (fator * potencia * 4 >= maximo) {
+          return fator * potencia * 4;
+        }
+      }
+    }
+  }
+
+  // Valores de um mês ("2026-10"): quanto foi investido nas entradas e quanto entrou nos recebimentos.
+  function valoresDoMes(registros, chave) {
+    const entradas = registros.filter((r) => r.aquisicao.slice(0, 7) === chave);
+    const recebidas = registros.filter((r) => r.recebimento && r.recebimento.slice(0, 7) === chave);
+    return {
+      investido: entradas.reduce((t, r) => t + r.custo, 0),
+      recebido: recebidas.reduce((t, r) => t + r.previsto, 0),
+      lucro: recebidas.reduce((t, r) => t + r.previsto - r.custo, 0),
+    };
+  }
+
   function quantidade(total, singular, plural) {
     return `${total} ${total === 1 ? singular : plural}`;
   }
@@ -187,6 +209,6 @@ const GestorDados = (() => {
 
   return {
     TITULOS_CONTA, moeda, reais, dataBr, dataHora, hojeIso, cpf, situacao, contarSituacoes, indicadores,
-    normalizar, chaveTexto, encontra, filtrar, resumoMensal, quantidade, rotuloMes, carregar, contaDaOperacao,
+    normalizar, chaveTexto, encontra, filtrar, resumoMensal, escala, valoresDoMes, quantidade, rotuloMes, carregar, contaDaOperacao,
   };
 })();

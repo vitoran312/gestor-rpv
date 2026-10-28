@@ -37,18 +37,31 @@ const LeitorBackup = (() => {
   async function derivarChave(senha, sal, aoProgredir) {
     // NFC: a mesma senha com acentos dá a mesma chave, como em cifra.derivar_chave.
     const texto = new TextEncoder().encode(senha.normalize('NFC'));
-    const bruta = await scrypt.scrypt(texto, sal, SCRYPT.N, SCRYPT.r, SCRYPT.p, SCRYPT.tamanho, aoProgredir);
-    return crypto.subtle.importKey('raw', bruta, 'AES-GCM', false, ['decrypt']);
+    return scrypt.scrypt(texto, sal, SCRYPT.N, SCRYPT.r, SCRYPT.p, SCRYPT.tamanho, aoProgredir);
   }
 
-  async function decifrar(bytes, senha, aoProgredir = () => {}) {
+  function iguais(a, b) {
+    return a && b && a.length === b.length && a.every((x, i) => x === b[i]);
+  }
+
+  // `acesso` traz a senha ou a chave já calculada deste backup ({sal, bruta}, guardada pelo Face ID): com a
+  // chave, a conferência demorada da senha (scrypt) é pulada. Devolve o conteúdo e a chave usada.
+  async function decifrar(bytes, acesso, aoProgredir = () => {}) {
     if (bytes.length < CABECALHO + ETIQUETA || !cifrado(bytes)) {
       throw new ErroBackup('O arquivo não é um backup com senha do Gestor de RPV.');
     }
     const cabecalho = bytes.subarray(0, CABECALHO);
     const sal = cabecalho.subarray(MAGICO.length, MAGICO.length + TAMANHO_SAL);
     const prefixo = cabecalho.subarray(MAGICO.length + TAMANHO_SAL);
-    const chave = await derivarChave(senha, sal, (p) => aoProgredir('senha', p));
+    let bruta;
+    if (acesso.chave && iguais(acesso.chave.sal, sal)) {
+      bruta = acesso.chave.bruta;
+    } else if (acesso.senha) {
+      bruta = await derivarChave(acesso.senha, sal, (p) => aoProgredir('senha', p));
+    } else {
+      throw new SenhaIncorreta('Este backup é protegido por senha.');
+    }
+    const chave = await crypto.subtle.importKey('raw', bruta, 'AES-GCM', false, ['decrypt']);
     const partes = [];
     let total = 0;
     for (let inicio = CABECALHO, indice = 0; inicio < bytes.length; inicio += BLOCO + ETIQUETA, indice += 1) {
@@ -72,7 +85,7 @@ const LeitorBackup = (() => {
       resultado.set(parte, posicao);
       posicao += parte.length;
     }
-    return resultado;
+    return { conteudo: resultado, chave: { sal: Uint8Array.from(sal), bruta: Uint8Array.from(bruta) } };
   }
 
   async function sha256(bytes) {
@@ -133,7 +146,7 @@ const LeitorBackup = (() => {
   }
 
   // Lê o backup inteiro. Devolve o banco aberto (somente para consulta), o manifesto e os tempos de cada etapa.
-  async function ler(bytes, senha, { aoProgredir = () => {}, comAnexos = false } = {}) {
+  async function ler(bytes, senha, { aoProgredir = () => {}, comAnexos = false, chave = null } = {}) {
     const tempos = {};
     let marca = performance.now();
     const medir = (etapa) => {
@@ -143,11 +156,9 @@ const LeitorBackup = (() => {
     };
     const ehCifrado = cifrado(bytes);
     let zip = bytes;
+    let chaveUsada = null;
     if (ehCifrado) {
-      if (!senha) {
-        throw new SenhaIncorreta('Este backup é protegido por senha.');
-      }
-      zip = await decifrar(bytes, senha, aoProgredir);
+      ({ conteudo: zip, chave: chaveUsada } = await decifrar(bytes, { senha, chave }, aoProgredir));
       medir('decifrar');
     } else if (!comeca(bytes, [0x50, 0x4b])) {
       throw new ErroBackup('O arquivo não é um backup do Gestor de RPV.');
@@ -159,7 +170,7 @@ const LeitorBackup = (() => {
     medir('abrir_banco');
     // Os anexos ficam compactados na memória e só são extraídos quando a pessoa abre um deles.
     const extrair = (caminho) => extrairDocumento(zip, manifesto, caminho);
-    return { db, manifesto, cifrado: ehCifrado, tempos, arquivos, extrair };
+    return { db, manifesto, cifrado: ehCifrado, tempos, arquivos, extrair, chave: chaveUsada };
   }
 
   return { ler, decifrar, cifrado, ErroBackup, SenhaIncorreta };

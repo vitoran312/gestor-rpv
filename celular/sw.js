@@ -8,7 +8,7 @@
 const VERSAO = '__VERSAO__';  // Trocada pelo fluxo de publicação a cada versão publicada.
 const CACHE = 'gestor-rpv-' + VERSAO;
 const ARQUIVOS = [
-  './', 'index.html', 'estilo.css', 'app.js', 'dados.js', 'leitor.js', 'manifest.webmanifest',
+  './', 'index.html', 'estilo.css', 'app.js', 'dados.js', 'leitor.js', 'guarda.js', 'faceid.js', 'manifest.webmanifest',
   'vendor/scrypt.js', 'vendor/fflate.js', 'vendor/sql-wasm.js', 'vendor/sql-wasm.wasm',
   'icones/apple-touch-icon.png', 'icones/icone-192.png', 'icones/icone-512.png', 'icones/icone-mascara-512.png',
 ];
