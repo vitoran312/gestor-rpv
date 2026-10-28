@@ -16,7 +16,7 @@ import tela_arquivos
 import tela_registro
 from componentes import CampoData, CampoMoeda, AreaRolavel
 from dados import Banco
-from test_contas import banco_com_contas
+from test_contas import banco_com_contas, dados_rpv
 from tema import cores, PALETAS
 
 
@@ -569,6 +569,30 @@ class TestInterface(unittest.TestCase):
         self.assertEqual(self.programa.tabela.get_children(),(str(identificador),))
         self.assertEqual(self.banco.obter(identificador)['previsao_atual'],'2027-01-20')
         self.assertFalse(hasattr(self.programa,'mostrar_auditoria'))
+
+    def test_ctrl_n_e_lixeira_repetidos_abrem_uma_janela_so(self):
+        self.programa.mostrar_historico()
+        self.root.update()
+        for _ in range(3):
+            self.programa.historico.event_generate('<Control-n>')
+            self.root.update()
+        formularios = [w for w in self.root.winfo_children() if isinstance(w, tk.Toplevel) and w.title() == 'Nova entrada']
+        self.assertEqual(len(formularios), 1)
+        formularios[0].destroy()
+        identificador = self.banco.salvar(dados_rpv(nome='Primeira'))
+        for _ in range(2):
+            botao(self.programa.historico, 'Lixeira').invoke()
+            self.root.update()
+        lixeiras = [w for w in self.programa.historico.winfo_children() if isinstance(w, tk.Toplevel) and w.title() == 'Lixeira']
+        self.assertEqual(len(lixeiras), 1)
+        # Excluir com a lixeira aberta: a entrada aparece nela sem reabrir.
+        self.programa.atualizar()
+        self.programa.tabela.selection_set(str(identificador))
+        with patch.object(messagebox, 'askyesno', return_value=True):
+            self.programa.excluir()
+        self.root.update()
+        tabela = next(w for w in filhos(lixeiras[0]) if isinstance(w, ttk.Treeview))
+        self.assertEqual(tabela.get_children(), (str(identificador),))
 
     def test_ordenacao_colunas_tres_cliques_e_filtro(self):
         ids = []

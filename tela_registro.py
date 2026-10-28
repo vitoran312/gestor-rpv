@@ -45,6 +45,13 @@ def pad(valor):
 
 class RegistroMixin:
     def formulario(self, identificador=None):
+        # Um formulário por vez: Ctrl+N repetido (ou a tecla presa) traz o que já está aberto,
+        # em vez de abrir outro e salvar a mesma entrada duas vezes.
+        if self.janela_formulario is not None and self.janela_formulario.winfo_exists():
+            self.janela_formulario.deiconify()
+            self.janela_formulario.lift()
+            self.janela_formulario.focus_set()
+            return
         registro = self.banco.obter(identificador) if identificador else None
         contas=list(self.banco.contas(somente_ativas=True))
         conta_original=self.banco.obter_conta(registro['conta_id']) if registro and registro['conta_id'] is not None else None
@@ -60,7 +67,7 @@ class RegistroMixin:
                 mapa_contas[conta_inicial]=None
         else:
             conta_inicial=contas[0]['identificacao']
-        tela = tk.Toplevel(self.janela)
+        tela = self.janela_formulario = tk.Toplevel(self.janela)
         tela.withdraw()
         tela.title('Editar registro' if registro else 'Nova entrada')
         tela.configure(bg=cores()['fundo'])

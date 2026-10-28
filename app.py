@@ -44,6 +44,8 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
         self.calculadora = None
         self.sobre = None
         self.grafico_mensal = None
+        self.janela_formulario = None
+        self.janela_lixeira = None
         tema_salvo = self.banco.configuracao('tema', 'claro')
         self.modo_tema = tk.StringVar(value=tema_salvo if tema_salvo in ('claro', 'escuro') else 'claro')
         self.configurar_tema()

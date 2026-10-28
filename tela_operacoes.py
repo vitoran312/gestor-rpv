@@ -248,6 +248,9 @@ class OperacoesMixin:
         self.indicadores_resumo['previsto'].set('R$ '+moeda(sum(r['previsto']-r['custo'] for r in registros)))
         self.indicadores_resumo['realizado'].set('R$ '+moeda(sum(r['previsto']-r['custo'] for r in registros if r['recebimento'])))
         self.indicadores_resumo['aberto'].set('R$ '+moeda(sum(r['custo'] for r in registros if not r['recebimento'])))
+        # Com a lixeira aberta ao lado, o que acabou de ser excluído aparece nela na hora.
+        if self.janela_lixeira is not None and self.janela_lixeira.winfo_exists():
+            self.janela_lixeira.atualizar_lista()
 
     def ordenar_coluna(self, coluna):
         primeira = 'asc' if coluna in ('nome', 'conta') else 'desc'
@@ -423,7 +426,13 @@ class OperacoesMixin:
             self.icone_lixeira.put(cor,to=retangulo)
 
     def mostrar_lixeira(self):
-        tela = tk.Toplevel(self.historico)
+        if self.janela_lixeira is not None and self.janela_lixeira.winfo_exists():
+            self.janela_lixeira.atualizar_lista()
+            self.janela_lixeira.deiconify()
+            self.janela_lixeira.lift()
+            self.janela_lixeira.focus_set()
+            return
+        tela = self.janela_lixeira = tk.Toplevel(self.historico)
         tela.withdraw()
         tela.title('Lixeira')
         tela.configure(bg=cores()['fundo'])
@@ -488,6 +497,7 @@ class OperacoesMixin:
             menu.add_command(label='Excluir permanentemente',command=excluir_definitivamente)
             return mostrar_menu(menu,evento)
 
+        tela.atualizar_lista = atualizar
         habilitar_selecao(tabela,abrir=restaurar,excluir=excluir_definitivamente)
         tabela.bind('<Button-3>',contexto)
         rodape = ttk.Frame(corpo,padding=(0,12,0,0))
