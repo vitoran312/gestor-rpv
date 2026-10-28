@@ -232,14 +232,10 @@ class RegistroMixin:
         def salvar():
             try:
                 dados = {chave: variavel.get().strip() for chave, variavel in campos.items()}
-                if not dados['nome']:
-                    raise ValueError('Informe o nome completo do titular original.')
                 if modo_previsao.get() == 'dias':
                     dados['previsao'] = previsao_por_prazo(dados['aquisicao'],prazo.get())
                 for chave in ('aquisicao', 'previsao'):
                     dados[chave] = data_iso(dados[chave])
-                if dados['previsao'] < dados['aquisicao']:
-                    raise ValueError('A previsão não pode ser anterior à aquisição.')
                 for chave in ('previsto', 'custo'):
                     dados[chave] = centavos(dados[chave])
                 dados['conta_id'] = mapa_contas.get(dados['conta'])

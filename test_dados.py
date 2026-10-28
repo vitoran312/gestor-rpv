@@ -64,6 +64,24 @@ class TestDados(unittest.TestCase):
             self.assertEqual(len(reaberto.listar('22/10/2026')), 2)
             self.assertEqual(reaberto.obter(segundo)['nome'], 'Pessoa De Teste')
 
+    def test_regras_da_entrada_valem_na_gravacao_sem_depender_da_tela(self):
+        from datetime import date, timedelta
+        from test_contas import dados_rpv
+        with tempfile.TemporaryDirectory() as pasta:
+            banco = banco_com_contas(Path(pasta) / 'teste.sqlite3')
+            amanha = (date.today() + timedelta(days=1)).isoformat()
+            for valores, mensagem in (
+                (dict(aquisicao=amanha, previsao='2099-01-01'), 'aquisição não pode estar no futuro'),
+                (dict(aquisicao='2026-05-10', previsao='2026-05-01'), 'previsão não pode ser anterior'),
+                (dict(comissao=2000001), 'comissão não pode superar'),
+                (dict(aquisicao='0001-01-01'), 'entre 1900 e 2100'),
+                (dict(previsao='31/12/2026'), 'Previsão de recebimento: informe uma data válida'),
+            ):
+                with self.subTest(mensagem), self.assertRaisesRegex(ValueError, mensagem):
+                    banco.salvar(dados_rpv(**valores))
+            self.assertEqual(banco.listar(), [])
+            self.assertTrue(banco.salvar(dados_rpv(comissao=2000000, previsao='2026-10-22')))
+
     def test_exclusao_persistente_preserva_outro_registro_igual(self):
         with tempfile.TemporaryDirectory() as pasta:
             caminho = Path(pasta) / 'teste.sqlite3'

@@ -104,6 +104,17 @@ def data_iso(texto):
     return valor.isoformat()
 
 
+def validar_data_iso(texto, campo):
+    """Confere uma data já em ISO (vinda da interface ou de outra rotina) antes de gravar."""
+    try:
+        valor = date.fromisoformat(texto)
+    except (TypeError, ValueError):
+        raise ValueError(f'{campo}: informe uma data válida.') from None
+    if not ANO_MINIMO <= valor.year <= ANO_MAXIMO:
+        raise ValueError(f'{campo}: informe uma data entre {ANO_MINIMO} e {ANO_MAXIMO}.')
+    return valor.isoformat()
+
+
 def data_br(texto):
     # Sem strftime: no Linux, '%Y' não completa anos com zeros à esquerda.
     valor = date.fromisoformat(texto)
@@ -382,6 +393,15 @@ class Banco:
         dados['observacoes'] = dados['observacoes'][:1].upper() + dados['observacoes'][1:]
         if not dados['nome']:
             raise ValueError('Informe o nome completo do titular original.')
+        # As regras ficam aqui, e não só na interface, para valerem em qualquer caminho de gravação.
+        dados['aquisicao'] = validar_data_iso(dados['aquisicao'], 'Data da aquisição')
+        dados['previsao'] = validar_data_iso(dados['previsao'], 'Previsão de recebimento')
+        if dados['aquisicao'] > date.today().isoformat():
+            raise ValueError('A data da aquisição não pode estar no futuro.')
+        if dados['previsao'] < dados['aquisicao']:
+            raise ValueError('A previsão não pode ser anterior à aquisição.')
+        if dados['comissao'] is not None and dados['comissao'] > dados['previsto']:
+            raise ValueError('A comissão não pode superar o Valor Total RPV.')
         if dados['custo'] <= 0:
             raise ValueError('O valor de aquisição deve ser maior que zero.')
         if dados['custo'] > dados['previsto']:
