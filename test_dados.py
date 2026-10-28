@@ -62,6 +62,14 @@ class TestDados(unittest.TestCase):
             self.assertIsNone(reaberto.obter(primeiro)['comissao'])
             self.assertEqual(len(reaberto.listar('APÓSTROFO')), 1)
             self.assertEqual(len(reaberto.listar('22/10/2026')), 2)
+            reaberto.salvar(dict(dados, nome="José D'Ávila"))
+            for busca in ('jose', 'JOSE', 'davila', "d'ávila", 'Lilian', 'José D'):
+                with self.subTest(busca):
+                    self.assertTrue(reaberto.listar(busca))
+            self.assertEqual(reaberto.listar('%'), [])
+            from ordenacao import ordenar
+            nomes = [dict(nome=n) for n in ('Anabela', 'Ana Maria', 'Álvaro', 'ana luiza')]
+            self.assertEqual([r['nome'] for r in ordenar(nomes, 'nome', 'asc')], ['Álvaro', 'ana luiza', 'Ana Maria', 'Anabela'])
             self.assertEqual(reaberto.obter(segundo)['nome'], 'Pessoa De Teste')
 
     def test_regras_da_entrada_valem_na_gravacao_sem_depender_da_tela(self):

@@ -140,6 +140,11 @@ def normalizar(texto):
                    if c.isalnum() and not unicodedata.combining(c))
 
 
+def chave_texto(texto):
+    """Para ordenar: sem acentos nem maiúsculas, mas com os espaços ("Ana Maria" antes de "Anabela")."""
+    return ' '.join(normalizar(palavra) for palavra in texto.split())
+
+
 def validar_cpf(texto):
     if not texto.strip():
         raise ValueError('Informe o CPF.')
@@ -450,7 +455,13 @@ class Banco:
     def listar(self, busca=''):
         with self.conectar() as con:
             registros = con.execute(CONSULTA_RPVS + ' WHERE r.lixeira_em IS NULL ORDER BY aquisicao DESC, id DESC').fetchall()
-        return [r for r in registros if busca.casefold() in r['nome'].casefold() or busca in data_br(r['aquisicao'])]
+        # Sem acentos, maiúsculas nem pontuação: "jose" acha "José" e "davila" acha "D'Ávila".
+        # A busca também procura na conta; buscas só de símbolos comparam o texto como foi digitado.
+        termo = normalizar(busca)
+        if not termo:
+            return [r for r in registros if busca.casefold() in r['nome'].casefold() or busca in data_br(r['aquisicao'])]
+        return [r for r in registros if termo in normalizar(r['nome']) or termo in normalizar(r['conta'])
+                or busca.strip() in data_br(r['aquisicao'])]
 
     def obter(self, identificador):
         with self.conectar() as con:
