@@ -5,7 +5,7 @@ from datetime import datetime
 from tkinter import messagebox, filedialog, simpledialog, ttk
 
 import cifra
-from backup import (criar_backup, BackupPreparado, aviso_backup, executar_backup_automatico, PASTA_AUTOMATICA,
+from backup import (criar_backup, documentos_sem_arquivo, BackupPreparado, aviso_backup, executar_backup_automatico, PASTA_AUTOMATICA,
                     SenhaAusente, SenhaNecessaria, salvar_senha, senha_salva)
 from componentes import centralizar
 from visual import px
@@ -226,7 +226,11 @@ class ArquivosMixin:
             messagebox.showerror('Backup', 'Não foi possível criar o backup. ' + descrever_erro(erro), parent=pai)
             return
         self.atualizar_ultimo_backup()
-        messagebox.showinfo('Backup concluído', f'Backup salvo em:\n{arquivo}', parent=pai)
+        sumidos = len(documentos_sem_arquivo(self.banco))
+        aviso = (f'\n\nAtenção: {sumidos} anexo(s) cadastrado(s) não estão mais na pasta de documentos (apagados por '
+                 'fora do programa, pelo antivírus ou pela sincronização) e ficaram fora do backup. As operações e os '
+                 'demais anexos foram salvos normalmente.') if sumidos else ''
+        messagebox.showinfo('Backup concluído', f'Backup salvo em:\n{arquivo}{aviso}', parent=pai)
 
     def importar_dados(self):
         if self.janelas_de_edicao_abertas():
@@ -276,6 +280,8 @@ class ArquivosMixin:
         if not messagebox.askyesno('Importar dados', aviso +
             f"O backup contém {resumo['registros']} entrada(s), {resumo['lixeira']} na lixeira, "
             f"{resumo['contas']} conta(s) e {resumo['documentos']} documento(s).\n\n"
+            + (f"{resumo['documentos_ausentes']} anexo(s) citado(s) no backup não estão dentro dele e ficarão de fora; "
+               'o restante entra normalmente.\n\n' if resumo['documentos_ausentes'] else '') +
             'Ele substituirá os dados deste computador, sem juntar os históricos. '
             'Uma cópia automática dos dados atuais será salva antes. Continuar?',
             parent=self.historico, icon='warning', default='no'):

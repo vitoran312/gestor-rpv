@@ -6,7 +6,7 @@ from datetime import date
 from tkinter import ttk
 
 import demonstracao
-from backup import limpar_temporarios
+from backup import limpar_temporarios, recuperar_interrompidas
 from recuperacao import abrir_banco
 from componentes import centralizar, maximizar
 from contas import JanelaContas
@@ -32,6 +32,7 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
         self.janela = janela
         janela.withdraw()
         self.banco = abrir_banco(janela)
+        recuperar_interrompidas(self.banco)
         limpar_temporarios(self.banco.caminho.parent)
         try:
             # Uma carga da demonstração interrompida (programa fechado à força) é limpa e feita de novo.

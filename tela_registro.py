@@ -268,7 +268,11 @@ class RegistroMixin:
 
             converter('aquisicao', 'Data da aquisição', data_iso, dados['aquisicao'])
             if modo_previsao.get() == 'dias':
-                converter('previsao', 'Prazo em dias', lambda: data_iso(previsao_por_prazo(campos['aquisicao'].get(), prazo.get())))
+                if 'aquisicao' in mal_preenchidos:
+                    # O prazo conta a partir da aquisição: com ela errada, basta o aviso dela.
+                    mal_preenchidos.add('previsao')
+                else:
+                    converter('previsao', 'Prazo em dias', lambda: data_iso(previsao_por_prazo(campos['aquisicao'].get(), prazo.get())))
             else:
                 converter('previsao', 'Previsão inicial', data_iso, dados['previsao'])
             converter('previsto', 'Valor Total RPV', centavos, dados['previsto'])

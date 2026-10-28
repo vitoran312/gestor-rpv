@@ -24,7 +24,10 @@ PASTA_AUTOMATICA = 'backup_auto_pasta'
 PREFIXO_AUTOMATICO = 'GestorRPV-auto-'
 SENHA_BACKUP = 'senha_backup'
 # Configurações que pertencem a este computador: não vão no backup e não são trocadas ao importar.
-CONFIGURACOES_LOCAIS = (PASTA_AUTOMATICA, SENHA_BACKUP)
+# Marca, no banco novo, qual restauração o gravou: se o programa for fechado à força no meio de uma, a próxima
+# abertura sabe se a troca do banco chegou ao fim e devolve os anexos que combinam com ele.
+RESTAURACAO = 'restauracao_em_andamento'
+CONFIGURACOES_LOCAIS = (PASTA_AUTOMATICA, SENHA_BACKUP, RESTAURACAO)
 
 
 LIMITE_IMPORTACAO = 4 * 1024 ** 3  # Soma dos arquivos descompactados de um backup.
@@ -48,6 +51,31 @@ def limpar_temporarios(pasta, idade_segundos=24 * 60 * 60):
                     shutil.rmtree(sobra, ignore_errors=True)
             except OSError:
                 log.warning('Sobra de importação não removida.', exc_info=True)
+
+
+def recuperar_interrompidas(banco):
+    """Desfaz o que um encerramento forçado deixou pela metade, antes de limpar_temporarios apagar as sobras.
+
+    Restauração: o SQLite desfaz sozinho a troca do banco que não terminou, mas a pasta de anexos já pode ter
+    sido trocada. Se o banco atual não é o da restauração, os anexos anteriores voltam ao lugar. Exclusão: os
+    anexos cujo cadastro continua no banco voltam para a pasta de documentos.
+    """
+    try:
+        concluida = banco.configuracao(RESTAURACAO)
+        for pasta in sorted(banco.caminho.parent.glob(PREFIXO_RESTAURACAO + '*')):
+            antigos = pasta / 'documentos_anteriores'
+            if pasta.is_symlink() or not antigos.is_dir() or antigos.is_symlink() or pasta.name == concluida:
+                continue
+            destino = banco.pasta_documentos
+            if destino.exists():
+                os.replace(destino, Path(tempfile.mkdtemp(prefix='documentos_importados-', dir=pasta)) / 'documentos')
+            os.replace(antigos, destino)
+            log.warning('Anexos de uma restauração interrompida devolvidos à pasta de documentos.')
+        if concluida:
+            banco.remover_configuracao(RESTAURACAO)
+        banco.devolver_exclusoes()
+    except (OSError, sqlite3.Error):
+        log.error('Sobras de uma restauração ou exclusão interrompida não foram conferidas.', exc_info=True)
 
 
 def conferir_espaco(pasta, necessario):
@@ -159,18 +187,33 @@ def validar_banco(caminho, migrado=False):
         raise ValueError('Não foi possível validar o banco do backup.') from erro
 
 
+def documentos_sem_arquivo(banco):
+    """Anexos cadastrados cujo arquivo sumiu da pasta de documentos (apagado por fora, antivírus, sincronização)."""
+    with banco.conectar() as con:
+        caminhos = [r['caminho'] for r in con.execute('SELECT caminho FROM documentos')]
+    return [c for c in caminhos if not (banco.pasta_documentos / c).is_file()]
+
+
 def copia_para_backup(banco, destino, quando):
-    """Copia consistente do banco, sem as configurações deste computador (a senha não viaja no backup)."""
+    """Copia consistente do banco, sem as configurações deste computador (a senha não viaja no backup).
+
+    Anexos cujo arquivo sumiu saem da cópia: um backup que cita um arquivo que não carrega seria recusado na
+    importação, e todos os backups seguintes ficariam impossíveis de restaurar.
+    """
     con = sqlite3.connect(destino)
     try:
         with banco.conectar() as origem:
             origem.backup(con)
         con.execute('PRAGMA journal_mode=DELETE')
+        if tem_tabela(con, 'documentos'):
+            ausentes = [(c,) for (c,) in con.execute('SELECT caminho FROM documentos')
+                        if not (banco.pasta_documentos / c).is_file()]
+            con.executemany('DELETE FROM documentos WHERE caminho=?', ausentes)
         if tem_tabela(con, 'configuracoes'):
             con.execute("INSERT OR REPLACE INTO configuracoes (chave,valor) VALUES ('ultimo_backup',?)", (quando,))
             con.executemany('DELETE FROM configuracoes WHERE chave=?', [(c,) for c in CONFIGURACOES_LOCAIS])
-            con.commit()
-            con.execute('VACUUM')  # Não deixa a senha apagada em páginas livres do arquivo.
+        con.commit()
+        con.execute('VACUUM')  # Não deixa a senha apagada em páginas livres do arquivo.
         vinculados = sorted(r[0] for r in con.execute('SELECT caminho FROM documentos')) if tem_tabela(con, 'documentos') else []
     finally:
         con.close()
@@ -187,7 +230,8 @@ def gravar_documentos(pacote, documentos, vinculados):
         if arquivo.is_symlink():
             raise ValueError('Há um atalho simbólico na pasta de documentos.')
         if not arquivo.is_file():
-            continue
+            # Sumiu entre a cópia do banco e este ponto: sem o arquivo, o backup sairia impossível de restaurar.
+            raise ValueError('Um anexo foi apagado enquanto o backup era criado. Tente de novo.')
         relativo = 'documentos/' + caminho
         # O hash é calculado sobre os mesmos bytes gravados no ZIP, inclusive se a origem mudar durante a cópia.
         # O nome é montado com barras, sem depender da normalização do Windows.
@@ -322,6 +366,15 @@ def copiar_dados(origem, destino):
         con.close()
 
 
+def remover_documentos(caminho, caminhos):
+    con = sqlite3.connect(caminho)
+    try:
+        with con:
+            con.executemany('DELETE FROM documentos WHERE caminho=?', [(c,) for c in caminhos])
+    finally:
+        con.close()
+
+
 def gravar_configuracoes(caminho, valores):
     con = sqlite3.connect(caminho)
     try:
@@ -387,6 +440,7 @@ class BackupPreparado:
         self.pasta_trabalho = pasta_trabalho
         self.temporario = None
         self.cifrado = False
+        self.ausentes = []
 
     def __enter__(self):
         if self.pasta_trabalho is not None:
@@ -442,12 +496,14 @@ class BackupPreparado:
         # Cada arquivo de documentos/ precisa ser um anexo cadastrado, e cada anexo cadastrado precisa estar lá:
         # nada de executáveis, atalhos ou outros arquivos soltos chegando à pasta de documentos da pessoa.
         cadastrados = {'documentos/' + c for c in caminhos}
-        if cadastrados - set(self.documentos):
-            raise ValueError('Um documento vinculado está ausente no backup.')
         if set(self.documentos) - cadastrados:
             raise ValueError('O backup contém arquivos que não são documentos cadastrados.')
+        # Anexo cadastrado sem o arquivo (backups das versões até a 0.32.0 podiam sair assim quando um anexo
+        # tinha sumido da pasta): os dados entram, e só a referência a esse anexo fica de fora, com aviso.
+        self.ausentes = sorted(c for c in caminhos if 'documentos/' + c not in self.documentos)
         self.resumo = validar_banco(banco, migrado=True)
         self.resumo['documentos'] = len(self.documentos)
+        self.resumo['documentos_ausentes'] = len(self.ausentes)
         self.criado_em = manifesto.get('criado_em', '')
 
     def extrair_documentos(self, destino):
@@ -481,9 +537,10 @@ class BackupPreparado:
             # aplicativo, e os valores são copiados linha a linha. Nada do esquema do arquivo importado sobrevive.
             limpo = trabalho / 'banco_limpo.sqlite3'
             copiar_dados(self.pasta / 'banco.sqlite3', limpo)
+            remover_documentos(limpo, self.ausentes)
             # A pasta do backup automático e a senha pertencem a este computador, não ao arquivo importado. Elas
             # já entram no banco novo, para que a troca abaixo seja uma só: ou tudo muda, ou nada muda.
-            gravar_configuracoes(limpo, locais)
+            gravar_configuracoes(limpo, {**locais, RESTAURACAO: trabalho.name})
             tinha_documentos = destino.exists()
             if tinha_documentos:
                 os.replace(destino, antigos)
@@ -497,4 +554,6 @@ class BackupPreparado:
                 if tinha_documentos:
                     os.replace(antigos, destino)
                 raise
+        # A marca da restauração fica no banco até a próxima abertura (recuperar_interrompidas a apaga): nada é
+        # gravado depois da troca. Ela nunca vai para um backup, por estar em CONFIGURACOES_LOCAIS.
         return seguranca

@@ -57,6 +57,18 @@ class TestRecuperacao(unittest.TestCase):
         self.assertEqual(self.caminho.read_bytes(), self.lixo)
         self.assertEqual(list(self.caminho.parent.glob('gestor-danificado-*')), [])
 
+    def test_erro_inesperado_do_zip_oferece_outro_arquivo_em_vez_de_fechar(self):
+        with patch.object(recuperacao.messagebox, 'askyesno', return_value=True), \
+                patch.object(recuperacao, 'pedir_backup', return_value=('x.rpvbackup', None)), \
+                patch.object(recuperacao, 'BackupPreparado', side_effect=NotImplementedError('Deflate64')), \
+                patch.object(recuperacao.messagebox, 'askretrycancel', return_value=False) as erro, \
+                patch.object(recuperacao.messagebox, 'showinfo'), patch.object(recuperacao, 'abrir_pasta'):
+            with self.assertRaises(SystemExit):
+                recuperacao.abrir_banco(None, self.caminho)
+        self.assertIn('inesperado', erro.call_args.args[1])
+        self.assertEqual(self.caminho.read_bytes(), self.lixo)
+        self.assertEqual(list(self.caminho.parent.glob('gestor-danificado-*')), [])
+
     def test_banco_de_versao_mais_nova_nao_e_aberto_nem_rebaixado(self):
         self.caminho.unlink()
         banco = banco_com_contas(self.caminho)
@@ -149,7 +161,7 @@ class TestRecuperacao(unittest.TestCase):
 
     def test_falha_so_ao_guardar_a_senha_nao_desfaz_a_restauracao(self):
         with patch.object(recuperacao, 'salvar_senha', side_effect=OSError('DPAPI recusou')):
-            banco, guardado, _documentos, senha_guardada = recuperacao.restaurar_em_banco_novo(
+            banco, guardado, _documentos, senha_guardada, _ausentes = recuperacao.restaurar_em_banco_novo(
                 self.caminho, self.backup_com('Recuperada'), SENHA_TESTE)
         self.assertEqual([r['nome'] for r in banco.listar()], ['Recuperada'])
         self.assertFalse(senha_guardada)

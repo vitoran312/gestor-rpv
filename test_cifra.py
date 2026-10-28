@@ -58,7 +58,8 @@ class TestCifra(unittest.TestCase):
         for senha, trecho in (('123456789', '10 a 256'), ('x' * 257, '10 a 256'), (' cofre azul 7', 'espaço'),
                               ('cofre azul 7 ', 'espaço'), ('          ', 'espaço'), ('aaaaaaaaaa', 'fácil'),
                               ('1234567890', 'fácil'), ('Password123', 'fácil'), ('senha@12345', 'fácil'),
-                              ('qwerty12345', 'fácil'), ('brasil2026!', 'fácil'), ('abcabcab12', 'fácil')):
+                              ('qwerty12345', 'fácil'), ('brasil2026!', 'fácil'), ('abcabcab12', 'fácil'),
+                              ('abcdefghij', 'fácil'), ('aaaaaaaaab12', 'fácil'), ('zyxwvutsrq', 'fácil')):
             with self.subTest(senha=senha), self.assertRaisesRegex(ValueError, trecho):
                 cifra.validar_senha(senha)
         self.assertEqual(cifra.validar_senha('cavalo bateria'), 'cavalo bateria')

@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from backup import BackupPreparado, criar_backup
+from backup import BackupPreparado, criar_backup, documentos_sem_arquivo
 from dados import VERSAO_BANCO, Banco
 from apoio_testes import SENHA_TESTE, banco_com_contas, dados_conta, dados_rpv
 
@@ -78,11 +78,12 @@ class TestRecusasDoBackup(unittest.TestCase):
             zipado.writestr('BANCO.sqlite3', self.banco_bytes)
         self.assertRecusa(repetido, 'repetidos')
 
-    def test_documento_cadastrado_ausente_no_pacote(self):
+    def test_documento_cadastrado_ausente_no_pacote_entra_sem_o_anexo(self):
+        """Backups antigos podiam citar um anexo que tinha sumido: os dados entram, só esse anexo fica de fora."""
         origem = banco_com_contas(self.pasta / 'origem' / 'gestor.sqlite3')
         anexo = self.pasta / 'contrato.pdf'
         anexo.write_bytes(b'%PDF')
-        origem.salvar(dados_rpv(), anexos=[anexo])
+        identificador = origem.salvar(dados_rpv(), anexos=[anexo])
         origem.remover_configuracao('senha_backup')
         completo = criar_backup(origem, self.pasta / 'backups', exigir_senha=False)
         with ZipFile(completo) as zipado:
@@ -93,7 +94,32 @@ class TestRecusasDoBackup(unittest.TestCase):
         with ZipFile(sem_documento, 'w') as zipado:
             zipado.writestr('banco.sqlite3', banco)
             zipado.writestr('manifesto.json', json.dumps(manifesto))
-        self.assertRecusa(sem_documento, 'ausente no backup')
+        destino = banco_com_contas(self.pasta / 'destino' / 'gestor.sqlite3')
+        with BackupPreparado(sem_documento) as preparado:
+            self.assertEqual(preparado.resumo['documentos_ausentes'], 1)
+            preparado.restaurar(destino, copia_de_seguranca=False)
+        self.assertEqual(destino.listar()[0]['id'], identificador)
+        self.assertEqual(destino.documentos(identificador), [])
+
+    def test_anexo_apagado_por_fora_nao_estraga_o_backup(self):
+        origem = banco_com_contas(self.pasta / 'origem' / 'gestor.sqlite3')
+        anexos = []
+        for nome in ('a.pdf', 'b.pdf'):
+            anexos.append(self.pasta / nome)
+            anexos[-1].write_bytes(b'%PDF ' + nome.encode())
+        identificador = origem.salvar(dados_rpv(), anexos=anexos)
+        sumido = origem.documentos(identificador)[0]
+        (origem.pasta_documentos / sumido['caminho']).unlink()
+        self.assertEqual(documentos_sem_arquivo(origem), [sumido['caminho']])
+        arquivo = criar_backup(origem, self.pasta / 'backups')
+        destino = banco_com_contas(self.pasta / 'destino' / 'gestor.sqlite3')
+        with BackupPreparado(arquivo, SENHA_TESTE) as preparado:
+            self.assertEqual(preparado.resumo['documentos'], 1)
+            self.assertEqual(preparado.resumo['documentos_ausentes'], 0)
+            preparado.restaurar(destino, copia_de_seguranca=False)
+        self.assertEqual(len(destino.documentos(identificador)), 1)
+        # O banco de origem não muda: a pessoa continua vendo que o anexo sumiu.
+        self.assertEqual(len(origem.documentos(identificador)), 2)
 
 
 class TestRecusasDaGravacao(unittest.TestCase):

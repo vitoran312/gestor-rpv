@@ -11,6 +11,7 @@ from diario import log
 
 CHAVE = 'dados_demonstracao'
 REFERENCIA = date(2026, 10, 24)
+OBSERVACAO = 'Operação fictícia de demonstração.'
 
 CONTAS = (
     dict(identificacao='Conta principal', nome='Rafael Monteiro Duarte', cpf='31415926590',
@@ -86,6 +87,15 @@ def limpar_carga_interrompida(banco):
     """Apaga o que uma carga interrompida deixou. Devolve True se havia o que limpar."""
     ids = ids_registrados(banco)
     if ids and ids['carregando']:
+        # O programa pode ter sido fechado entre gravar um registro e anotá-lo. A carga só começa num banco
+        # vazio e nada mais é gravado enquanto ela não termina; então todo registro com os dados fictícios é dela.
+        with banco.conectar() as con:
+            operacoes = [r['id'] for r in con.execute(
+                f'SELECT id FROM rpvs WHERE observacoes=? AND nome IN ({",".join("?" * len(OPERACOES))})',
+                (OBSERVACAO, *(operacao[0] for operacao in OPERACOES)))]
+            contas = [r['id'] for r in con.execute(
+                f'SELECT id FROM contas WHERE cpf IN ({",".join("?" * len(CONTAS))})', [c['cpf'] for c in CONTAS])]
+        anotar(banco, sorted(set(ids['contas'] + contas)), sorted(set(ids['operacoes'] + operacoes)), carregando=True)
         remover(banco)
         return True
     return False
@@ -98,7 +108,7 @@ def _carregar(banco, data, contas, operacoes):
     for nome, aquisicao, custo, total, conta, previsao, atual, recebimento in OPERACOES:
         identificador = banco.salvar(dict(nome=nome, aquisicao=data(aquisicao), custo=custo, previsto=total,
                                           conta_id=contas[conta], conta='', previsao=data(previsao),
-                                          comissao=None, observacoes='Operação fictícia de demonstração.'))
+                                          comissao=None, observacoes=OBSERVACAO))
         operacoes.append(identificador)
         anotar(banco, contas, operacoes, carregando=True)
         if atual:

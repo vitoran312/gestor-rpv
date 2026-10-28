@@ -39,7 +39,7 @@ class TestDados(unittest.TestCase):
         self.assertEqual(centavos('R$ 1.000,00'), 100000)
         self.assertEqual(centavos('1500.5'), 150050)
         for invalido in ('NaN', 'Infinity', '-1', '12,345', '', '1e3', '1E2', '2e-2', '1_000', '١٢٣', '１２３',
-                         '+5', '.5', '5.', '1,2,3', 'abc'):
+                         '+5', '.5', '5.', '1,2,3', 'abc', '1,23.45', '12.34,56', '1234.567,00', '1.2345,00'):
             with self.assertRaises(ValueError):
                 centavos(invalido)
         with self.assertRaises(ValueError):

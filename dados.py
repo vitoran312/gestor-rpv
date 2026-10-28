@@ -28,6 +28,7 @@ CONSULTA_RPVS = '''SELECT r.*,
 MANTER_BACKUPS = 10
 VALOR_MAXIMO = Decimal('999999999999.99')
 PREFIXO_EXCLUSAO = '.excluir-rpv-'  # Pasta de trabalho da exclusão de anexos; sobras são limpas na abertura.
+LISTA_EXCLUSAO = 'movidos.txt'
 LIMITE_NOME, LIMITE_OBSERVACOES = 150, 5000
 VERSAO_BANCO = 8  # PRAGMA user_version gravado pela versão atual do esquema.
 
@@ -92,6 +93,10 @@ def centavos(texto):
     if ',' in texto and '.' in texto:
         # Os dois separadores: o último é o decimal. "1.500,00" (Brasil) ou "1,500.00" (Estados Unidos).
         milhar, decimal = ('.', ',') if texto.rfind(',') > texto.rfind('.') else (',', '.')
+        grupos = texto.rpartition(decimal)[0].split(milhar)
+        # Separador de milhar só a cada três dígitos: "1,23.45" e "12.34,56" são erros de digitação, não valores.
+        if not (1 <= len(grupos[0]) <= 3 and all(len(g) == 3 for g in grupos[1:])):
+            raise ValueError('Informe um valor positivo ou zero, com até duas casas decimais.')
         texto = texto.replace(milhar, '').replace(decimal, '.')
     elif ',' in texto:
         texto = texto.replace(',', '.')
@@ -743,6 +748,10 @@ class Banco:
                         raise ValueError('Caminho de documento inválido.')
                     if arquivo.is_file():
                         destino = Path(pasta) / str(len(movidos))
+                        # A lista vem antes da mudança: se o programa for fechado à força antes da exclusão
+                        # chegar ao banco, a próxima abertura devolve o arquivo ao lugar (devolver_exclusoes).
+                        with open(Path(pasta) / LISTA_EXCLUSAO, 'a', encoding='utf-8') as lista:
+                            lista.write(f'{destino.name}\t{documento["caminho"]}\n')
                         os.replace(arquivo, destino)
                         movidos.append((arquivo, destino))
             try:
@@ -751,6 +760,24 @@ class Banco:
                 for arquivo, destino in reversed(movidos):
                     os.replace(destino, arquivo)
                 raise
+
+    def devolver_exclusoes(self):
+        """Devolve os anexos de exclusões interrompidas cujo cadastro continua no banco (a exclusão não terminou)."""
+        with self.conectar() as con:
+            cadastrados = {r['caminho'] for r in con.execute('SELECT caminho FROM documentos')}
+        raiz = self.pasta_documentos.resolve()
+        for pasta in self.caminho.parent.glob(PREFIXO_EXCLUSAO + '*'):
+            lista = pasta / LISTA_EXCLUSAO
+            if pasta.is_symlink() or not lista.is_file():
+                continue
+            for linha in lista.read_text(encoding='utf-8').splitlines():
+                nome, _, caminho = linha.partition('\t')
+                movido, original = pasta / nome, (raiz / caminho).resolve()
+                if (caminho in cadastrados and original.is_relative_to(raiz)
+                        and movido.is_file() and not original.exists()):
+                    original.parent.mkdir(parents=True, exist_ok=True)
+                    os.replace(movido, original)
+                    log.warning('Anexo de uma exclusão interrompida devolvido à pasta de documentos.')
 
     def remover_documento(self, identificador):
         with self.arquivos_para_excluir() as preparar:

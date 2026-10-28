@@ -36,7 +36,7 @@ def restaurar_em_banco_novo(caminho, arquivo, senha=None):
     """Guarda o banco danificado e os anexos dele com outro nome, cria um banco vazio e restaura o backup nele.
 
     Devolve o banco restaurado, os nomes com que o banco e os anexos danificados foram guardados (None se não
-    havia anexos) e se a senha do backup ficou salva. Se a restauração falhar em qualquer ponto, o banco vazio
+    havia anexos), se a senha do backup ficou salva e quantos anexos citados no backup não estavam nele. Se a restauração falhar em qualquer ponto, o banco vazio
     e os anexos do backup são descartados e o banco e os anexos originais voltam ao lugar.
     """
     marca = f'{datetime.now():%Y%m%d-%H%M%S-%f}'
@@ -51,6 +51,7 @@ def restaurar_em_banco_novo(caminho, arquivo, senha=None):
         with BackupPreparado(arquivo, senha, pasta_trabalho=caminho.parent) as preparado:
             # O banco vazio criado aqui não merece cópia de segurança: os dados antigos já estão guardados acima.
             preparado.restaurar(Banco(caminho), copia_de_seguranca=False)
+            ausentes = len(preparado.ausentes)
         banco = Banco(caminho)
     except BaseException:
         caminho.unlink(missing_ok=True)
@@ -68,7 +69,7 @@ def restaurar_em_banco_novo(caminho, arquivo, senha=None):
             senha_salva = True
         except Exception:
             log.warning('Senha do backup restaurado não foi guardada; será pedida uma nova no próximo backup.')
-    return banco, guardado, documentos_guardados if documentos_guardados.exists() else None, senha_salva
+    return banco, guardado, documentos_guardados if documentos_guardados.exists() else None, senha_salva, ausentes
 
 
 def danificado(caminho):
@@ -122,14 +123,19 @@ def abrir_banco(janela, caminho=None):
         while backup is not None:
             arquivo, senha = backup
             try:
-                banco, guardado, documentos_guardados, senha_guardada = restaurar_em_banco_novo(caminho, arquivo, senha)
+                banco, guardado, documentos_guardados, senha_guardada, ausentes = restaurar_em_banco_novo(
+                    caminho, arquivo, senha)
             except SenhaNecessaria as falha:
                 # Senha errada: pergunta de novo a senha, sem voltar à escolha do arquivo.
                 senha = simpledialog.askstring(TITULO, f'{falha}\n\nDigite a senha deste backup:', show='•',
                                                parent=janela)
                 backup = (arquivo, senha) if senha is not None else pedir_backup(janela, caminho)
                 continue
-            except (sqlite3.Error, ValueError, OSError) as falha:
+            except Exception as falha:
+                # Qualquer falha (inclusive de um ZIP em formato que o Python não lê) já foi desfeita acima:
+                # a pessoa escolhe outro arquivo em vez de o programa fechar sem explicação.
+                if not isinstance(falha, (sqlite3.Error, ValueError, OSError)):
+                    log.error('Restauração falhou.', exc_info=True)
                 if not messagebox.askretrycancel(TITULO, f'Não foi possível restaurar o backup: {descrever_erro(falha)}',
                                                  parent=janela):
                     break
@@ -139,6 +145,8 @@ def abrir_banco(janela, caminho=None):
                                                  if documentos_guardados else '')
             aviso_senha = ('' if senha_guardada or not senha else
                            '\n\nA senha desse backup é mais fraca que o exigido agora: crie uma nova senha no próximo backup.')
+            if ausentes:
+                aviso_senha += f'\n\n{ausentes} anexo(s) citado(s) no backup não estavam nele e ficaram de fora.'
             messagebox.showinfo(TITULO, f'Backup restaurado. O arquivo com problema foi guardado como {guardados}, '
                                 f'na pasta dos dados.{aviso_senha}', parent=janela)
             return banco

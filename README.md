@@ -299,7 +299,12 @@ alterar os dados locais e recusa por segurança:
 - arquivos compactados de forma suspeita, mais de 4 GB descompactados ou falta de espaço no disco.
 A extração acontece na pasta dos dados do programa, e sobras de importações interrompidas são apagadas
 na abertura seguinte. Em caso de falha durante a troca, os documentos anteriores são recuperados e a
-cópia de segurança permanece.
+cópia de segurança permanece; se o programa for fechado à força no meio da troca (queda de energia), a
+abertura seguinte devolve os anexos que combinam com o banco antes de limpar qualquer sobra.
+
+Anexo cadastrado cujo arquivo sumiu da pasta de documentos (apagado por fora do programa, pelo antivírus ou
+pela sincronização) fica fora do backup, com aviso ao terminar o backup manual; os dados e os demais anexos
+entram normalmente. Um backup antigo que cite um anexo que não carrega é importado sem esse anexo, com aviso.
 
 ## Documentos da entrada
 

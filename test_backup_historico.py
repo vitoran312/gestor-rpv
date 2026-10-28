@@ -76,7 +76,8 @@ class TestBackupHistorico(unittest.TestCase):
         destino_docs = self.destino.caminho.parent / 'documentos'
         arquivo = criar_backup(self.origem, self.pasta / 'backups')
         with BackupPreparado(arquivo, SENHA_TESTE) as preparado:
-            self.assertEqual(preparado.resumo, {'registros': 1, 'lixeira': 1, 'contas': 3, 'documentos': 2})
+            self.assertEqual(preparado.resumo, {'registros': 1, 'lixeira': 1, 'contas': 3, 'documentos': 2,
+                                             'documentos_ausentes': 0})
             seguranca = preparado.restaurar(self.destino)
         restaurado = Banco(self.destino.caminho)
         self.assertEqual(restaurado.obter(rpv)['previsao_atual'], '2027-01-20')

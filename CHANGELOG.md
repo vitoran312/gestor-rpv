@@ -1,5 +1,26 @@
 # Histórico de versões
 
+## 0.33.0
+
+Correções do veredito do chefe da banca sobre a 0.32.0.
+
+**Backup e anexos**
+- Anexo que sumiu da pasta de documentos (apagado por fora, antivírus, sincronização) não estraga mais os
+  backups: antes, todo backup seguinte saía impossível de restaurar ("Um documento vinculado está ausente").
+  Agora o anexo fica de fora com aviso, e backups antigos nessa situação são importados sem ele.
+- Restauração interrompida à força (queda de energia) no meio da troca: a abertura seguinte devolve os anexos
+  que combinam com o banco, em vez de deixá-los numa pasta temporária que seria apagada em 24 horas.
+- Exclusão de anexo interrompida antes de chegar ao banco: o arquivo volta para a pasta de documentos.
+- Na tela de recuperação, qualquer erro ao abrir o backup escolhido (por exemplo, um ZIP em formato que o
+  programa não lê) oferece escolher outro arquivo, em vez de fechar o programa sem mensagem.
+
+**Valores, senha e demonstração**
+- Separador de milhar fora do lugar ("1,23.45", "12.34,56") é recusado, em vez de virar outro valor.
+- Senhas em sequência ou repetidas ("abcdefghij", "aaaaaaaaab12") são recusadas.
+- Carga da demonstração interrompida entre gravar e anotar um registro não deixa conta ou operação fictícia
+  órfã.
+- Formulário com prazo em dias e data de aquisição inválida mostra o erro da data uma vez só.
+
 ## 0.32.0
 
 Correções da terceira rodada da banca de revisão. Quatro itens da 0.31.0 não estavam completos e foram

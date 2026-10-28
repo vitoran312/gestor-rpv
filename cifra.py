@@ -60,7 +60,9 @@ def validar_senha(senha):
     if not SENHA_MINIMA <= len(senha) <= SENHA_MAXIMA:
         raise ValueError(f'A senha precisa ter de {SENHA_MINIMA} a {SENHA_MAXIMA} caracteres.')
     letras = ''.join(c for c in unicodedata.normalize('NFKD', senha.casefold()) if c.isalpha())
-    if len(set(senha)) < 4 or letras in BASES_OBVIAS:
+    # Teclas vizinhas no alfabeto ou repetidas ("abcdefghij", "aaaaaaaaab12", "1234567890"): quase sem acaso.
+    passos = sum(abs(ord(a) - ord(b)) <= 1 for a, b in zip(senha.casefold(), senha.casefold()[1:]))
+    if len(set(senha)) < 4 or letras in BASES_OBVIAS or passos >= len(senha) - 3:
         raise ValueError('Essa senha é fácil demais de adivinhar. Use uma frase com palavras que só você liga, '
                          'por exemplo "cavalo azul bebe café".')
     return senha
