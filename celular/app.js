@@ -235,7 +235,13 @@
     }
   }
 
+  let encerrarVisualizador = null;  // Libera as páginas desenhadas e o PDF aberto.
+
   function liberarDocumento() {
+    if (encerrarVisualizador) {
+      encerrarVisualizador();
+      encerrarVisualizador = null;
+    }
     if (enderecoAberto) {
       URL.revokeObjectURL(enderecoAberto);
       enderecoAberto = null;
@@ -434,27 +440,30 @@
     const extensao = d.caminho.split('.').pop().toLowerCase();
     const tipo = TIPOS[extensao] || 'application/octet-stream';
     const area = el('div', { class: 'documento' }, el('p', { class: 'discreto', texto: 'Abrindo o documento…' }));
-    info.extrair(d.caminho).then((bytes) => {
+    const acoes = el('div');
+    const visualizacao = el('div', { class: 'visualizacao' });
+    info.extrair(d.caminho).then(async (bytes) => {
       if (location.hash !== `#documento/${id}`) {
         return;  // A pessoa já saiu da tela.
       }
       const arquivo = new File([bytes], d.nome, { type: tipo });
       liberarDocumento();
       enderecoAberto = URL.createObjectURL(arquivo);
-      const visualizacao = tipo === 'application/pdf'
-        ? el('iframe', { class: 'documento-pdf', src: enderecoAberto, title: d.nome })
-        : el('img', { class: 'documento-imagem', src: enderecoAberto, alt: d.nome });
       const podeCompartilhar = navigator.canShare && navigator.canShare({ files: [arquivo] });
-      area.replaceChildren(
-        podeCompartilhar
-          ? el('button', { type: 'button', class: 'primario', texto: 'Compartilhar ou salvar', onclick: () => {
-            navigator.share({ files: [arquivo] }).catch(() => {});  // Cancelar o menu não é erro.
-          } })
-          : el('a', { class: 'cartao', href: enderecoAberto, download: d.nome, texto: 'Baixar o documento' }),
-        visualizacao);
+      acoes.replaceChildren(podeCompartilhar
+        ? el('button', { type: 'button', class: 'secundario', texto: 'Compartilhar ou salvar', onclick: () => {
+          navigator.share({ files: [arquivo] }).catch(() => {});  // Cancelar o menu não é erro.
+        } })
+        : el('a', { class: 'cartao', href: enderecoAberto, download: d.nome, texto: 'Baixar o documento' }));
+      area.replaceChildren(visualizacao, acoes);
+      encerrarVisualizador = tipo === 'application/pdf'
+        ? await Visualizador.pdf(bytes, visualizacao)
+        : Visualizador.imagem(enderecoAberto, d.nome, visualizacao);
+      window.scrollTo(0, 0);
     }).catch((erro) => {
+      // Se o arquivo saiu do backup mas não pôde ser desenhado, "Compartilhar" ainda abre no visualizador do iPhone.
       area.replaceChildren(el('p', { class: 'erro', texto: erro instanceof LeitorBackup.ErroBackup ? erro.message
-        : 'Não foi possível abrir o documento neste aparelho.' }));
+        : 'Não foi possível mostrar o documento aqui. Use "Compartilhar ou salvar" para abrir em outro app.' }), acoes);
     });
     return [el('p', { class: 'discreto pequeno', texto: d.tipo === 'recebimento' ? 'Comprovante de recebimento' : 'Documento da entrada' }), area];
   }
@@ -630,6 +639,8 @@
     const id = Number(parametro);
     liberarDocumento();
     $('titulo').textContent = tela.titulo;
+    // A barra de zoom dos documentos fica logo abaixo do cabeçalho fixo.
+    document.documentElement.style.setProperty('--altura-topo', `${document.querySelector('.topo').offsetHeight}px`);
     $('voltar').hidden = !tela.voltar;
     document.querySelectorAll('.abas a').forEach((a) => a.classList.toggle('ativa', a.dataset.aba === tela.aba));
     $('tela').replaceChildren(...[tela.montar(id)].flat(2).filter(Boolean));

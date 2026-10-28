@@ -33,6 +33,30 @@ TEXTOS = ["Ana Júlia D'Ávila", 'Maria-José  Souza', 'João_da Silva', '  ', '
 TELAS = ['#inicio', '#operacoes', '#contas', '#mais', '#grafico', '#lixeira', '#backup']
 
 
+def pdf_de_teste(textos, enchimento=0):
+    """PDF válido com uma página por texto (fonte Helvetica, não embutida) e um bloco de bytes aleatórios sem uso."""
+    objetos = [b'<< /Type /Catalog /Pages 2 0 R >>', None, b'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>']
+    paginas = []
+    for texto in textos:
+        conteudo = f'BT /F1 24 Tf 72 720 Td ({texto.encode("latin-1").decode("latin-1")}) Tj ET'.encode('latin-1')
+        objetos.append(b'<< /Length %d >>\nstream\n' % len(conteudo) + conteudo + b'\nendstream')
+        objetos.append(b'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> '
+                       b'/Contents %d 0 R >>' % len(objetos))
+        paginas.append(len(objetos))
+    objetos[1] = b'<< /Type /Pages /Kids [%s] /Count %d >>' % (b' '.join(b'%d 0 R' % n for n in paginas), len(paginas))
+    if enchimento:
+        objetos.append(b'<< /Length %d >>\nstream\n' % enchimento + os.urandom(enchimento) + b'\nendstream')
+    saida, posicoes = bytearray(b'%PDF-1.4\n'), []
+    for numero, corpo in enumerate(objetos, 1):
+        posicoes.append(len(saida))
+        saida += b'%d 0 obj\n' % numero + corpo + b'\nendobj\n'
+    inicio = len(saida)
+    saida += b'xref\n0 %d\n0000000000 65535 f \n' % (len(objetos) + 1)
+    saida += b''.join(b'%010d 00000 n \n' % p for p in posicoes)
+    saida += b'trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n' % (len(objetos) + 1, inicio)
+    return bytes(saida)
+
+
 class Silencioso(SimpleHTTPRequestHandler):
     def log_message(self, *_):
         pass
@@ -75,7 +99,7 @@ class TestAppDoCelular(unittest.TestCase):
         banco = cls.banco = banco_com_contas(cls.pasta / 'dados' / 'gestor.sqlite3')
         # Um anexo de 2,5 MB faz o backup passar de um bloco da cifra (1 MiB): confere a costura dos blocos.
         anexo = cls.pasta / 'contrato.pdf'
-        anexo.write_bytes(b'%PDF' + os.urandom(2_500_000))
+        anexo.write_bytes(pdf_de_teste(['Contrato de cessão', 'Página dois do contrato'], enchimento=2_500_000))
         cls.ana = banco.salvar(dados_rpv(nome='Ana Júlia D\'Ávila', aquisicao='2026-09-10', previsao='2026-10-01'),
                                anexos=[anexo])
         cls.bruno = banco.salvar(dados_rpv(nome='Bruno Lima', conta='Lilian', aquisicao='2026-10-01',
@@ -197,10 +221,17 @@ class TestAppDoCelular(unittest.TestCase):
 
     def test_pdf_e_imagem_abrem_na_tela(self):
         documentos = self.resultados['documentos']
-        self.assertEqual(documentos[self.endereco_pdf], {'tag': 'iframe', 'blob': True, 'carregada': True,
-                                                         'titulo': 'contrato.pdf'})
-        self.assertEqual(documentos[self.endereco_png], {'tag': 'img', 'blob': True, 'carregada': True,
-                                                         'titulo': 'comprovante.png'})
+        pdf = documentos[self.endereco_pdf]
+        self.assertEqual(pdf['titulo'], 'contrato.pdf')
+        self.assertEqual(pdf['paginas'], 2)
+        self.assertGreater(pdf['pixels_desenhados'], 0)   # A primeira página foi desenhada.
+        self.assertTrue(pdf['texto_desenhado'])             # E não em branco: o texto (fonte padrão) aparece.
+        self.assertAlmostEqual(pdf['largura'], pdf['largura_tela'], delta=2)  # Começa na largura da tela.
+        self.assertAlmostEqual(pdf['largura_com_zoom'], pdf['largura_tela'] * 1.5, delta=3)
+        self.assertEqual(pdf['rotulo_zoom'], '150%')
+        self.assertEqual(documentos[self.endereco_png]['tag'], 'img')
+        self.assertTrue(documentos[self.endereco_png]['blob'])
+        self.assertTrue(documentos[self.endereco_png]['carregada'])
         self.assertTrue(self.resultados['blob_liberado'])
 
     # ---- Telas ----------------------------------------------------------------------------------------------
@@ -266,7 +297,7 @@ class TestArquivosDoApp(unittest.TestCase):
                 self.assertTrue(arquivo == './' or (RAIZ / 'celular' / arquivo).is_file())
         # Todo arquivo do app (fora os testes) precisa estar na lista, senão não abre sem internet.
         publicados = {str(c.relative_to(RAIZ / 'celular')).replace(os.sep, '/') for c in (RAIZ / 'celular').rglob('*')
-                      if c.is_file() and 'testes' not in c.parts and c.name not in ('sw.js', 'LICENCAS.txt')}
+                      if c.is_file() and 'testes' not in c.parts and c.name != 'sw.js' and not c.name.startswith('LICEN')}
         self.assertEqual(publicados - set(arquivos), set())
 
     def test_manifesto_e_icones(self):

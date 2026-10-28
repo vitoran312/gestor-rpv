@@ -2,6 +2,8 @@ Bibliotecas de terceiros, copiadas sem alteração dos pacotes npm:
 - scrypt.js: scrypt-js 3.0.1 (MIT)
 - fflate.js: fflate 0.8.2, umd/index.js (MIT)
 - sql-wasm.js e sql-wasm.wasm: sql.js 1.10.3, dist/ (MIT)
+- pdfjs/: pdfjs-dist 4.10.38, build/pdf.min.mjs, build/pdf.worker.min.mjs e standard_fonts/ (Apache-2.0; licenças
+  em pdfjs/LICENSE e, das fontes, em pdfjs/standard_fonts/LICENSE_FOXIT e LICENSE_LIBERATION)
 
 ===== scrypt-js-3.0.1/package/LICENSE.txt
 The MIT License (MIT)

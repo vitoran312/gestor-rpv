@@ -93,18 +93,48 @@ const { chromium } = require('playwright');
       await pagina.waitForFunction(() => document.getElementById('tela').childElementCount > 0);
       resultados.telas[endereco] = await pagina.evaluate(() => document.getElementById('aplicativo').innerText);
     }
-    // Cada anexo aberto na tela: PDF num quadro, imagem como imagem, os dois a partir do próprio aparelho (blob:).
+    // Cada anexo aberto na tela: PDF desenhado pelo pdf.js na largura da tela, com zoom; imagem como imagem.
     resultados.documentos = {};
     for (const endereco of telas.documentos) {
       await pagina.evaluate((h) => { location.hash = h; }, endereco);
-      const visualizacao = await pagina.waitForSelector('.documento iframe, .documento img, .documento .erro', { timeout: 30000 });
-      resultados.documentos[endereco] = await visualizacao.evaluate((e) => ({
-        tag: e.tagName.toLowerCase(), blob: (e.getAttribute('src') || '').startsWith('blob:'),
-        carregada: e.tagName === 'IMG' ? e.complete && e.naturalWidth > 0 : true, titulo: document.getElementById('titulo').textContent,
-      }));
-      if (resultados.documentos[endereco].tag === 'img') {
-        await pagina.waitForFunction(() => document.querySelector('.documento img').naturalWidth > 0, null, { timeout: 10000 })
-          .then(() => { resultados.documentos[endereco].carregada = true; }).catch(() => {});
+      const visualizacao = await pagina.waitForSelector('.documento canvas, .documento img, .documento .erro', { timeout: 30000 });
+      const tag = await visualizacao.evaluate((e) => e.tagName.toLowerCase());
+      if (tag === 'canvas') {
+        await pagina.waitForFunction(() => {
+          const tela = document.querySelector('.pagina canvas');
+          return tela.width > 0 && !tela.closest('.paginas').querySelector('canvas[width="0"]:first-child');
+        }, null, { timeout: 30000 });
+        await pagina.waitForTimeout(500);
+        const medida = () => pagina.evaluate(() => {
+          const tela = document.querySelector('.pagina canvas');
+          const contexto = tela.getContext('2d');
+          const dados = contexto.getImageData(0, 0, tela.width, Math.floor(tela.height / 4)).data;
+          let escuros = 0;
+          for (let i = 0; i < dados.length; i += 4) {
+            escuros += dados[i] < 128 && dados[i + 3] > 0 ? 1 : 0;
+          }
+          return {
+            paginas: document.querySelectorAll('.pagina').length, pixels_desenhados: tela.width * tela.height,
+            texto_desenhado: escuros > 50, largura: tela.getBoundingClientRect().width,
+            largura_tela: document.querySelector('.visualizacao').clientWidth,
+            titulo: document.getElementById('titulo').textContent,
+          };
+        });
+        const antes = await medida();
+        await pagina.click('[aria-label="Aumentar o zoom"]');
+        await pagina.waitForTimeout(300);
+        antes.largura_com_zoom = (await medida()).largura;
+        antes.rotulo_zoom = await pagina.evaluate(() => document.querySelector('.zoom span').textContent);
+        resultados.documentos[endereco] = antes;
+      } else {
+        resultados.documentos[endereco] = await visualizacao.evaluate((e) => ({
+          tag: e.tagName.toLowerCase(), blob: (e.getAttribute('src') || '').startsWith('blob:'), carregada: false,
+          erro: e.tagName === 'P' ? e.textContent : '',
+        }));
+        if (tag === 'img') {
+          await pagina.waitForFunction(() => document.querySelector('.documento img').naturalWidth > 0, null, { timeout: 10000 })
+            .then(() => { resultados.documentos[endereco].carregada = true; }).catch(() => {});
+        }
       }
     }
     await pagina.evaluate(() => { location.hash = '#mais'; });

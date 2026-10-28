@@ -217,9 +217,29 @@ dl.campos dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
 .legenda .entradas::before { color: var(--neutro); }
 .legenda .recebidas::before { color: var(--verde); }
 
-.documento { display: grid; gap: 12px; }
+.documento { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+/* Sem isto, uma página com zoom alarga a tela inteira em vez de rolar dentro da própria área. */
+.documento > *, .visualizacao { min-width: 0; }
 .documento-imagem { width: 100%; height: auto; border-radius: 10px; background: var(--superficie); }
-.documento-pdf { width: 100%; height: 70vh; border: 1px solid var(--borda-suave); border-radius: 10px; background: #fff; }
+.zoom {
+  position: sticky;
+  top: calc(var(--altura-topo, 0px));
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 48px 1fr 48px auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+  background: var(--fundo);
+}
+.zoom button { padding: 8px 10px; font-size: 1.1rem; font-weight: 700; background: var(--superficie); }
+.zoom button:last-child { font-size: 0.9rem; }
+.zoom span { text-align: center; font-weight: 600; color: var(--secundario); }
+.paginas { overflow-x: auto; -webkit-overflow-scrolling: touch; display: grid; gap: 12px; justify-content: start; max-width: 100%; }
+.pagina { position: relative; }
+.pagina canvas { display: block; background: #fff; border-radius: 4px; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18); }
+.legenda-pagina { text-align: center; color: var(--secundario); font-size: 0.8rem; margin-top: 4px; }
+.paginas .documento-imagem { width: 100%; max-width: none; }
 
 button.secundario { background: var(--superficie); color: var(--texto); }
 .botoes { display: flex; gap: 8px; margin-top: 8px; }

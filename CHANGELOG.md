@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## 0.40.0
+
+- App do celular: PDFs abrem com a página inteira na largura da tela (antes apareciam em tamanho real,
+  parecendo ampliados), com botões de zoom (−, +, Ajustar) e indicação "Página 1 de N". Os PDFs são
+  desenhados pelo próprio app (pdf.js), só as páginas perto da parte visível, para não esgotar a memória.
+  Imagens ganharam os mesmos botões de zoom.
+
 ## 0.39.0
 
 App do celular:
