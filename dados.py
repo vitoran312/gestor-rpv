@@ -29,6 +29,34 @@ LIMITE_NOME, LIMITE_OBSERVACOES = 150, 5000
 VERSAO_BANCO = 8  # PRAGMA user_version gravado pela versão atual do esquema.
 
 
+# Etapas de migração em ordem: versão do aplicativo que introduziu a mudança e como saber se ela falta.
+# A primeira que falta dá nome à cópia guardada antes de migrar (backup-antes-<versão>-…).
+ETAPAS = (
+    ('0.4.0', lambda e: 'conta_id' not in e['rpvs']),
+    ('0.6.0', lambda e: 'recebimento' not in e['rpvs']),
+    ('0.7.0', lambda e: 'previsao_atual_definida' not in e['rpvs'] or
+                        not {'numero_endereco', 'cidade', 'estado'}.issubset(e['contas'])),
+    ('0.9.0', lambda e: 'lixeira_em' not in e['rpvs'] or e['cpf_unico']),
+    ('0.10.0', lambda e: not e['tem_documentos']),
+    ('0.11.0', lambda e: 'tipo' not in e['documentos']),
+    ('0.16.0', lambda e: e['versao'] < 7),
+    ('0.21.0', lambda e: e['versao'] < VERSAO_BANCO),
+)
+
+CAMPOS_CONTA = ('identificacao', 'nome', 'cpf', 'endereco', 'numero_endereco', 'cidade', 'estado', 'banco',
+                'agencia', 'numero', 'pix')
+# Esquema atual, em um lugar só: colunas que cada tabela precisa ter. A importação de backup confere por ele.
+ESQUEMA = {
+    'rpvs': {'id', 'nome', 'aquisicao', 'previsto', 'custo', 'conta', 'previsao', 'comissao', 'observacoes',
+             'conta_id', 'conta_snapshot', 'recebimento', 'previsao_atual_definida', 'lixeira_em'},
+    'contas': {'id', 'identificacao_chave', 'ativa', 'banco_chave', 'agencia_chave', 'numero_chave', *CAMPOS_CONTA},
+    'prorrogacoes': {'id', 'rpv_id', 'data', 'criada_em'},
+    'documentos': {'id', 'rpv_id', 'nome', 'caminho', 'tipo'},
+    'previsoes_historico': {'id', 'rpv_id', 'anterior', 'nova', 'alterada_em'},
+    'configuracoes': {'chave', 'valor'},
+}
+
+
 class VersaoMaisNova(ValueError):
     """O banco foi gravado por uma versão mais nova do aplicativo e não deve ser aberto por esta."""
 
@@ -178,117 +206,128 @@ class Banco:
         self.novo = not self.caminho.exists()  # Banco criado agora: instalação nova neste computador.
         self.caminho.parent.mkdir(parents=True, exist_ok=True)
         with self.conectar() as con:
-            colunas = {r['name'] for r in con.execute('PRAGMA table_info(rpvs)')}
-            colunas_contas = {r['name'] for r in con.execute('PRAGMA table_info(contas)')}
-            cpf_unico = self.cpf_unico(con)
-            tem_documentos = con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='documentos'").fetchone() is not None
-            colunas_documentos = {r['name'] for r in con.execute('PRAGMA table_info(documentos)')}
-            versao_atual=con.execute('PRAGMA user_version').fetchone()[0]
-        if versao_atual > VERSAO_BANCO:
+            estado = self.estado_do_esquema(con)
+        if estado['versao'] > VERSAO_BANCO:
             # Abrir e regravar como versão antiga apagaria em silêncio o que a versão nova acrescentou.
             raise VersaoMaisNova('Estes dados foram gravados por uma versão mais nova do Gestor de RPV. '
                                  'Atualize o programa para abri-los.')
-        migrar = ('previsao_atual_definida' not in colunas or 'recebimento' not in colunas or
-                  not {'numero_endereco', 'cidade', 'estado'}.issubset(colunas_contas) or
-                  'lixeira_em' not in colunas or cpf_unico or not tem_documentos or 'tipo' not in colunas_documentos or versao_atual<VERSAO_BANCO)
-        if colunas and migrar:
-            versao_backup = ('0.4.0' if 'conta_id' not in colunas else
-                             '0.6.0' if 'recebimento' not in colunas else
-                             '0.7.0' if 'previsao_atual_definida' not in colunas or
-                             not {'numero_endereco', 'cidade', 'estado'}.issubset(colunas_contas) else
-                             '0.9.0' if 'lixeira_em' not in colunas or cpf_unico else '0.10.0' if not tem_documentos else '0.11.0' if 'tipo' not in colunas_documentos else '0.16.0' if versao_atual<7 else '0.21.0')
-            backup = self.caminho.with_name(f'backup-antes-{versao_backup}-' +
-                datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.sqlite3')
-            with self.conectar() as origem:
-                destino = sqlite3.connect(backup)
-                try:
-                    origem.backup(destino)
-                finally:
-                    destino.close()
-            limitar_backups(self.caminho.parent, 'backup-antes-*.sqlite3')
+        pendente = next((rotulo for rotulo, falta in ETAPAS if falta(estado)), None)
+        if estado['rpvs'] and pendente:
+            self.copiar_antes_de_migrar(pendente)
         with self.conectar() as con:
-            # Recriação de contas preserva os IDs referenciados por RPVs.
+            # Recriar tabelas preserva os IDs referenciados por outras; as chaves voltam a valer no fim.
             con.execute('PRAGMA foreign_keys=OFF')
             con.execute('BEGIN IMMEDIATE')
-            # O aplicativo nunca cria triggers nem views; se algum existir, veio de fora e é removido.
-            for tipo, nome in con.execute("SELECT type, name FROM sqlite_master WHERE type IN ('trigger','view')").fetchall():
-                con.execute(f'DROP {tipo.upper()} IF EXISTS "{nome.replace(chr(34), chr(34) * 2)}"')
-            con.execute('''CREATE TABLE IF NOT EXISTS contas (
-                id INTEGER PRIMARY KEY, identificacao TEXT NOT NULL,
-                identificacao_chave TEXT NOT NULL UNIQUE,
-                nome TEXT NOT NULL DEFAULT '', cpf TEXT,
-                endereco TEXT NOT NULL DEFAULT '', numero_endereco TEXT NOT NULL DEFAULT '',
-                cidade TEXT NOT NULL DEFAULT '', estado TEXT NOT NULL DEFAULT '', banco TEXT NOT NULL DEFAULT '',
-                agencia TEXT NOT NULL DEFAULT '', numero TEXT NOT NULL DEFAULT '',
-                pix TEXT NOT NULL DEFAULT '', ativa INTEGER NOT NULL DEFAULT 1,
-                banco_chave TEXT, agencia_chave TEXT, numero_chave TEXT,
-                UNIQUE(banco_chave, agencia_chave, numero_chave))''')
-            existentes = {r['name'] for r in con.execute('PRAGMA table_info(contas)')}
-            for campo in ('numero_endereco', 'cidade', 'estado'):
-                if campo not in existentes:
-                    con.execute(f"ALTER TABLE contas ADD COLUMN {campo} TEXT NOT NULL DEFAULT ''")
-            if cpf_unico:
-                esquema = con.execute("SELECT sql FROM sqlite_master WHERE name='contas'").fetchone()[0]
-                # O esquema legado é interno ao aplicativo; só removemos a unicidade do CPF.
-                esquema = re.sub(r'^CREATE TABLE\s+(?:IF NOT EXISTS\s+)?[\"`\[]?contas[\"`\]]?',
-                                 'CREATE TABLE contas_nova', esquema, count=1, flags=re.IGNORECASE)
-                esquema = re.sub(r'\bcpf\s+TEXT\s+UNIQUE\b', 'cpf TEXT', esquema, flags=re.IGNORECASE)
-                con.execute(esquema)
-                campos = ','.join(r['name'] for r in con.execute('PRAGMA table_info(contas)'))
-                con.execute(f'INSERT INTO contas_nova ({campos}) SELECT {campos} FROM contas')
-                con.execute('DROP TABLE contas')
-                con.execute('ALTER TABLE contas_nova RENAME TO contas')
-            if colunas and 'conta_id' not in colunas:
-                # Bancos anteriores à 0.4.0 guardavam só o nome da conta; cada nome vira uma conta a completar.
-                for (nome,) in con.execute('SELECT DISTINCT conta FROM rpvs').fetchall():
-                    con.execute('''INSERT OR IGNORE INTO contas (identificacao, identificacao_chave)
-                                   VALUES (?, ?)''', (nome, normalizar(nome)))
-                self.criar_rpvs(con, 'rpvs_nova')
-                for r in con.execute('SELECT * FROM rpvs').fetchall():
-                    conta = con.execute('SELECT * FROM contas WHERE identificacao=?', (r['conta'],)).fetchone()
-                    con.execute('''INSERT INTO rpvs_nova
-                        (id,nome,aquisicao,previsto,custo,conta,previsao,comissao,observacoes,conta_id,conta_snapshot)
-                        VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
-                        tuple(r[k] for k in ('id','nome','aquisicao','previsto','custo','conta','previsao','comissao','observacoes')) +
-                        (conta['id'], self.snapshot(conta)))
-                con.execute('DROP TABLE rpvs')
-                con.execute('ALTER TABLE rpvs_nova RENAME TO rpvs')
-            else:
-                self.criar_rpvs(con, 'rpvs')
-            con.execute('''CREATE TABLE IF NOT EXISTS prorrogacoes (
-                id INTEGER PRIMARY KEY, rpv_id INTEGER NOT NULL REFERENCES rpvs(id) ON DELETE CASCADE,
-                data TEXT NOT NULL, criada_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(rpv_id, data))''')
-            atuais = {r['name'] for r in con.execute('PRAGMA table_info(rpvs)')}
-            if 'recebimento' not in atuais:
-                con.execute('ALTER TABLE rpvs ADD COLUMN recebimento TEXT')
-            if 'previsao_atual_definida' not in atuais:
-                con.execute('ALTER TABLE rpvs ADD COLUMN previsao_atual_definida TEXT')
-            if 'lixeira_em' not in atuais:
-                con.execute('ALTER TABLE rpvs ADD COLUMN lixeira_em TEXT')
-            # O histórico geral de alterações foi descontinuado na 0.10.0 e removido na 0.21.0;
-            # a cópia backup-antes-0.21.0 preserva registros antigos, se houver.
-            con.execute('DROP TABLE IF EXISTS historico_alteracoes')
-            if con.execute('PRAGMA foreign_key_check').fetchall():
-                raise ValueError('Não foi possível migrar o banco: vínculos inconsistentes.')
-            con.execute('''CREATE TABLE IF NOT EXISTS documentos (
-                id INTEGER PRIMARY KEY, rpv_id INTEGER NOT NULL REFERENCES rpvs(id) ON DELETE CASCADE,
-                nome TEXT NOT NULL, caminho TEXT NOT NULL UNIQUE)''')
-            if 'tipo' not in colunas_documentos:
-                con.execute("ALTER TABLE documentos ADD COLUMN tipo TEXT NOT NULL DEFAULT 'entrada' CHECK(tipo IN ('entrada','recebimento'))")
-            if any(r['name']=='conta_id' and r['notnull'] for r in con.execute('PRAGMA table_info(rpvs)')):
-                self.criar_rpvs(con,'rpvs_nova')
-                campos=','.join(r['name'] for r in con.execute('PRAGMA table_info(rpvs)'))
-                con.execute(f'INSERT INTO rpvs_nova ({campos}) SELECT {campos} FROM rpvs')
-                con.execute('DROP TABLE rpvs')
-                con.execute('ALTER TABLE rpvs_nova RENAME TO rpvs')
-            con.execute('''CREATE TABLE IF NOT EXISTS previsoes_historico (
-                id INTEGER PRIMARY KEY, rpv_id INTEGER NOT NULL REFERENCES rpvs(id) ON DELETE CASCADE,
-                anterior TEXT NOT NULL, nova TEXT NOT NULL, alterada_em TEXT NOT NULL)''')
-            con.execute('CREATE TABLE IF NOT EXISTS configuracoes (chave TEXT PRIMARY KEY,valor TEXT NOT NULL)')
+            self.remover_estruturas_estranhas(con)
+            self.migrar_contas(con, estado)
+            self.migrar_rpvs(con, estado)
+            self.criar_tabelas_auxiliares(con, estado)
             if con.execute('PRAGMA foreign_key_check').fetchall():
                 raise ValueError('Não foi possível migrar o banco: vínculos inconsistentes.')
             con.execute(f'PRAGMA user_version={VERSAO_BANCO}')
+
+    @classmethod
+    def estado_do_esquema(cls, con):
+        """O que já existe no arquivo: colunas de cada tabela, versão gravada e particularidades antigas."""
+        colunas = lambda tabela: {r['name'] for r in con.execute(f'PRAGMA table_info({tabela})')}
+        return {'rpvs': colunas('rpvs'), 'contas': colunas('contas'), 'documentos': colunas('documentos'),
+                'tem_documentos': bool(colunas('documentos')), 'cpf_unico': cls.cpf_unico(con),
+                'versao': con.execute('PRAGMA user_version').fetchone()[0]}
+
+    def copiar_antes_de_migrar(self, versao):
+        """Antes de mexer no esquema, guarda o banco como estava; ficam as 10 cópias mais recentes."""
+        backup = self.caminho.with_name(f'backup-antes-{versao}-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.sqlite3')
+        with self.conectar() as origem:
+            destino = sqlite3.connect(backup)
+            try:
+                origem.backup(destino)
+            finally:
+                destino.close()
+        limitar_backups(self.caminho.parent, 'backup-antes-*.sqlite3')
+
+    @staticmethod
+    def remover_estruturas_estranhas(con):
+        # O aplicativo nunca cria triggers nem views; se algum existir, veio de fora e é removido.
+        for tipo, nome in con.execute("SELECT type, name FROM sqlite_master WHERE type IN ('trigger','view')").fetchall():
+            con.execute(f'DROP {tipo.upper()} IF EXISTS "{nome.replace(chr(34), chr(34) * 2)}"')
+
+    def migrar_contas(self, con, estado):
+        con.execute('''CREATE TABLE IF NOT EXISTS contas (
+            id INTEGER PRIMARY KEY, identificacao TEXT NOT NULL,
+            identificacao_chave TEXT NOT NULL UNIQUE,
+            nome TEXT NOT NULL DEFAULT '', cpf TEXT,
+            endereco TEXT NOT NULL DEFAULT '', numero_endereco TEXT NOT NULL DEFAULT '',
+            cidade TEXT NOT NULL DEFAULT '', estado TEXT NOT NULL DEFAULT '', banco TEXT NOT NULL DEFAULT '',
+            agencia TEXT NOT NULL DEFAULT '', numero TEXT NOT NULL DEFAULT '',
+            pix TEXT NOT NULL DEFAULT '', ativa INTEGER NOT NULL DEFAULT 1,
+            banco_chave TEXT, agencia_chave TEXT, numero_chave TEXT,
+            UNIQUE(banco_chave, agencia_chave, numero_chave))''')
+        existentes = {r['name'] for r in con.execute('PRAGMA table_info(contas)')}
+        for campo in ('numero_endereco', 'cidade', 'estado'):  # 0.7.0
+            if campo not in existentes:
+                con.execute(f"ALTER TABLE contas ADD COLUMN {campo} TEXT NOT NULL DEFAULT ''")
+        if estado['cpf_unico']:  # 0.9.0: o mesmo CPF pode ter mais de uma conta.
+            esquema = con.execute("SELECT sql FROM sqlite_master WHERE name='contas'").fetchone()[0]
+            esquema = re.sub(r'^CREATE TABLE\s+(?:IF NOT EXISTS\s+)?[\"`\[]?contas[\"`\]]?',
+                             'CREATE TABLE contas_nova', esquema, count=1, flags=re.IGNORECASE)
+            esquema = re.sub(r'\bcpf\s+TEXT\s+UNIQUE\b', 'cpf TEXT', esquema, flags=re.IGNORECASE)
+            con.execute(esquema)
+            self.trocar_tabela(con, 'contas', 'contas_nova')
+
+    def migrar_rpvs(self, con, estado):
+        if estado['rpvs'] and 'conta_id' not in estado['rpvs']:
+            # 0.4.0: a conta era só um nome; cada nome vira uma conta a completar.
+            for (nome,) in con.execute('SELECT DISTINCT conta FROM rpvs').fetchall():
+                con.execute('''INSERT OR IGNORE INTO contas (identificacao, identificacao_chave)
+                               VALUES (?, ?)''', (nome, normalizar(nome)))
+            self.criar_rpvs(con, 'rpvs_nova')
+            for r in con.execute('SELECT * FROM rpvs').fetchall():
+                conta = con.execute('SELECT * FROM contas WHERE identificacao=?', (r['conta'],)).fetchone()
+                con.execute('''INSERT INTO rpvs_nova
+                    (id,nome,aquisicao,previsto,custo,conta,previsao,comissao,observacoes,conta_id,conta_snapshot)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
+                    tuple(r[k] for k in ('id','nome','aquisicao','previsto','custo','conta','previsao','comissao','observacoes')) +
+                    (conta['id'], self.snapshot(conta)))
+            con.execute('DROP TABLE rpvs')
+            con.execute('ALTER TABLE rpvs_nova RENAME TO rpvs')
+        else:
+            self.criar_rpvs(con, 'rpvs')
+        atuais = {r['name'] for r in con.execute('PRAGMA table_info(rpvs)')}
+        for coluna in ('recebimento', 'previsao_atual_definida', 'lixeira_em'):  # 0.6.0, 0.7.0 e 0.9.0
+            if coluna not in atuais:
+                con.execute(f'ALTER TABLE rpvs ADD COLUMN {coluna} TEXT')
+        if any(r['name'] == 'conta_id' and r['notnull'] for r in con.execute('PRAGMA table_info(rpvs)')):
+            # 0.16.0: a conta removida deixa a operação sem conta, com a cópia dos dados bancários.
+            self.criar_rpvs(con, 'rpvs_nova')
+            self.trocar_tabela(con, 'rpvs', 'rpvs_nova')
+
+    @staticmethod
+    def criar_tabelas_auxiliares(con, estado):
+        con.execute('''CREATE TABLE IF NOT EXISTS prorrogacoes (
+            id INTEGER PRIMARY KEY, rpv_id INTEGER NOT NULL REFERENCES rpvs(id) ON DELETE CASCADE,
+            data TEXT NOT NULL, criada_em TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(rpv_id, data))''')
+        # O histórico geral de alterações foi descontinuado na 0.10.0 e removido na 0.21.0;
+        # a cópia backup-antes-0.21.0 preserva registros antigos, se houver.
+        con.execute('DROP TABLE IF EXISTS historico_alteracoes')
+        con.execute('''CREATE TABLE IF NOT EXISTS documentos (
+            id INTEGER PRIMARY KEY, rpv_id INTEGER NOT NULL REFERENCES rpvs(id) ON DELETE CASCADE,
+            nome TEXT NOT NULL, caminho TEXT NOT NULL UNIQUE)''')
+        if 'tipo' not in estado['documentos']:  # 0.11.0
+            con.execute("ALTER TABLE documentos ADD COLUMN tipo TEXT NOT NULL DEFAULT 'entrada' CHECK(tipo IN ('entrada','recebimento'))")
+        con.execute('''CREATE TABLE IF NOT EXISTS previsoes_historico (
+            id INTEGER PRIMARY KEY, rpv_id INTEGER NOT NULL REFERENCES rpvs(id) ON DELETE CASCADE,
+            anterior TEXT NOT NULL, nova TEXT NOT NULL, alterada_em TEXT NOT NULL)''')
+        con.execute('CREATE TABLE IF NOT EXISTS configuracoes (chave TEXT PRIMARY KEY,valor TEXT NOT NULL)')
+
+    @staticmethod
+    def trocar_tabela(con, tabela, nova):
+        """Copia os dados para a tabela nova, já com o esquema certo, e a põe no lugar da antiga."""
+        # Os nomes vêm sempre de constantes internas, nunca do usuário.
+        campos = ','.join(r['name'] for r in con.execute(f'PRAGMA table_info({tabela})'))
+        con.execute(f'INSERT INTO {nova} ({campos}) SELECT {campos} FROM {tabela}')
+        con.execute(f'DROP TABLE {tabela}')
+        con.execute(f'ALTER TABLE {nova} RENAME TO {tabela}')
 
     @staticmethod
     def cpf_unico(con):

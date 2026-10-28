@@ -15,7 +15,7 @@ from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED, BadZipFile
 import cifra
 from documentos import EXTENSOES
 from versao import VERSAO
-from dados import VERSAO_BANCO, Banco, limitar_backups
+from dados import ESQUEMA, VERSAO_BANCO, Banco, limitar_backups
 
 
 FORMATO = 'gestor-rpv-backup'
@@ -115,20 +115,14 @@ def validar_banco(caminho):
             versao_banco = con.execute('PRAGMA user_version').fetchone()[0]
             if not 4 <= versao_banco <= VERSAO_BANCO:
                 raise ValueError('Este backup exige outra versão do Gestor de RPV.')
-            requisitos = {
-                'rpvs': {'id','nome','aquisicao','previsto','custo','conta','previsao','comissao',
-                         'observacoes','conta_id','conta_snapshot','recebimento','previsao_atual_definida','lixeira_em'},
-                'contas': {'id','identificacao','identificacao_chave','nome','cpf','endereco','numero_endereco',
-                           'cidade','estado','banco','agencia','numero','pix','ativa','banco_chave','agencia_chave','numero_chave'},
-                'prorrogacoes': {'id','rpv_id','data','criada_em'},
-            }
+            # As colunas vêm do esquema atual (dados.ESQUEMA); versões antigas ainda não tinham algumas tabelas.
+            tabelas = {'rpvs', 'contas', 'prorrogacoes'}
             if versao_banco >= 5:
-                requisitos['documentos'] = {'id','rpv_id','nome','caminho'}
-            if versao_banco >= 6:
-                requisitos['documentos'].add('tipo')
-            if versao_banco>=7:
-                requisitos['previsoes_historico']={'id','rpv_id','anterior','nova','alterada_em'}
-                requisitos['configuracoes']={'chave','valor'}
+                tabelas.add('documentos')
+            if versao_banco >= 7:
+                tabelas |= {'previsoes_historico', 'configuracoes'}
+            requisitos = {tabela: ESQUEMA[tabela] - ({'tipo'} if tabela == 'documentos' and versao_banco < 6 else set())
+                          for tabela in tabelas}
             for tabela, campos in requisitos.items():
                 presentes = {r[1] for r in con.execute(f'PRAGMA table_info({tabela})')}
                 if not campos.issubset(presentes):
