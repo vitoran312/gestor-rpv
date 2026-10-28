@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.30.0
+# Gestor de RPV — 0.31.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -17,7 +17,7 @@ O pacote `cryptography` protege os backups com senha; o executável já o traz e
 
 Mantenha todos os arquivos `.py` e a pasta `recursos` juntos. Essa pasta contém o ícone da Vitoran Tech.
 A tela inicial tem os botões **Nova entrada**, **Minhas operações**,
-**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.30.0**, acompanhada do emblema com 50% de opacidade,
+**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.31.0**, acompanhada do emblema com 50% de opacidade,
 aparece no canto inferior direito.
 O número é lido da versão do programa e acompanha cada atualização.
 O programa funciona em uma única janela, que abre maximizada. **Minhas operações**, **Contas de
@@ -247,17 +247,21 @@ Clique no aviso para escolher a pasta e fazer um backup. Ele desaparece após a
 gravação bem-sucedida; cancelar ou ocorrer uma falha mantém o lembrete.
 O prazo é recalculado ao abrir ou voltar às janelas principais, sem interromper o uso.
 
-1. Clique em **Arquivo → Fazer backup**. Na primeira vez, crie a **senha dos backups** (pelo menos
-   6 caracteres) e anote-a: sem ela, não há como abrir os backups.
+1. Clique em **Arquivo → Fazer backup**. Na primeira vez, crie a **senha dos backups** (de 8 a 256
+   caracteres, sem espaço nas pontas e nada óbvio como "12345678") e anote-a: sem ela, não há como abrir
+   os backups.
 2. Escolha uma pasta do Windows. O programa salva um arquivo `GestorRPV-data-hora.rpvbackup`.
 3. No outro computador, abra o aplicativo e escolha **Arquivo → Importar dados**.
 4. Selecione esse arquivo, digite a senha se for pedida, confira as quantidades e confirme.
 
 Os backups são cifrados com AES-256-GCM, com a chave derivada da senha por scrypt: sem a senha, ninguém
-lê nem altera o conteúdo sem ser percebido. A senha fica salva só neste computador, para o backup
-automático funcionar; ela não vai dentro do backup e não é trocada ao importar o de outro computador.
-Para trocar, use **Arquivo → Backup automático… → Senha dos backups…**; a nova vale para os próximos.
-Backups antigos, sem senha, continuam podendo ser importados.
+lê nem altera o conteúdo sem ser percebido. Todo o trabalho acontece na pasta dos dados do programa: na
+pasta escolhida (que pode ser o OneDrive) só chega o arquivo final, já cifrado. A senha fica salva só
+neste computador, protegida pelo Windows para o usuário atual (DPAPI), para o backup automático
+funcionar; ela não vai dentro do backup e não é trocada ao importar o de outro computador. Para trocar,
+use **Arquivo → Backup automático… → Senha dos backups…** (pede a senha atual); a nova vale para os
+próximos. Backups antigos, sem senha, continuam podendo ser importados, mas quem já usa senha é avisado
+antes, porque um arquivo sem senha pode ter sido montado por outra pessoa.
 
 **Importar substitui os dados locais; não junta dois históricos.** Antes da troca,
 é criado um backup dos dados atuais em
@@ -367,8 +371,9 @@ ser importados; anexos antigos mantêm sua categoria.
 O banco local não é criptografado (fica na pasta do usuário do Windows); os backups são. Não envie
 dados pessoais ao GitHub.
 
-Se o banco não abrir (arquivo danificado), o programa explica o problema e oferece restaurar um backup
-na hora; o arquivo com problema nunca é apagado, fica guardado como `gestor-danificado-….sqlite3`.
+Se o banco não abrir (arquivo danificado ou vazio), o programa explica o problema e oferece restaurar um
+backup na hora; o arquivo com problema e os anexos dele nunca são apagados: ficam guardados como
+`gestor-danificado-….sqlite3` e `documentos-danificado-…`.
 Dados gravados por uma versão mais nova do programa não são abertos por uma mais antiga: é preciso
 atualizar. Erros que a tela contorna sem avisar ficam anotados em `%LOCALAPPDATA%\GestorRPV\gestor.log`.
 

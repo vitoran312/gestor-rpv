@@ -1,5 +1,42 @@
 # Histórico de versões
 
+## 0.31.0
+
+Correções da segunda rodada da banca de revisão.
+
+**Dados que não se perdem**
+- Restaurar um backup com o banco danificado guarda também os anexos que estavam com ele
+  (`documentos-danificado-…`); antes eles eram apagados. Arquivo de dados vazio também é tratado como
+  danificado. Senha errada na recuperação pede a senha de novo, sem voltar à escolha do arquivo.
+- "Apagar dados de demonstração" preserva qualquer registro que a pessoa tenha salvo pelo formulário, e uma
+  carga de demonstração interrompida não deixa dados fictícios para trás.
+- Fechar o formulário de conta com alterações pergunta antes de descartar; importar com um formulário
+  aberto pede para fechá-lo antes.
+- Colar um valor troca o valor inteiro do campo (antes juntava os dígitos e criava outro valor).
+
+**Segurança**
+- O backup é montado na pasta dos dados: na pasta escolhida só chega o arquivo final, cifrado.
+- Na importação, os anexos só são gravados depois da confirmação (só o hash deles é conferido antes).
+- Senha dos backups protegida pelo Windows (DPAPI) no banco local, com no mínimo 8 caracteres, sem espaços
+  nas pontas e sem senhas óbvias; trocar a senha pede a atual. Acentos digitados de jeitos diferentes
+  abrem o mesmo backup.
+- Quem usa senha é avisado antes de importar um backup sem senha.
+- O diário de erros não guarda o texto das mensagens (que pode ter o que foi digitado).
+
+**Uso**
+- O formulário lista de uma vez todas as regras não atendidas; colar valor acima do máximo diz o limite.
+- Senha errada na importação avisa sempre que errou; cancelar a criação da senha avisa que o backup não
+  foi feito; o rodapé avisa quando o backup automático está parado por falta de senha; a janela de backup
+  automático continua em primeiro plano depois de definir a senha.
+- Recebimento, previsão, lixeira, formulário, Sobre e calculadora abrem uma janela só.
+- Chaves Pix: CNPJ com e sem pontuação é a mesma chave; CPF e celular com os mesmos dígitos, não.
+- Busca respeita os espaços entre as palavras.
+
+**Manutenção**
+- Validação do backup em etapas curtas; esquema único conferido por teste; testes de interface divididos
+  em quatro arquivos por assunto, com a base em `apoio_interface.py` e os dados de exemplo em
+  `apoio_testes.py`; estilo padronizado e conferido no CI (pycodestyle).
+
 ## 0.30.0
 
 Correções apontadas pela banca de revisão (segurança, uso, manutenção e testes).

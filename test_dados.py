@@ -20,6 +20,17 @@ class TestDados(unittest.TestCase):
         with self.assertRaises(ValueError):
             previsao_por_prazo('31/02/2026', '2')
 
+    def test_esquema_declarado_e_o_banco_criado_sao_iguais(self):
+        from dados import ESQUEMA, TABELAS_LEGADAS
+        with tempfile.TemporaryDirectory() as pasta:
+            banco = Banco(Path(pasta) / 'novo.sqlite3')
+            with banco.conectar() as con:
+                tabelas = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+                self.assertEqual(tabelas - TABELAS_LEGADAS, set(ESQUEMA))
+                for tabela, colunas in ESQUEMA.items():
+                    with self.subTest(tabela):
+                        self.assertEqual({r['name'] for r in con.execute(f'PRAGMA table_info({tabela})')}, colunas)
+
     def test_valores_e_datas(self):
         self.assertEqual(centavos('20.000,00'), 2000000)
         self.assertEqual(centavos('12000,50'), 1200050)
