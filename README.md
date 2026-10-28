@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.29.2
+# Gestor de RPV — 0.30.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -9,12 +9,15 @@ Baixe em **Code → Download ZIP**, extraia **todos os arquivos** e abra `app.py
 Se precisar ver uma mensagem de erro, abra o Prompt de Comando nessa pasta:
 
 ```bat
+python -m pip install cryptography
 python app.py
 ```
 
+O pacote `cryptography` protege os backups com senha; o executável já o traz embutido.
+
 Mantenha todos os arquivos `.py` e a pasta `recursos` juntos. Essa pasta contém o ícone da Vitoran Tech.
 A tela inicial tem os botões **Nova entrada**, **Minhas operações**,
-**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.29.2**, acompanhada do emblema com 50% de opacidade,
+**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.30.0**, acompanhada do emblema com 50% de opacidade,
 aparece no canto inferior direito.
 O número é lido da versão do programa e acompanha cada atualização.
 O programa funciona em uma única janela, que abre maximizada. **Minhas operações**, **Contas de
@@ -244,10 +247,17 @@ Clique no aviso para escolher a pasta e fazer um backup. Ele desaparece após a
 gravação bem-sucedida; cancelar ou ocorrer uma falha mantém o lembrete.
 O prazo é recalculado ao abrir ou voltar às janelas principais, sem interromper o uso.
 
-1. Clique em **Arquivo → Fazer backup** e escolha uma pasta do Windows.
-2. O programa salva um arquivo `GestorRPV-data-hora.rpvbackup`.
+1. Clique em **Arquivo → Fazer backup**. Na primeira vez, crie a **senha dos backups** (pelo menos
+   6 caracteres) e anote-a: sem ela, não há como abrir os backups.
+2. Escolha uma pasta do Windows. O programa salva um arquivo `GestorRPV-data-hora.rpvbackup`.
 3. No outro computador, abra o aplicativo e escolha **Arquivo → Importar dados**.
-4. Selecione esse arquivo, confira as quantidades e confirme.
+4. Selecione esse arquivo, digite a senha se for pedida, confira as quantidades e confirme.
+
+Os backups são cifrados com AES-256-GCM, com a chave derivada da senha por scrypt: sem a senha, ninguém
+lê nem altera o conteúdo sem ser percebido. A senha fica salva só neste computador, para o backup
+automático funcionar; ela não vai dentro do backup e não é trocada ao importar o de outro computador.
+Para trocar, use **Arquivo → Backup automático… → Senha dos backups…**; a nova vale para os próximos.
+Backups antigos, sem senha, continuam podendo ser importados.
 
 **Importar substitui os dados locais; não junta dois históricos.** Antes da troca,
 é criado um backup dos dados atuais em
@@ -260,8 +270,9 @@ Na primeira abertura em um computador sem dados, o programa já mostra 13 opera�
 fictícias — nomes, CPFs e dados bancários inventados —, para quem quiser conhecê-lo antes de usar.
 As datas acompanham o dia da instalação, então o cenário é sempre o mesmo: 5 pendentes,
 4 atrasadas e 4 recebidas. Uma faixa em Minhas operações avisa que são dados de demonstração;
-o botão **Apagar dados de demonstração** remove só o que é fictício e mantém o que a pessoa já
-tiver cadastrado. Em um computador que já tem dados, nada é acrescentado.
+o botão **Apagar dados de demonstração** remove só o que é fictício (pelos nomes e CPFs inventados,
+não só pelos números dos registros, que o banco pode reaproveitar) e mantém o que a pessoa já tiver
+cadastrado. Em um computador que já tem dados, nada é acrescentado.
 
 ### Backup automático
 
@@ -274,11 +285,17 @@ externo desconectado), o programa não cria outra no lugar: o lembrete de backup
 janelas que interrompam o uso. O rodapé de Minhas operações indica quando o backup automático está ativo.
 A pasta escolhida vale para este computador e é mantida ao importar um backup de outro.
 
-O formato `.rpvbackup` é um ZIP com um snapshot consistente do SQLite, os arquivos
-da pasta `documentos` e um manifesto com hashes SHA-256. Inclui contas, RPVs ativas,
-lixeira, datas e documentos anexados. A importação valida formato, conteúdo,
-integridade do banco e hashes antes de alterar os dados locais. Em caso de falha
-durante a troca, os documentos anteriores são recuperados e a cópia de segurança permanece.
+Por dentro, o `.rpvbackup` é um ZIP (cifrado com a senha) com um snapshot consistente do SQLite, os
+anexos cadastrados e um manifesto com hashes SHA-256. Inclui contas, RPVs ativas, lixeira, datas e
+documentos anexados. A importação valida formato, conteúdo, integridade do banco e hashes antes de
+alterar os dados locais e recusa por segurança:
+- triggers, views e qualquer tabela ou índice que o aplicativo não cria (o banco é recriado do zero e
+  só os dados são copiados);
+- arquivos na pasta de documentos que não sejam anexos cadastrados (por exemplo, `.exe` ou atalhos);
+- arquivos compactados de forma suspeita, mais de 4 GB descompactados ou falta de espaço no disco.
+A extração acontece na pasta dos dados do programa, e sobras de importações interrompidas são apagadas
+na abertura seguinte. Em caso de falha durante a troca, os documentos anteriores são recuperados e a
+cópia de segurança permanece.
 
 ## Documentos da entrada
 
@@ -347,7 +364,13 @@ o histórico específico de previsão. Contas, IDs, cópias dos dados bancários
 são preservados na migração. Backups das versões 0.9.0 a 0.15.1 continuam podendo
 ser importados; anexos antigos mantêm sua categoria.
 
-O banco e os backups não são criptografados. Não envie dados pessoais ao GitHub.
+O banco local não é criptografado (fica na pasta do usuário do Windows); os backups são. Não envie
+dados pessoais ao GitHub.
+
+Se o banco não abrir (arquivo danificado), o programa explica o problema e oferece restaurar um backup
+na hora; o arquivo com problema nunca é apagado, fica guardado como `gestor-danificado-….sqlite3`.
+Dados gravados por uma versão mais nova do programa não são abertos por uma mais antiga: é preciso
+atualizar. Erros que a tela contorna sem avisar ficam anotados em `%LOCALAPPDATA%\GestorRPV\gestor.log`.
 
 ## Validação
 

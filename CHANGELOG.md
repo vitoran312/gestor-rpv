@@ -1,5 +1,47 @@
 # Histórico de versões
 
+## 0.30.0
+
+Correções apontadas pela banca de revisão (segurança, uso, manutenção e testes).
+
+**Segurança dos dados**
+- Importar backup recusa triggers, views e estruturas que o aplicativo não cria e recria o banco
+  copiando só os dados: um backup forjado não consegue mais trocar a chave Pix das contas salvas depois.
+  Ao abrir, o banco local também descarta triggers e views.
+- Backups protegidos por senha (AES-256-GCM, chave por scrypt). A senha é criada no primeiro backup e
+  fica só neste computador; backups antigos sem senha continuam importáveis.
+- Backup só leva e só aceita anexos cadastrados, com nome e extensão gerados pelo programa.
+- Importação recusa compactação suspeita, confere o espaço livre, extrai na pasta dos dados e limpa
+  sobras de importações interrompidas.
+
+**Dados que não se perdem**
+- "Apagar dados de demonstração" não remove mais cadastros reais que reaproveitaram o número de um
+  registro fictício, e apaga também os anexos fictícios.
+- Banco danificado não fecha o programa calado: aparece a explicação e a opção de restaurar um backup;
+  o arquivo com problema é guardado. Banco de versão mais nova não é aberto nem rebaixado.
+- Fechar formulário, recebimento ou previsão com alterações pergunta antes de descartar.
+- Ctrl+N repetido abre um formulário só (antes duplicava a entrada); a lixeira abre uma vez e acompanha
+  as exclusões.
+
+**Validações**
+- Valores aceitam só dígitos 0-9 e um separador decimal ("1e3", "1_000" e dígitos de outros alfabetos
+  são recusados; colar um valor inválido explica o motivo).
+- Datas entre 1900 e 2100; aquisição no futuro, previsão antes da aquisição e comissão acima do total
+  são recusadas também na gravação. Nome com até 150 caracteres e observações com até 5000.
+- O formulário lista todos os problemas de uma vez, dizendo o campo de cada um, e falhas do sistema
+  aparecem em português, sem códigos técnicos.
+- Chave Pix de telefone com e sem +55 é a mesma; remover conta em uso avisa quantas operações a usam.
+
+**Outros**
+- Excel: situação Atrasada como na tela, sem caracteres que invalidam o arquivo e com células dentro do
+  limite do Excel; "relatorio.csv" vira "relatorio.xlsx".
+- Busca ignora acentos e pontuação e procura também na conta; ordenação por nome respeita os espaços.
+- Calculadora usa o resultado exato (1 ÷ 3 × 3 = 1), repete o número em "5 + =" e não mostra "-0" nem
+  notação científica.
+- Manutenção: migrações em etapas nomeadas com esquema único, código repetido removido, funções grandes
+  divididas, código morto retirado, diário de erros em `gestor.log`, actions fixadas por SHA com
+  Dependabot, testes no CI a cada push com pyflakes, e 33 testes novos.
+
 ## 0.29.2
 
 - Tela inicial: título afastado 8 px do emblema; no Windows, a imagem do emblema encostava no texto.
