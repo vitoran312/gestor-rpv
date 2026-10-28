@@ -25,6 +25,7 @@ CONSULTA_RPVS = '''SELECT r.*,
 
 
 MANTER_BACKUPS = 10
+LIMITE_NOME, LIMITE_OBSERVACOES = 150, 5000
 VERSAO_BANCO = 8  # PRAGMA user_version gravado pela versão atual do esquema.
 
 
@@ -393,6 +394,10 @@ class Banco:
         dados['observacoes'] = dados['observacoes'][:1].upper() + dados['observacoes'][1:]
         if not dados['nome']:
             raise ValueError('Informe o nome completo do titular original.')
+        if len(dados['nome']) > LIMITE_NOME:
+            raise ValueError(f'O nome do titular pode ter até {LIMITE_NOME} caracteres.')
+        if len(dados['observacoes']) > LIMITE_OBSERVACOES:
+            raise ValueError(f'As observações podem ter até {LIMITE_OBSERVACOES} caracteres.')
         # As regras ficam aqui, e não só na interface, para valerem em qualquer caminho de gravação.
         dados['aquisicao'] = validar_data_iso(dados['aquisicao'], 'Data da aquisição')
         dados['previsao'] = validar_data_iso(dados['previsao'], 'Previsão de recebimento')

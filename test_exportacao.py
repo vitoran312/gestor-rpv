@@ -36,7 +36,8 @@ class TestExportacao(unittest.TestCase):
     def test_planilha_tem_cabecalho_valores_datas_e_situacao(self):
         recebida = self.banco.salvar(dados_rpv(nome='Pessoa <&> "aspas"', comissao=15050, observacoes='Linha\x01 extra'))
         self.banco.salvar(dados_rpv(nome='Pendente', aquisicao='2026-10-23', previsao='2099-12-31'))
-        self.banco.salvar(dados_rpv(nome='Atrasada', aquisicao='2020-01-01', previsao='2020-02-01'))
+        self.banco.salvar(dados_rpv(nome='Atrasada', aquisicao='2020-01-01', previsao='2020-02-01',
+                                    observacoes='a\ufffeb\uffffc'))
         self.banco.registrar_recebimento(recebida, '2026-10-22')
         lixo = self.banco.salvar(dados_rpv(nome='Na lixeira'))
         self.banco.excluir(lixo)
@@ -55,6 +56,16 @@ class TestExportacao(unittest.TestCase):
         self.assertEqual(recebida[2:6], ['12000.00', '150.50', '20000.00', '8000.00'])
         self.assertEqual(recebida[9], 'Recebido')
         self.assertEqual(recebida[11], 'Linha extra')
+        self.assertEqual(atrasada[11], 'Abc')
+
+    def test_celula_respeita_o_limite_do_excel(self):
+        from exportacao import LIMITE_CELULA, limitar_celula
+        self.assertEqual(limitar_celula('curto'), 'curto')
+        longo = limitar_celula('a' * 40000)
+        self.assertEqual((len(longo), longo[-1]), (LIMITE_CELULA, '…'))
+        emojis = limitar_celula('😀' * 20000)  # Cada emoji ocupa dois caracteres no Excel.
+        self.assertLessEqual(len(emojis.encode('utf-16-le')) // 2, LIMITE_CELULA)
+        self.assertTrue(emojis.endswith('😀…'))
         self.assertEqual(list(self.pasta.glob('saida/*.tmp')), [])
 
     def test_auxiliares_de_coluna_e_data(self):

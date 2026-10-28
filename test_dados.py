@@ -76,6 +76,8 @@ class TestDados(unittest.TestCase):
                 (dict(comissao=2000001), 'comissão não pode superar'),
                 (dict(aquisicao='0001-01-01'), 'entre 1900 e 2100'),
                 (dict(previsao='31/12/2026'), 'Previsão de recebimento: informe uma data válida'),
+                (dict(nome='A' * 151), 'até 150 caracteres'),
+                (dict(observacoes='x' * 5001), 'até 5000 caracteres'),
             ):
                 with self.subTest(mensagem), self.assertRaisesRegex(ValueError, mensagem):
                     banco.salvar(dados_rpv(**valores))

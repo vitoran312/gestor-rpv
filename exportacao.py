@@ -25,7 +25,9 @@ COLUNAS = (
     ('Observações', 'texto', 40),
 )
 ESTILOS = {'cabecalho': 1, 'moeda': 2, 'data': 3, 'texto': 0}
-INVALIDOS = re.compile('[\x00-\x08\x0b\x0c\x0e-\x1f]')
+# Tudo o que o XML 1.0 não aceita: controles, metades de pares substitutos e U+FFFE/U+FFFF.
+INVALIDOS = re.compile('[^\x09\x0a\x0d\x20-\ud7ff\ue000-\ufffd\U00010000-\U0010ffff]')
+LIMITE_CELULA = 32767  # Caracteres por célula no Excel, contados em UTF-16.
 
 CONTENT_TYPES = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -94,6 +96,13 @@ def linha_registro(registro):
             registro['recebimento'], registro['observacoes'])
 
 
+def limitar_celula(texto):
+    if len(texto.encode('utf-16-le')) // 2 <= LIMITE_CELULA:
+        return texto
+    cortado = texto.encode('utf-16-le')[:(LIMITE_CELULA - 1) * 2].decode('utf-16-le', 'ignore')
+    return cortado + '…'
+
+
 def celula(referencia, valor, tipo, estilo=None):
     estilo = ESTILOS[tipo] if estilo is None else estilo
     atributo_estilo = f' s="{estilo}"' if estilo else ''
@@ -103,7 +112,7 @@ def celula(referencia, valor, tipo, estilo=None):
         return f'<c r="{referencia}"{atributo_estilo}><v>{valor / 100:.2f}</v></c>'
     if tipo == 'data':
         return f'<c r="{referencia}"{atributo_estilo}><v>{serial_excel(valor)}</v></c>'
-    texto = escape(INVALIDOS.sub('', str(valor)))
+    texto = escape(limitar_celula(INVALIDOS.sub('', str(valor))))
     return f'<c r="{referencia}" t="inlineStr"{atributo_estilo}><is><t xml:space="preserve">{texto}</t></is></c>'
 
 
