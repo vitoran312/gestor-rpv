@@ -61,6 +61,17 @@ class TestContas(unittest.TestCase):
             with self.subTest(cpf=cpf), self.assertRaises(ValueError):
                 self.banco.salvar_conta(dados_conta(cpf=cpf))
 
+    def test_pix_de_telefone_com_ou_sem_ddi_e_a_mesma_chave(self):
+        from dados import chave_pix
+        self.assertEqual(chave_pix('+55 (11) 99999-9999'), chave_pix('(11) 99999-9999'))
+        self.assertEqual(chave_pix('55 11 3333-4444'), chave_pix('11 3333-4444'))
+        self.assertEqual(chave_pix('529.982.247-25'), '52998224725')        # CPF continua igual.
+        self.assertEqual(chave_pix('55.123.456/0001-00'.replace('/', '')), '55123456000100')  # CNPJ também.
+        self.banco.salvar_conta(dados_conta(pix='+55 (11) 99999-9999'))
+        with self.assertRaisesRegex(ValueError, 'chave Pix já está cadastrada'):
+            self.banco.salvar_conta(dados_conta(identificacao='Outra', numero='999-1', cpf='11144477735',
+                                                pix='(11) 99999-9999'))
+
     def test_snapshot_desativacao_reativacao_e_nome(self):
         identificador = self.banco.salvar_conta(dados_conta())
         rpv = self.banco.salvar(dados_rpv(conta_id=identificador))

@@ -163,7 +163,12 @@ def validar_cpf(texto):
 def chave_pix(texto):
     texto = texto.strip().casefold()
     if re.fullmatch(r'[0-9+ ().-]+', texto):
-        return re.sub(r'\D', '', texto)
+        digitos = re.sub(r'\D', '', texto)
+        # Telefone com DDI do Brasil (12 ou 13 dígitos começando por 55) é a mesma chave sem o +55.
+        # CPF (11) e CNPJ (14) têm outros tamanhos e não são afetados.
+        if len(digitos) in (12, 13) and digitos.startswith('55'):
+            digitos = digitos[2:]
+        return digitos
     return texto
 
 
