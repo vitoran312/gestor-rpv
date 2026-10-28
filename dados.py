@@ -165,6 +165,9 @@ class Banco:
             # Recriação de contas preserva os IDs referenciados por RPVs.
             con.execute('PRAGMA foreign_keys=OFF')
             con.execute('BEGIN IMMEDIATE')
+            # O aplicativo nunca cria triggers nem views; se algum existir, veio de fora e é removido.
+            for tipo, nome in con.execute("SELECT type, name FROM sqlite_master WHERE type IN ('trigger','view')").fetchall():
+                con.execute(f'DROP {tipo.upper()} IF EXISTS "{nome.replace(chr(34), chr(34) * 2)}"')
             con.execute('''CREATE TABLE IF NOT EXISTS contas (
                 id INTEGER PRIMARY KEY, identificacao TEXT NOT NULL,
                 identificacao_chave TEXT NOT NULL UNIQUE,

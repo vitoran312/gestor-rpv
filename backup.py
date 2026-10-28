@@ -44,6 +44,22 @@ def hash_arquivo(caminho):
     return digest.hexdigest()
 
 
+# Tabelas que alguma versão do aplicativo já criou. Qualquer outro objeto (trigger, view, índice próprio)
+# não vem do Gestor de RPV: um trigger escondido poderia, por exemplo, trocar a chave Pix de toda conta salva.
+TABELAS_CONHECIDAS = {'rpvs', 'contas', 'prorrogacoes', 'documentos', 'previsoes_historico', 'configuracoes',
+                      'historico_alteracoes', 'sqlite_sequence', 'sqlite_stat1', 'sqlite_stat4'}
+# Ordem de cópia na importação: tabelas referenciadas antes das que apontam para elas.
+TABELAS_IMPORTADAS = ('contas', 'rpvs', 'prorrogacoes', 'documentos', 'previsoes_historico', 'configuracoes')
+
+
+def verificar_estruturas(con):
+    for tipo, nome in con.execute('SELECT type, name FROM sqlite_master'):
+        conhecido = (nome in TABELAS_CONHECIDAS if tipo == 'table' else
+                     tipo == 'index' and nome.startswith('sqlite_autoindex_'))
+        if not conhecido:
+            raise ValueError('O backup contém estruturas que o Gestor de RPV não cria e foi recusado por segurança.')
+
+
 def conexao_leitura(caminho):
     return sqlite3.connect(Path(caminho).resolve().as_uri() + '?mode=ro', uri=True)
 
@@ -54,6 +70,7 @@ def validar_banco(caminho):
         try:
             if con.execute('PRAGMA integrity_check').fetchall() != [('ok',)]:
                 raise ValueError('O banco do backup está danificado.')
+            verificar_estruturas(con)
             versao_banco = con.execute('PRAGMA user_version').fetchone()[0]
             if versao_banco not in (4,5,6,7,8):
                 raise ValueError('Este backup exige outra versão do Gestor de RPV.')
@@ -172,6 +189,25 @@ def copiar_banco(origem, destino):
         alvo.close()
 
 
+def copiar_dados(origem, destino):
+    """Cria um banco novo com o esquema do aplicativo e copia para ele apenas os valores da origem."""
+    Banco(destino)
+    con = sqlite3.connect(Path(destino).resolve().as_uri(), uri=True)
+    try:
+        con.execute('PRAGMA foreign_keys=OFF')
+        con.execute('ATTACH DATABASE ? AS origem', (Path(origem).resolve().as_uri() + '?mode=ro',))
+        with con:
+            for tabela in TABELAS_IMPORTADAS:
+                # tabela vem da lista fixa acima; as colunas, do banco novo, criado pelo aplicativo.
+                campos = ','.join(r[1] for r in con.execute(f'PRAGMA main.table_info({tabela})'))
+                con.execute(f'INSERT INTO main.{tabela} ({campos}) SELECT {campos} FROM origem.{tabela}')
+        if con.execute('PRAGMA main.foreign_key_check').fetchall():
+            raise ValueError('O backup contém vínculos inconsistentes.')
+        con.execute('DETACH DATABASE origem')
+    finally:
+        con.close()
+
+
 class BackupPreparado:
     """Valida e extrai em uma pasta temporária; só restaura após confirmação da UI."""
     def __init__(self, arquivo):
@@ -258,10 +294,14 @@ class BackupPreparado:
             tinha_documentos = destino.exists()
             if tinha_documentos:
                 os.replace(destino, antigos)
+            # Só os dados do backup são aproveitados: as tabelas vêm de um banco novo, criado pelo próprio
+            # aplicativo, e os valores são copiados linha a linha. Nada do esquema do arquivo importado sobrevive.
+            limpo = trabalho / 'banco_limpo.sqlite3'
+            copiar_dados(self.pasta / 'banco.sqlite3', limpo)
             try:
                 os.replace(novos, destino)
                 # SQLite faz a substituição do banco em uma transação própria.
-                copiar_banco(self.pasta / 'banco.sqlite3', banco.caminho)
+                copiar_banco(limpo, banco.caminho)
             except Exception:
                 if destino.exists():
                     os.replace(destino, trabalho / 'documentos_importados')

@@ -5,10 +5,38 @@ import tempfile
 import unittest
 from unittest.mock import patch
 from zipfile import ZipFile, ZIP_DEFLATED
+import hashlib
+import json
 
 from backup import criar_backup, BackupPreparado, executar_backup_automatico, PASTA_AUTOMATICA
 from dados import Banco, limitar_backups
 from test_contas import banco_com_contas, dados_rpv, dados_conta
+
+
+def adulterar_banco(arquivo, destino, sql):
+    """Gera um backup com o banco alterado por `sql` e hashes recalculados, como faria um atacante."""
+    with tempfile.TemporaryDirectory() as pasta:
+        banco = Path(pasta) / 'banco.sqlite3'
+        with ZipFile(arquivo) as origem:
+            banco.write_bytes(origem.read('banco.sqlite3'))
+            con = sqlite3.connect(banco)
+            con.executescript(sql)
+            con.close()
+            manifesto = json.loads(origem.read('manifesto.json'))
+            manifesto['arquivos']['banco.sqlite3'] = hashlib.sha256(banco.read_bytes()).hexdigest()
+            with ZipFile(destino, 'w', ZIP_DEFLATED) as alvo:
+                for nome in origem.namelist():
+                    if nome == 'banco.sqlite3':
+                        alvo.write(banco, nome)
+                    elif nome == 'manifesto.json':
+                        alvo.writestr(nome, json.dumps(manifesto))
+                    else:
+                        alvo.writestr(nome, origem.read(nome))
+    return destino
+
+
+TRIGGER_PIX = """CREATE TRIGGER t_pix AFTER INSERT ON contas BEGIN
+    UPDATE contas SET pix='golpista@exemplo.com' WHERE id=NEW.id; END;"""
 
 
 class TestBackupHistorico(unittest.TestCase):
@@ -89,6 +117,36 @@ class TestBackupHistorico(unittest.TestCase):
         invalido.write_bytes(b'isto nao e um backup')
         with self.assertRaises(ValueError), BackupPreparado(invalido):
             pass
+
+    def test_backup_com_trigger_ou_view_e_recusado(self):
+        arquivo = criar_backup(self.origem, self.pasta / 'backups')
+        for nome, sql in (('trigger', TRIGGER_PIX), ('view', 'CREATE VIEW v AS SELECT * FROM contas;'),
+                          ('indice', 'CREATE INDEX i ON contas(pix);'), ('tabela', 'CREATE TABLE extra (x);')):
+            with self.subTest(nome):
+                adulterado = adulterar_banco(arquivo, self.pasta / f'{nome}.rpvbackup', sql)
+                with self.assertRaisesRegex(ValueError, 'segurança'), BackupPreparado(adulterado):
+                    pass
+
+    def test_importacao_recria_o_esquema_e_copia_so_os_dados(self):
+        # Mesmo que um trigger passasse pela validação, a importação monta um banco novo e o descarta.
+        arquivo = criar_backup(self.origem, self.pasta / 'backups')
+        adulterado = adulterar_banco(arquivo, self.pasta / 'trigger.rpvbackup', TRIGGER_PIX)
+        with patch('backup.verificar_estruturas'), BackupPreparado(adulterado) as preparado:
+            preparado.restaurar(self.destino)
+        restaurado = Banco(self.destino.caminho)
+        with restaurado.conectar() as con:
+            self.assertEqual(con.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='trigger'").fetchone()[0], 0)
+        conta = restaurado.obter_conta(restaurado.salvar_conta(dados_conta(identificacao='Nova', pix='meu@exemplo.com',
+                                                                           numero='777-1', cpf='52998224725')))
+        self.assertEqual(conta['pix'], 'meu@exemplo.com')
+
+    def test_banco_local_com_trigger_e_limpo_ao_abrir(self):
+        con = sqlite3.connect(self.destino.caminho)
+        con.executescript(TRIGGER_PIX + 'CREATE VIEW "v""x" AS SELECT 1;')
+        con.close()
+        banco = Banco(self.destino.caminho)
+        with banco.conectar() as con:
+            self.assertEqual(con.execute("SELECT COUNT(*) FROM sqlite_master WHERE type IN ('trigger','view')").fetchone()[0], 0)
 
     def test_lixeira_restauracao_e_prorrogacao_somente_na_lista_ativa(self):
         identificador = self.origem.salvar(dados_rpv())
