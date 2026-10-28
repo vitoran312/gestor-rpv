@@ -4,6 +4,7 @@ Roda um navegador de verdade (Playwright + Chromium); fica de fora quando não h
 como no Windows do CI. Exemplo: GESTOR_RPV_TESTE_CELULAR=1 python -m unittest test_celular -v
 """
 import functools
+import hashlib
 import json
 import os
 import shutil
@@ -21,6 +22,9 @@ from grafico import resumo_mensal
 from apoio_testes import SENHA_TESTE, banco_com_contas, dados_rpv, prorrogacao_antiga
 
 RAIZ = Path(__file__).resolve().parent
+# Imagem PNG de 1x1 pixel, para o comprovante de teste.
+PNG_1X1 = bytes.fromhex('89504e470d0a1a0a0000000d4948445200000001000000010802000000907753de0000000c49444154789c63f8cf'
+                        'c000000301010018dd8db40000000049454e44ae426082')
 HOJE = date(2026, 10, 28)
 TERMOS = ['', 'ana', 'jose', 'maria jose', 'ria jo', 'lva', 'silva c', 'lva c', 'davila', 'lilian', '10/2026', '---', 'ÁVILA',
           'x y z', '  bruno  ']
@@ -72,7 +76,10 @@ class TestAppDoCelular(unittest.TestCase):
                                            previsao='2026-12-01', comissao=50000))
         cls.maria = banco.salvar(dados_rpv(nome='Maria-José Souza', aquisicao='2026-08-05', previsao='2026-09-01',
                                            custo=700000, previsto=1000000))
-        banco.registrar_recebimento(cls.maria, '2026-09-15')
+        comprovante = cls.pasta / 'comprovante.png'
+        comprovante.write_bytes(PNG_1X1)
+        banco.registrar_recebimento(cls.maria, '2026-09-15', anexos=[comprovante])
+        cls.hashes = {a.name: hashlib.sha256(a.read_bytes()).hexdigest() for a in (anexo, comprovante)}
         cls.carlos = banco.salvar(dados_rpv(nome='Carlos Silva', aquisicao='2026-10-20', previsao='2026-11-10'))
         banco.atualizar_previsao(cls.carlos, '2026-12-20')
         cls.antiga = banco.salvar(dados_rpv(nome='Operação Antiga', aquisicao='2025-11-02', previsao='2026-01-10',
@@ -99,7 +106,11 @@ class TestAppDoCelular(unittest.TestCase):
         ]
         regras = {'arquivo': endereco(cifrado), 'senha': SENHA_TESTE, 'hoje': HOJE.isoformat(), 'termos': TERMOS,
                   'valores': VALORES, 'textos': TEXTOS}
-        telas = {'arquivo': str(cifrado), 'senha': SENHA_TESTE, 'enderecos': TELAS + [f'#operacao/{cls.antiga}']}
+        documentos = {d['nome']: d['id'] for r in (cls.ana, cls.maria) for t in ('entrada', 'recebimento')
+                      for d in banco.documentos(r, t)}
+        cls.endereco_pdf, cls.endereco_png = (f'#documento/{documentos[n]}' for n in ('contrato.pdf', 'comprovante.png'))
+        telas = {'arquivo': str(cifrado), 'senha': SENHA_TESTE, 'enderecos': TELAS + [f'#operacao/{cls.antiga}'],
+                 'documentos': [cls.endereco_pdf, cls.endereco_png]}
         return {'casos': casos, 'regras': regras, 'telas': telas}
 
     # ---- Leitura do backup ------------------------------------------------------------------------------
@@ -107,7 +118,7 @@ class TestAppDoCelular(unittest.TestCase):
         resultado = dict(self.resultados['leituras']['cifrado'])
         self.assertTrue(resultado.pop('cifrado'))
         resultado.pop('versao_app')
-        self.assertEqual(resultado, {'operacoes': 5, 'lixeira': 1, 'contas': len(self.banco.contas()), 'documentos': 1,
+        self.assertEqual(resultado, {'operacoes': 5, 'lixeira': 1, 'contas': len(self.banco.contas()), 'documentos': 2,
                                      'nomes': [r['nome'] for r in sorted(self.banco.listar(), key=lambda r: r['id'])]})
 
     def test_backup_antigo_sem_senha_tambem_abre(self):
@@ -165,7 +176,22 @@ class TestAppDoCelular(unittest.TestCase):
         regras = self.resultados['regras']
         self.assertEqual(regras['historico'], {str(self.carlos): 1})
         self.assertEqual(regras['prorrogacoes'], {str(self.antiga): 1})
-        self.assertEqual(regras['documentos'], {str(self.ana): ['contrato.pdf']})
+        self.assertEqual(regras['documentos'], {str(self.ana): ['contrato.pdf'], str(self.maria): ['comprovante.png']})
+
+    # ---- Anexos ---------------------------------------------------------------------------------------------
+    def test_anexos_saem_do_backup_identicos_aos_originais(self):
+        self.assertEqual(self.resultados['regras']['anexos'], self.hashes)
+
+    def test_caminho_que_nao_e_anexo_do_backup_e_recusado(self):
+        self.assertEqual(self.resultados['regras']['recusas'], ['ErroBackup'] * 3)
+
+    def test_pdf_e_imagem_abrem_na_tela(self):
+        documentos = self.resultados['documentos']
+        self.assertEqual(documentos[self.endereco_pdf], {'tag': 'iframe', 'blob': True, 'carregada': True,
+                                                         'titulo': 'contrato.pdf'})
+        self.assertEqual(documentos[self.endereco_png], {'tag': 'img', 'blob': True, 'carregada': True,
+                                                         'titulo': 'comprovante.png'})
+        self.assertTrue(self.resultados['blob_liberado'])
 
     # ---- Telas ----------------------------------------------------------------------------------------------
     def test_todas_as_telas_abrem_sem_erro(self):

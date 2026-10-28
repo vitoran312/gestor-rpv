@@ -170,7 +170,7 @@ const GestorDados = (() => {
       operacoes: linhas(db, CONSULTA_RPVS + ' WHERE r.lixeira_em IS NULL ORDER BY aquisicao DESC, id DESC'),
       lixeira: linhas(db, CONSULTA_RPVS + ' WHERE r.lixeira_em IS NOT NULL ORDER BY lixeira_em DESC, id DESC'),
       contas: linhas(db, 'SELECT * FROM contas ORDER BY ativa DESC, identificacao COLLATE NOCASE, id'),
-      documentos: agrupar(linhas(db, 'SELECT id, rpv_id, nome, tipo FROM documentos ORDER BY id'), 'rpv_id'),
+      documentos: agrupar(linhas(db, 'SELECT id, rpv_id, nome, caminho, tipo FROM documentos ORDER BY id'), 'rpv_id'),
       historico: agrupar(linhas(db, 'SELECT * FROM previsoes_historico ORDER BY id DESC'), 'rpv_id'),
       prorrogacoes: agrupar(linhas(db, 'SELECT * FROM prorrogacoes ORDER BY data DESC, id DESC'), 'rpv_id'),
       demonstracao: Boolean(configuracoes.dados_demonstracao),

@@ -104,6 +104,26 @@ const LeitorBackup = (() => {
     return { manifesto, banco, arquivos };
   }
 
+  // Um anexo do backup ("12/abc….pdf", como gravado na tabela documentos), conferido pelo hash do manifesto.
+  async function extrairDocumento(zip, manifesto, caminho) {
+    const nome = 'documentos/' + caminho;
+    const esperado = manifesto.arquivos[nome];
+    if (!esperado || caminho.includes('..')) {
+      throw new ErroBackup('Este documento não está no backup.');
+    }
+    let arquivos;
+    try {
+      arquivos = fflate.unzipSync(zip, { filter: (f) => f.name === nome });
+    } catch (erro) {
+      throw new ErroBackup('Não foi possível abrir o documento.');
+    }
+    const bytes = arquivos[nome];
+    if (!bytes || await sha256(bytes) !== esperado) {
+      throw new ErroBackup('O documento do backup está danificado ou foi alterado.');
+    }
+    return bytes;
+  }
+
   let carregarSql = null;
 
   function sqlJs() {
@@ -137,7 +157,9 @@ const LeitorBackup = (() => {
     const SQL = await sqlJs();
     const db = new SQL.Database(banco);
     medir('abrir_banco');
-    return { db, manifesto, cifrado: ehCifrado, tempos, arquivos };
+    // Os anexos ficam compactados na memória e só são extraídos quando a pessoa abre um deles.
+    const extrair = (caminho) => extrairDocumento(zip, manifesto, caminho);
+    return { db, manifesto, cifrado: ehCifrado, tempos, arquivos, extrair };
   }
 
   return { ler, decifrar, cifrado, ErroBackup, SenhaIncorreta };

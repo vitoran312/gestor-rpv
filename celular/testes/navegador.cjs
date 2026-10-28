@@ -42,9 +42,26 @@ const { chromium } = require('playwright');
     resultados.regras = await pagina.evaluate(async ({ arquivo, senha, hoje, termos, valores, textos }) => {
       const D = GestorDados;
       const bytes = new Uint8Array(await (await fetch(arquivo)).arrayBuffer());
-      const { db } = await LeitorBackup.ler(bytes, senha);
+      const { db, extrair } = await LeitorBackup.ler(bytes, senha);
       const dados = D.carregar(db);
       db.close();
+      const hex = async (b) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', b)),
+        (x) => x.toString(16).padStart(2, '0')).join('');
+      const anexos = {};
+      for (const lista of dados.documentos.values()) {
+        for (const d of lista) {
+          anexos[d.nome] = await hex(await extrair(d.caminho));
+        }
+      }
+      const recusas = [];
+      for (const caminho of ['1/naoexiste.pdf', '../banco.sqlite3', '']) {
+        try {
+          await extrair(caminho);
+          recusas.push('aceito');
+        } catch (erro) {
+          recusas.push(erro.constructor.name);
+        }
+      }
       const [ano, mes, dia] = hoje.split('-').map(Number);
       return {
         ordem: dados.operacoes.map((r) => r.id),
@@ -60,6 +77,8 @@ const { chromium } = require('playwright');
         historico: Object.fromEntries([...dados.historico].map(([id, lista]) => [id, lista.length])),
         prorrogacoes: Object.fromEntries([...dados.prorrogacoes].map(([id, lista]) => [id, lista.length])),
         documentos: Object.fromEntries([...dados.documentos].map(([id, lista]) => [id, lista.map((d) => d.nome)])),
+        anexos,
+        recusas,
       };
     }, regras);
 
@@ -74,7 +93,22 @@ const { chromium } = require('playwright');
       await pagina.waitForFunction(() => document.getElementById('tela').childElementCount > 0);
       resultados.telas[endereco] = await pagina.evaluate(() => document.getElementById('aplicativo').innerText);
     }
+    // Cada anexo aberto na tela: PDF num quadro, imagem como imagem, os dois a partir do próprio aparelho (blob:).
+    resultados.documentos = {};
+    for (const endereco of telas.documentos) {
+      await pagina.evaluate((h) => { location.hash = h; }, endereco);
+      const visualizacao = await pagina.waitForSelector('.documento iframe, .documento img, .documento .erro', { timeout: 30000 });
+      resultados.documentos[endereco] = await visualizacao.evaluate((e) => ({
+        tag: e.tagName.toLowerCase(), blob: (e.getAttribute('src') || '').startsWith('blob:'),
+        carregada: e.tagName === 'IMG' ? e.complete && e.naturalWidth > 0 : true, titulo: document.getElementById('titulo').textContent,
+      }));
+      if (resultados.documentos[endereco].tag === 'img') {
+        await pagina.waitForFunction(() => document.querySelector('.documento img').naturalWidth > 0, null, { timeout: 10000 })
+          .then(() => { resultados.documentos[endereco].carregada = true; }).catch(() => {});
+      }
+    }
     await pagina.evaluate(() => { location.hash = '#mais'; });
+    resultados.blob_liberado = await pagina.evaluate(() => !document.querySelector('.documento'));
     await pagina.getByText('Fechar dados').click();
     resultados.fechado = await pagina.evaluate(() => ({
       abertura: !document.getElementById('abertura').hidden,

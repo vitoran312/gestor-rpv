@@ -12,7 +12,10 @@
   const ETAPAS = { senha: 'Conferindo a senha', decifrar: 'Abrindo o backup' };
 
   let dados = null;      // Conteúdo do backup aberto.
-  let info = null;       // Arquivo, manifesto e tempos de abertura.
+  let info = null;       // Arquivo, manifesto, tempos de abertura e extrair(), que tira um anexo do backup.
+  let enderecoAberto = null;  // Anexo exibido agora (blob:), liberado ao sair da tela.
+  const TIPOS = { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp',
+    gif: 'image/gif', bmp: 'image/bmp', tif: 'image/tiff', tiff: 'image/tiff' };
   const estado = { busca: '', filtro: 'todas' };
 
   // ---- Montagem de elementos ---------------------------------------------------------------------------
@@ -72,7 +75,7 @@
         leitura.db.close();
       }
       info = { arquivo: arquivo.name, tamanho: arquivo.size, manifesto: leitura.manifesto, cifrado: leitura.cifrado,
-        tempos: leitura.tempos };
+        tempos: leitura.tempos, extrair: leitura.extrair };
       $('senha').value = '';
       $('formulario').reset();
       $('andamento').hidden = true;
@@ -93,7 +96,15 @@
     }
   });
 
+  function liberarDocumento() {
+    if (enderecoAberto) {
+      URL.revokeObjectURL(enderecoAberto);
+      enderecoAberto = null;
+    }
+  }
+
   function fecharDados() {
+    liberarDocumento();
     dados = null;
     info = null;
     estado.busca = '';
@@ -221,10 +232,56 @@
         : el('p', { class: 'discreto', texto: 'A previsão nunca foi alterada.' }),
       el('h2', { texto: 'Documentos' }),
       documentos.length
-        ? cartao(campos(documentos.map((d) => [d.tipo === 'recebimento' ? 'Comprovante' : 'Documento', d.nome])),
-          el('p', { class: 'discreto pequeno', texto: 'Abrir os documentos no celular será a próxima etapa.' }))
+        ? el('div', { class: 'menu' }, documentos.map((d) => el('a', { class: 'cartao', href: `#documento/${d.id}` },
+          el('div', { class: 'nome', texto: d.nome }),
+          el('div', { class: 'discreto pequeno', texto: d.tipo === 'recebimento' ? 'Comprovante de recebimento' : 'Documento da entrada' }))))
         : el('p', { class: 'discreto', texto: 'Nenhum documento anexado.' }),
     ];
+  }
+
+  function documentoPorId(id) {
+    for (const lista of dados.documentos.values()) {
+      const encontrado = lista.find((d) => d.id === id);
+      if (encontrado) {
+        return encontrado;
+      }
+    }
+    return null;
+  }
+
+  // Anexo: extraído do backup só agora, conferido pelo hash e mostrado na própria tela. "Compartilhar"
+  // abre o menu do iPhone (ver em tela cheia, salvar em Arquivos, enviar).
+  function telaDocumento(id) {
+    const d = documentoPorId(id);
+    if (!d) {
+      return [vazio('Documento não encontrado neste backup.')];
+    }
+    const extensao = d.caminho.split('.').pop().toLowerCase();
+    const tipo = TIPOS[extensao] || 'application/octet-stream';
+    const area = el('div', { class: 'documento' }, el('p', { class: 'discreto', texto: 'Abrindo o documento…' }));
+    info.extrair(d.caminho).then((bytes) => {
+      if (location.hash !== `#documento/${id}`) {
+        return;  // A pessoa já saiu da tela.
+      }
+      const arquivo = new File([bytes], d.nome, { type: tipo });
+      liberarDocumento();
+      enderecoAberto = URL.createObjectURL(arquivo);
+      const visualizacao = tipo === 'application/pdf'
+        ? el('iframe', { class: 'documento-pdf', src: enderecoAberto, title: d.nome })
+        : el('img', { class: 'documento-imagem', src: enderecoAberto, alt: d.nome });
+      const podeCompartilhar = navigator.canShare && navigator.canShare({ files: [arquivo] });
+      area.replaceChildren(
+        podeCompartilhar
+          ? el('button', { type: 'button', class: 'primario', texto: 'Compartilhar ou salvar', onclick: () => {
+            navigator.share({ files: [arquivo] }).catch(() => {});  // Cancelar o menu não é erro.
+          } })
+          : el('a', { class: 'cartao', href: enderecoAberto, download: d.nome, texto: 'Baixar o documento' }),
+        visualizacao);
+    }).catch((erro) => {
+      area.replaceChildren(el('p', { class: 'erro', texto: erro instanceof LeitorBackup.ErroBackup ? erro.message
+        : 'Não foi possível abrir o documento neste aparelho.' }));
+    });
+    return [el('p', { class: 'discreto pequeno', texto: d.tipo === 'recebimento' ? 'Comprovante de recebimento' : 'Documento da entrada' }), area];
   }
 
   function telaContas() {
@@ -329,6 +386,7 @@
     inicio: { titulo: 'Início', aba: 'inicio', montar: telaInicio },
     operacoes: { titulo: 'Operações', aba: 'operacoes', montar: telaOperacoes },
     operacao: { titulo: 'Operação', aba: 'operacoes', montar: telaOperacao, voltar: true },
+    documento: { titulo: 'Documento', aba: 'operacoes', montar: telaDocumento, voltar: true },
     contas: { titulo: 'Contas de recebimento', aba: 'contas', montar: telaContas },
     mais: { titulo: 'Mais', aba: 'mais', montar: telaMais },
     lixeira: { titulo: 'Lixeira', aba: 'mais', montar: telaLixeira, voltar: true },
@@ -343,6 +401,7 @@
     const [nome, parametro] = location.hash.slice(1).split('/');
     const tela = TELAS[nome] || TELAS.inicio;
     const id = Number(parametro);
+    liberarDocumento();
     $('titulo').textContent = tela.titulo;
     $('voltar').hidden = !tela.voltar;
     document.querySelectorAll('.abas a').forEach((a) => a.classList.toggle('ativa', a.dataset.aba === tela.aba));
@@ -350,6 +409,9 @@
     if (tela === TELAS.operacao && dados.operacoes.concat(dados.lixeira).some((r) => r.id === id)) {
       const r = dados.operacoes.find((o) => o.id === id) || dados.lixeira.find((o) => o.id === id);
       $('titulo').textContent = r.nome;
+    }
+    if (tela === TELAS.documento && documentoPorId(id)) {
+      $('titulo').textContent = documentoPorId(id).nome;
     }
     window.scrollTo(0, 0);
   }

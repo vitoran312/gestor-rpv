@@ -5,13 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <!-- Nada sai do aparelho: a página só carrega arquivos dela mesma e não se conecta a nenhum outro endereço. -->
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self'; img-src 'self' data:; connect-src 'self'; form-action 'none'; base-uri 'none'">
+        content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; frame-src blob:; object-src 'none'; connect-src 'self'; form-action 'none'; base-uri 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="color-scheme" content="light dark">
   <title>Gestor de RPV</title>
   <!-- App na Tela de Início do iPhone: nome, ícone e abertura em tela cheia. -->
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icones/apple-touch-icon.png">
+  <link rel="apple-touch-icon-precomposed" sizes="180x180" href="icones/apple-touch-icon.png">
   <link rel="icon" type="image/png" href="icones/icone-192.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">

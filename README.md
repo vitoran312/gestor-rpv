@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.37.0
+# Gestor de RPV — 0.38.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -453,8 +453,9 @@ contém o código das telas, e os dados ficam na memória do app enquanto ele es
 computador não muda.
 
 Telas (só consulta): Início com os indicadores e a situação das operações, Operações em cartões com busca e
-filtros, detalhe de cada operação (todos os campos, conta de destino, histórico da previsão e nomes dos
-documentos), Contas de recebimento, Lixeira, Gráfico mensal e dados do backup aberto. "Fechar dados" apaga
+filtros, detalhe de cada operação (todos os campos, conta de destino, histórico da previsão e documentos,
+que abrem na tela — PDF ou imagem — e podem ser compartilhados ou salvos pelo menu do iPhone), Contas de
+recebimento, Lixeira, Gráfico mensal e dados do backup aberto. "Fechar dados" apaga
 tudo da memória do celular. O endereço é https://vitoran312.github.io/gestor-rpv/; no Safari do iPhone,
 **Compartilhar → Adicionar à Tela de Início** instala o app com ícone e em tela cheia. O service worker
 (`celular/sw.js`) guarda só o código do app, para abrir também sem internet; os dados nunca são guardados.

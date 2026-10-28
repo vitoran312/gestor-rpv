@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## 0.38.0
+
+- App do celular abre os anexos: no detalhe da operação, cada documento e comprovante abre na tela (PDF ou
+  imagem) e pode ser compartilhado ou salvo pelo menu do iPhone. O anexo só é extraído do backup quando é
+  aberto, conferido pelo hash do backup, e sai da memória ao deixar a tela.
+- Ícone do app declarado também com tamanho e na forma antiga que o iPhone procura, para não cair no ícone
+  genérico ao adicionar à Tela de Início.
+
 ## 0.37.0
 
 - App do celular instalável: no Safari do iPhone, Compartilhar → Adicionar à Tela de Início cria o ícone
