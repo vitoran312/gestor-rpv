@@ -58,9 +58,11 @@ class ArquivosMixin:
         if evento.widget is not self.janela:
             return
         for nome in ('agendamento_backup', 'agendamento_data', 'agendamento_tema', 'agendamento_arte'):
-            if getattr(self, nome, None):
-                self.janela.after_cancel(getattr(self, nome))
-                setattr(self, nome, None)
+            setattr(self, nome, None)
+        # Qualquer tarefa ainda agendada (redesenhos com after_idle, relógio da animação, backup) é
+        # cancelada: depois de fechar a janela, ela chamaria funções que não existem mais.
+        for agendamento in self.janela.tk.splitlist(self.janela.tk.call('after', 'info')):
+            self.janela.after_cancel(agendamento)
 
     def configurar_backup_automatico(self):
         pai = self.historico if self.historico is not None and self.historico.winfo_exists() else self.janela
