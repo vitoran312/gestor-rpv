@@ -12,6 +12,7 @@ import time
 from datetime import date, datetime
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED, BadZipFile
 
+import cifra
 from documentos import EXTENSOES
 from versao import VERSAO
 from dados import VERSAO_BANCO, Banco, limitar_backups
@@ -20,6 +21,17 @@ from dados import VERSAO_BANCO, Banco, limitar_backups
 FORMATO = 'gestor-rpv-backup'
 PASTA_AUTOMATICA = 'backup_auto_pasta'
 PREFIXO_AUTOMATICO = 'GestorRPV-auto-'
+SENHA_BACKUP = 'senha_backup'
+# Configurações que pertencem a este computador: não vão no backup e não são trocadas ao importar.
+CONFIGURACOES_LOCAIS = (PASTA_AUTOMATICA, SENHA_BACKUP)
+
+
+class SenhaAusente(ValueError):
+    """Ainda não há senha definida para proteger os backups."""
+
+
+class SenhaNecessaria(ValueError):
+    """O backup é protegido e a senha informada (ou a falta dela) não o abre."""
 
 
 def aviso_backup(quando, hoje=None):
@@ -110,7 +122,14 @@ def validar_banco(caminho):
         raise ValueError('Não foi possível validar o banco do backup.') from erro
 
 
-def criar_backup(banco, pasta, prefixo='GestorRPV-'):
+def criar_backup(banco, pasta, prefixo='GestorRPV-', exigir_senha=True):
+    """Grava um backup completo, cifrado com a senha dos backups deste computador.
+
+    Sem senha definida, só as cópias de segurança locais (exigir_senha=False) saem sem criptografia.
+    """
+    senha = banco.configuracao(SENHA_BACKUP)
+    if exigir_senha and not senha:
+        raise SenhaAusente('Defina a senha dos backups antes de criar um backup.')
     pasta = Path(pasta)
     pasta.mkdir(parents=True, exist_ok=True)
     quando=datetime.now().astimezone().isoformat(timespec='seconds')
@@ -124,9 +143,11 @@ def criar_backup(banco, pasta, prefixo='GestorRPV-'):
             with banco.conectar() as origem:
                 origem.backup(con)
             con.execute('PRAGMA journal_mode=DELETE')
-            if con.execute('PRAGMA user_version').fetchone()[0]>=7:
+            if con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='configuracoes'").fetchone():
                 con.execute("INSERT OR REPLACE INTO configuracoes (chave,valor) VALUES ('ultimo_backup',?)",(quando,))
+                con.executemany('DELETE FROM configuracoes WHERE chave=?', [(c,) for c in CONFIGURACOES_LOCAIS])
                 con.commit()
+                con.execute('VACUUM')  # Não deixa a senha apagada em páginas livres do arquivo.
         finally:
             con.close()
         validar_banco(copia)
@@ -166,6 +187,10 @@ def criar_backup(banco, pasta, prefixo='GestorRPV-'):
                          'criado_em': datetime.now().astimezone().isoformat(timespec='seconds'),
                          'arquivos': arquivos}
             pacote.writestr('manifesto.json', json.dumps(manifesto, ensure_ascii=False, indent=2))
+        if senha:
+            protegido = trabalho / 'protegido.tmp'
+            cifra.cifrar_arquivo(zip_temporario, protegido, senha)
+            zip_temporario = protegido
         os.replace(zip_temporario, destino)
     banco.registrar_backup(quando)
     return destino
@@ -224,14 +249,24 @@ def copiar_dados(origem, destino):
 
 class BackupPreparado:
     """Valida e extrai em uma pasta temporária; só restaura após confirmação da UI."""
-    def __init__(self, arquivo):
+    def __init__(self, arquivo, senha=None):
         self.arquivo = Path(arquivo)
+        self.senha = senha
         self.temporario = None
 
     def __enter__(self):
         self.temporario = tempfile.TemporaryDirectory(prefix='gestor-rpv-importar-')
         self.pasta = Path(self.temporario.name)
         try:
+            self.pacote = self.arquivo
+            if cifra.cifrado(self.arquivo):
+                if not self.senha:
+                    raise SenhaNecessaria('Este backup é protegido por senha.')
+                self.pacote = self.pasta / 'pacote.zip'
+                try:
+                    cifra.decifrar_arquivo(self.arquivo, self.pacote, self.senha)
+                except cifra.SenhaIncorreta as erro:
+                    raise SenhaNecessaria(str(erro)) from None
             self.validar_extrair()
             return self
         except Exception:
@@ -243,7 +278,7 @@ class BackupPreparado:
 
     def validar_extrair(self):
         try:
-            with ZipFile(self.arquivo) as pacote:
+            with ZipFile(self.pacote) as pacote:
                 infos = pacote.infolist()
                 nomes = [i.filename for i in infos]
                 if len(nomes) != len({n.casefold() for n in nomes}) or len(nomes) > 20000:
@@ -297,7 +332,8 @@ class BackupPreparado:
 
     def restaurar(self, banco):
         # Esta cópia permanece disponível mesmo se uma falha interromper a importação.
-        seguranca = criar_backup(banco, banco.caminho.parent / 'backups_automaticos')
+        seguranca = criar_backup(banco, banco.caminho.parent / 'backups_automaticos', exigir_senha=False)
+        locais = {chave: banco.configuracao(chave) for chave in CONFIGURACOES_LOCAIS}
         limitar_backups(seguranca.parent, 'GestorRPV-*.rpvbackup')
         with tempfile.TemporaryDirectory(prefix='.restaurar-rpv-', dir=banco.caminho.parent) as temporaria:
             trabalho = Path(temporaria)
@@ -318,6 +354,12 @@ class BackupPreparado:
                 os.replace(novos, destino)
                 # SQLite faz a substituição do banco em uma transação própria.
                 copiar_banco(limpo, banco.caminho)
+                # A pasta do backup automático e a senha pertencem a este computador, não ao arquivo importado.
+                for chave, valor in locais.items():
+                    if valor is None:
+                        banco.remover_configuracao(chave)
+                    else:
+                        banco.salvar_configuracao(chave, valor)
             except Exception:
                 if destino.exists():
                     os.replace(destino, trabalho / 'documentos_importados')

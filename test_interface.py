@@ -657,6 +657,46 @@ class TestInterface(unittest.TestCase):
         self.assertEqual(self.banco.listar()[0]['nome'],'Primeira')
         self.assertEqual(len(self.programa.tabela.get_children()),1)
 
+    def test_primeiro_backup_pede_senha_e_importacao_pede_a_senha_do_arquivo(self):
+        import cifra
+        self.banco.remover_configuracao('senha_backup')
+        self.banco.salvar(dados_rpv(nome='Primeira'))
+        self.programa.mostrar_historico()
+        self.root.update()
+        pasta = Path(self.pasta.name)/'exportados'
+
+        def preencher(senha, repetida):
+            tela = next(w for w in filhos(self.root) if isinstance(w, tk.Toplevel) and w.title() == 'Senha dos backups')
+            entradas = [w for w in filhos(tela) if isinstance(w, ttk.Entry)]
+            for entrada, texto in zip(entradas, (senha, repetida)):
+                entrada.delete(0, 'end')
+                entrada.insert(0, texto)
+            botao(tela, 'Salvar senha').invoke()
+
+        # Senhas diferentes são recusadas; a janela continua aberta até acertar.
+        self.root.after(200, lambda: preencher('segredo1', 'segredo2'))
+        self.root.after(400, lambda: preencher('segredo1', 'segredo1'))
+        with patch.object(filedialog,'askdirectory',return_value=str(pasta)), patch.object(messagebox,'showinfo'), \
+                patch.object(messagebox,'showerror') as erro:
+            self.programa.exportar_backup()
+        self.assertIn('não são iguais', erro.call_args.args[1])
+        self.assertEqual(self.banco.configuracao('senha_backup'), 'segredo1')
+        arquivo = next(pasta.glob('*.rpvbackup'))
+        self.assertTrue(cifra.cifrado(arquivo))
+        # Em outro computador, com outra senha salva, a importação pede a senha do arquivo.
+        self.banco.salvar_configuracao('senha_backup', 'outra-senha')
+        self.banco.salvar(dados_rpv(nome='Segunda'))
+        respostas = iter(['errada', 'segredo1'])
+        with patch.object(filedialog,'askopenfilename',return_value=str(arquivo)), \
+                patch.object(tela_arquivos.simpledialog,'askstring',side_effect=lambda *a, **k: next(respostas)) as pedido, \
+                patch.object(messagebox,'askyesno',return_value=True), patch.object(messagebox,'showinfo'):
+            self.programa.menus['Arquivo'].invoke('Importar dados')
+        self.root.update()
+        self.assertEqual(pedido.call_count, 2)
+        self.assertIn('Senha incorreta', pedido.call_args_list[1].args[1])
+        self.assertEqual([r['nome'] for r in self.banco.listar()], ['Primeira'])
+        self.assertEqual(self.banco.configuracao('senha_backup'), 'outra-senha')
+
     def test_selecao_mouse_teclado_exclusao_e_restauracao_em_lote(self):
         from test_contas import dados_rpv
         ids = [str(self.banco.salvar(dados_rpv(nome=f'Pessoa {n}'))) for n in range(4)]
@@ -1735,6 +1775,12 @@ class TestInterface(unittest.TestCase):
         self.programa.verificar_backup_automatico()
         self.assertTrue(self.programa.falha_backup_automatico)
         self.assertIn('backup automático não conseguiu gravar', self.programa.texto_aviso_backup.get())
+        # Sem senha definida, o aviso explica o que falta em vez de culpar a pasta.
+        self.banco.salvar_configuracao(PASTA_AUTOMATICA, str(pasta))
+        self.banco.remover_configuracao('senha_backup')
+        self.programa.verificar_backup_automatico()
+        self.assertEqual(self.programa.falha_backup_automatico, 'senha')
+        self.assertIn('Defina a senha dos backups', self.programa.texto_aviso_backup.get())
 
 
 if __name__ == '__main__':

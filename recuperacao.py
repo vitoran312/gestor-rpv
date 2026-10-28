@@ -8,9 +8,10 @@ import sqlite3
 import subprocess
 import sys
 from datetime import datetime
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, simpledialog
 
-from backup import BackupPreparado
+import cifra
+from backup import SENHA_BACKUP, BackupPreparado
 from dados import Banco, VersaoMaisNova, pasta_dados
 
 
@@ -24,7 +25,7 @@ def abrir_pasta(pasta):
         pass  # A mensagem já mostra o caminho da pasta.
 
 
-def restaurar_em_banco_novo(caminho, arquivo):
+def restaurar_em_banco_novo(caminho, arquivo, senha=None):
     """Guarda o banco danificado com outro nome, cria um vazio e restaura o backup nele.
 
     Se a restauração falhar, o banco vazio é descartado e o arquivo original volta ao lugar.
@@ -35,9 +36,13 @@ def restaurar_em_banco_novo(caminho, arquivo):
         os.replace(caminho, guardado)
     try:
         banco = Banco(caminho)
-        with BackupPreparado(arquivo) as preparado:
+        with BackupPreparado(arquivo, senha) as preparado:
             preparado.restaurar(banco)
-        return Banco(caminho), guardado
+        banco = Banco(caminho)
+        if senha:
+            # Quem acabou de digitar a senha do backup continua usando-a nos próximos.
+            banco.salvar_configuracao(SENHA_BACKUP, senha)
+        return banco, guardado
     except Exception:
         caminho.unlink(missing_ok=True)
         if tinha_arquivo:
@@ -66,8 +71,13 @@ def abrir_banco(janela, caminho=None):
                                                  filetypes=[('Backup do Gestor de RPV', '*.rpvbackup')])
             if not arquivo:
                 break
+            senha = None
+            if cifra.cifrado(arquivo):
+                senha = simpledialog.askstring('Gestor de RPV', 'Digite a senha deste backup:', show='•', parent=janela)
+                if senha is None:
+                    continue
             try:
-                banco, guardado = restaurar_em_banco_novo(caminho, arquivo)
+                banco, guardado = restaurar_em_banco_novo(caminho, arquivo, senha)
             except (sqlite3.Error, ValueError, OSError) as falha:
                 restaurar = messagebox.askretrycancel('Gestor de RPV', f'Não foi possível restaurar o backup: {falha}',
                                                       parent=janela)

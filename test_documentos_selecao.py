@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from dados import Banco
 from backup import criar_backup, BackupPreparado
-from test_contas import banco_com_contas, dados_rpv
+from test_contas import banco_com_contas, dados_rpv, SENHA_TESTE
 
 
 class TestDocumentos(unittest.TestCase):
@@ -30,7 +30,7 @@ class TestDocumentos(unittest.TestCase):
         self.assertEqual(len(self.banco.documentos(identificador)),2)
         pacote = criar_backup(self.banco,self.pasta/'backups')
         destino = Banco(self.pasta/'outro'/'gestor.sqlite3')
-        with BackupPreparado(pacote) as preparado:
+        with BackupPreparado(pacote, SENHA_TESTE) as preparado:
             preparado.restaurar(destino)
         self.assertEqual(destino.caminho_documento(documentos[0]['id']).read_bytes(),b'%PDF-contrato')
 
@@ -73,7 +73,7 @@ class TestDocumentos(unittest.TestCase):
             con.execute('PRAGMA user_version=4')
         pacote = criar_backup(self.banco,self.pasta/'backups')
         destino = Banco(self.pasta/'outro'/'gestor.sqlite3')
-        with BackupPreparado(pacote) as preparado:
+        with BackupPreparado(pacote, SENHA_TESTE) as preparado:
             preparado.restaurar(destino)
         destino.salvar(dados_rpv(observacoes='Editado'),identificador)
         self.assertEqual(destino.documentos(identificador),[])
@@ -96,7 +96,7 @@ class TestDocumentos(unittest.TestCase):
         self.imagem.unlink()
         pacote = criar_backup(self.banco,self.pasta/'exportados')
         destino = Banco(self.pasta/'destino'/'gestor.sqlite3')
-        with BackupPreparado(pacote) as preparado:
+        with BackupPreparado(pacote, SENHA_TESTE) as preparado:
             preparado.restaurar(destino)
         self.assertEqual(destino.caminho_documento(recibo['id']).read_bytes(),b'PNG-protocolo')
         self.assertEqual(len(destino.documentos(identificador)),1)
@@ -109,7 +109,7 @@ class TestDocumentos(unittest.TestCase):
             con.execute('PRAGMA user_version=5')
         pacote = criar_backup(self.banco,self.pasta/'exportados')
         destino = Banco(self.pasta/'destino'/'gestor.sqlite3')
-        with BackupPreparado(pacote) as preparado:
+        with BackupPreparado(pacote, SENHA_TESTE) as preparado:
             preparado.restaurar(destino)
         self.assertEqual(len(destino.documentos(identificador)),1)
         self.assertEqual(destino.documentos(identificador,tipo='recebimento'),[])

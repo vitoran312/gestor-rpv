@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import recuperacao
 from backup import criar_backup
-from test_contas import banco_com_contas, dados_rpv
+from test_contas import SENHA_TESTE, banco_com_contas, dados_rpv
 
 
 class TestRecuperacao(unittest.TestCase):
@@ -35,9 +35,11 @@ class TestRecuperacao(unittest.TestCase):
         arquivo = criar_backup(origem, self.pasta / 'backups')
         with patch.object(recuperacao.messagebox, 'askyesno', return_value=True), \
                 patch.object(recuperacao.filedialog, 'askopenfilename', return_value=str(arquivo)), \
+                patch.object(recuperacao.simpledialog, 'askstring', return_value=SENHA_TESTE), \
                 patch.object(recuperacao.messagebox, 'showinfo'):
             banco = recuperacao.abrir_banco(None, self.caminho)
         self.assertEqual([r['nome'] for r in banco.listar()], ['Recuperada'])
+        self.assertEqual(banco.configuracao('senha_backup'), SENHA_TESTE)
         guardados = list(self.caminho.parent.glob('gestor-danificado-*.sqlite3'))
         self.assertEqual([g.read_bytes() for g in guardados], [self.lixo])
 

@@ -10,7 +10,7 @@ import hashlib
 
 from dados import Banco
 from backup import criar_backup, BackupPreparado, FORMATO
-from test_contas import banco_com_contas, dados_conta, dados_rpv
+from test_contas import banco_com_contas, dados_conta, dados_rpv, SENHA_TESTE
 
 
 class TestOperacoes016(unittest.TestCase):
@@ -90,7 +90,7 @@ class TestOperacoes016(unittest.TestCase):
         quando=self.banco.ultimo_backup()
         self.assertIsNotNone(quando)
         destino=Banco(self.pasta/'destino'/'banco.sqlite3')
-        with BackupPreparado(pacote) as preparado:preparado.restaurar(destino)
+        with BackupPreparado(pacote, SENHA_TESTE) as preparado:preparado.restaurar(destino)
         self.assertEqual(destino.ultimo_backup(),quando)
         self.assertEqual(len(destino.historico_previsoes(rpv)),1)
         self.banco.registrar_backup('2020-01-01T12:00:00+00:00')
@@ -123,7 +123,7 @@ class TestOperacoes016(unittest.TestCase):
         migrado=Banco(self.banco.caminho)
         self.assertTrue(list(migrado.caminho.parent.glob('backup-antes-0.16.0-*.sqlite3')))
         destino=Banco(self.pasta/'novo'/'banco.sqlite3')
-        with BackupPreparado(legado) as preparado:preparado.restaurar(destino)
+        with BackupPreparado(legado, SENHA_TESTE) as preparado:preparado.restaurar(destino)
         destino.remover_conta(conta)
         self.assertIsNone(destino.obter(rpv)['conta_id'])
         self.assertTrue(destino.caminho_documento(documento['id']).exists())

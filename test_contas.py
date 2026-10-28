@@ -15,9 +15,13 @@ def dados_rpv(**valores):
     return dados
 
 
+SENHA_TESTE = 'senha-de-teste'
+
+
 def banco_com_contas(caminho):
-    """Banco novo com as contas usadas nos dados de exemplo dos testes."""
+    """Banco novo com as contas usadas nos dados de exemplo dos testes e a senha dos backups definida."""
     banco = Banco(caminho)
+    banco.salvar_configuracao('senha_backup', SENHA_TESTE)
     with banco.conectar() as con:
         for nome in ('Vitor', 'Lilian'):
             con.execute('INSERT OR IGNORE INTO contas (identificacao, identificacao_chave) VALUES (?, ?)',

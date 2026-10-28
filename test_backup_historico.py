@@ -10,7 +10,7 @@ import json
 
 from backup import criar_backup, BackupPreparado, executar_backup_automatico, PASTA_AUTOMATICA
 from dados import Banco, limitar_backups
-from test_contas import banco_com_contas, dados_rpv, dados_conta
+from test_contas import banco_com_contas, dados_rpv, dados_conta, SENHA_TESTE
 
 
 def adulterar_banco(arquivo, destino, sql):
@@ -47,6 +47,11 @@ class TestBackupHistorico(unittest.TestCase):
         self.origem = banco_com_contas(self.pasta / 'origem' / 'gestor.sqlite3')
         self.destino = banco_com_contas(self.pasta / 'destino' / 'gestor.sqlite3')
 
+    def backup_sem_senha(self):
+        """Backup no formato antigo, sem criptografia: os testes de adulteração mexem direto no ZIP."""
+        self.origem.remover_configuracao('senha_backup')
+        return criar_backup(self.origem, self.pasta / 'backups', exigir_senha=False)
+
     def anexar(self, banco, rpv, nome, conteudo):
         """Anexa um arquivo pela rotina normal do aplicativo e devolve onde ele foi guardado."""
         origem = self.pasta / 'anexos' / nome
@@ -70,7 +75,7 @@ class TestBackupHistorico(unittest.TestCase):
         antigo = self.anexar(self.destino, anterior, 'antigo.pdf', b'antigo')
         destino_docs = self.destino.caminho.parent / 'documentos'
         arquivo = criar_backup(self.origem, self.pasta / 'backups')
-        with BackupPreparado(arquivo) as preparado:
+        with BackupPreparado(arquivo, SENHA_TESTE) as preparado:
             self.assertEqual(preparado.resumo, {'registros':1, 'lixeira':1, 'contas':3, 'documentos':2})
             seguranca = preparado.restaurar(self.destino)
         restaurado = Banco(self.destino.caminho)
@@ -80,7 +85,7 @@ class TestBackupHistorico(unittest.TestCase):
         self.assertEqual((destino_docs / contrato.relative_to(contrato.parents[1])).read_bytes(), b'%PDF-teste-do-contrato')
         self.assertFalse((destino_docs / contrato.parent.name / 'solto.exe').exists())
         self.assertFalse(antigo.exists())
-        with BackupPreparado(seguranca) as anterior:
+        with BackupPreparado(seguranca, SENHA_TESTE) as anterior:
             con = sqlite3.connect(anterior.pasta / 'banco.sqlite3')
             try:
                 self.assertEqual(con.execute('SELECT nome FROM rpvs').fetchone()[0], 'Anterior')
@@ -95,7 +100,7 @@ class TestBackupHistorico(unittest.TestCase):
         docs.mkdir()
         (docs / 'antigo.pdf').write_bytes(b'preservar')
         arquivo = criar_backup(self.origem, self.pasta / 'backups')
-        with BackupPreparado(arquivo) as preparado:
+        with BackupPreparado(arquivo, SENHA_TESTE) as preparado:
             with patch('backup.copiar_banco', side_effect=sqlite3.OperationalError('Falha simulada')):
                 with self.assertRaises(sqlite3.OperationalError):
                     preparado.restaurar(self.destino)
@@ -105,37 +110,37 @@ class TestBackupHistorico(unittest.TestCase):
 
     def test_backup_alterado_invalido_ou_caminho_inseguro_nao_importa(self):
         contrato = self.anexar(self.origem, self.origem.salvar(dados_rpv()), 'contrato.pdf', b'original')
-        arquivo = criar_backup(self.origem, self.pasta / 'backups')
+        arquivo = self.backup_sem_senha()
         alterado = self.pasta / 'alterado.rpvbackup'
         no_zip = 'documentos/' + contrato.relative_to(contrato.parents[1]).as_posix()
         with ZipFile(arquivo) as origem, ZipFile(alterado,'w',ZIP_DEFLATED) as alvo:
             for nome in origem.namelist():
                 alvo.writestr(nome, b'alterado' if nome == no_zip else origem.read(nome))
-        with self.assertRaises(ValueError), BackupPreparado(alterado):
+        with self.assertRaises(ValueError), BackupPreparado(alterado, SENHA_TESTE):
             pass
         inseguro = self.pasta / 'inseguro.rpvbackup'
         with ZipFile(inseguro,'w') as pacote:
             pacote.writestr('../fora.txt', 'invalido')
-        with self.assertRaises(ValueError), BackupPreparado(inseguro):
+        with self.assertRaises(ValueError), BackupPreparado(inseguro, SENHA_TESTE):
             pass
         self.assertFalse((self.pasta / 'fora.txt').exists())
         invalido = self.pasta / 'invalido.rpvbackup'
         invalido.write_bytes(b'isto nao e um backup')
-        with self.assertRaises(ValueError), BackupPreparado(invalido):
+        with self.assertRaises(ValueError), BackupPreparado(invalido, SENHA_TESTE):
             pass
 
     def test_backup_com_trigger_ou_view_e_recusado(self):
-        arquivo = criar_backup(self.origem, self.pasta / 'backups')
+        arquivo = self.backup_sem_senha()
         for nome, sql in (('trigger', TRIGGER_PIX), ('view', 'CREATE VIEW v AS SELECT * FROM contas;'),
                           ('indice', 'CREATE INDEX i ON contas(pix);'), ('tabela', 'CREATE TABLE extra (x);')):
             with self.subTest(nome):
                 adulterado = adulterar_banco(arquivo, self.pasta / f'{nome}.rpvbackup', sql)
-                with self.assertRaisesRegex(ValueError, 'segurança'), BackupPreparado(adulterado):
+                with self.assertRaisesRegex(ValueError, 'segurança'), BackupPreparado(adulterado, SENHA_TESTE):
                     pass
 
     def test_backup_com_arquivo_que_nao_e_documento_cadastrado_e_recusado(self):
         contrato = self.anexar(self.origem, self.origem.salvar(dados_rpv()), 'contrato.pdf', b'%PDF')
-        arquivo = criar_backup(self.origem, self.pasta / 'backups')
+        arquivo = self.backup_sem_senha()
         manifesto = json.loads(ZipFile(arquivo).read('manifesto.json'))
         for nome in ('documentos/LEIA-ME URGENTE.exe', 'documentos/desktop.ini',
                      'documentos/' + contrato.parent.name + '/Comprovante.pdf.url'):
@@ -146,14 +151,14 @@ class TestBackupHistorico(unittest.TestCase):
                     for item in origem.namelist():
                         alvo.writestr(item, json.dumps(manifesto_extra) if item == 'manifesto.json' else origem.read(item))
                     alvo.writestr(nome, b'x')
-                with self.assertRaisesRegex(ValueError, 'não são documentos cadastrados'), BackupPreparado(extra):
+                with self.assertRaisesRegex(ValueError, 'não são documentos cadastrados'), BackupPreparado(extra, SENHA_TESTE):
                     pass
 
     def test_importacao_recria_o_esquema_e_copia_so_os_dados(self):
         # Mesmo que um trigger passasse pela validação, a importação monta um banco novo e o descarta.
-        arquivo = criar_backup(self.origem, self.pasta / 'backups')
+        arquivo = self.backup_sem_senha()
         adulterado = adulterar_banco(arquivo, self.pasta / 'trigger.rpvbackup', TRIGGER_PIX)
-        with patch('backup.verificar_estruturas'), BackupPreparado(adulterado) as preparado:
+        with patch('backup.verificar_estruturas'), BackupPreparado(adulterado, SENHA_TESTE) as preparado:
             preparado.restaurar(self.destino)
         restaurado = Banco(self.destino.caminho)
         with restaurado.conectar() as con:
@@ -222,7 +227,7 @@ class TestBackupHistorico(unittest.TestCase):
         docs = self.origem.caminho.parent / 'documentos'
         primeiro = criar_backup(self.origem, docs)
         segundo = criar_backup(self.origem, docs)
-        with BackupPreparado(segundo) as preparado:
+        with BackupPreparado(segundo, SENHA_TESTE) as preparado:
             self.assertEqual(preparado.resumo['documentos'],1)
         self.assertTrue(primeiro.exists())
 
@@ -237,7 +242,7 @@ class TestBackupHistorico(unittest.TestCase):
         outro.write_text('não é backup')
         self.origem.salvar(dados_rpv(nome='Origem'))
         arquivo = criar_backup(self.origem, self.pasta / 'exportado')
-        with BackupPreparado(arquivo) as pacote:
+        with BackupPreparado(arquivo, SENHA_TESTE) as pacote:
             seguranca = pacote.restaurar(self.destino)
         restantes = list(automaticos.glob('*.rpvbackup'))
         self.assertEqual(len(restantes), 10)
@@ -283,7 +288,7 @@ class TestBackupHistorico(unittest.TestCase):
         self.assertTrue(ultimo.exists())
         self.assertTrue(primeiro.exists())
         self.assertTrue(manual.exists())
-        with BackupPreparado(ultimo) as preparado:
+        with BackupPreparado(ultimo, SENHA_TESTE) as preparado:
             self.assertEqual(preparado.resumo['contas'], 2)
 
     def test_backup_automatico_com_pasta_indisponivel_nao_cria_pasta(self):

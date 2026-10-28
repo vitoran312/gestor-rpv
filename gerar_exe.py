@@ -43,6 +43,8 @@ def main():
         '--windowed', '--noupx', '--name', 'Gestor de RPV',
         '--icon', str(RAIZ / 'recursos' / 'vitoran-tech.ico'),
         '--add-data', str(RAIZ / 'recursos') + os.pathsep + 'recursos',
+        # A criptografia dos backups é importada só quando usada; o PyInstaller precisa saber dela.
+        '--hidden-import', 'cryptography.hazmat.primitives.ciphers.aead',
         '--version-file', str(versao_windows), '--distpath', str(destino),
         '--workpath', str(trabalho / 'pyinstaller'), '--specpath', str(trabalho),
         str(RAIZ / 'app.py'),
@@ -55,6 +57,7 @@ def main():
         'Programa portátil para Windows 11 de 64 bits.\n\n'
         'Dados e anexos ficam em %LOCALAPPDATA%\\GestorRPV, fora do executável.\n'
         'Para trocar de computador, use Arquivo > Fazer backup e Importar dados.\n'
+        'Os backups são protegidos pela senha que você cria no primeiro backup; anote-a.\n'
         'Copiar apenas o executável não transfere seus registros.\n\n'
         'Desenvolvido por Vitor Alves Nascimento.\n', encoding='utf-8-sig')
     pacote = destino / f'GestorRPV-Windows-x64-v{VERSAO}.zip'
