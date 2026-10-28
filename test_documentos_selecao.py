@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from dados import Banco
+from dados import Banco, VERSAO_BANCO
 from backup import criar_backup, BackupPreparado
 from apoio_testes import banco_com_contas, dados_rpv, SENHA_TESTE
 
@@ -78,7 +78,7 @@ class TestDocumentos(unittest.TestCase):
         destino.salvar(dados_rpv(observacoes='Editado'), identificador)
         self.assertEqual(destino.documentos(identificador), [])
         with destino.conectar() as con:
-            self.assertEqual(con.execute('PRAGMA user_version').fetchone()[0], 8)
+            self.assertEqual(con.execute('PRAGMA user_version').fetchone()[0], VERSAO_BANCO)
             self.assertIsNone(con.execute("SELECT 1 FROM sqlite_master WHERE name='historico_alteracoes'").fetchone())
 
     def test_recebimento_separado_com_backup_e_rollback(self):

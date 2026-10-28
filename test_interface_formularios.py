@@ -391,7 +391,9 @@ class TestFormularios(TesteDeInterface):
         with patch.object(messagebox, 'showerror') as erro:
             botao(form, 'Salvar registro').invoke()
         texto = erro.call_args.args[1]
-        for trecho in ('Nome do titular', 'Data da aquisição: Informe uma data válida', 'Previsão inicial: Informe uma data entre'):
+        # Formato (com o nome do campo) e regras (nome vazio, valor zerado) na mesma mensagem.
+        for trecho in ('nome completo do titular', 'Data da aquisição: Informe uma data válida',
+                       'Previsão inicial: Informe uma data entre', 'deve ser maior que zero'):
             self.assertIn(trecho, texto)
         moedas = [w for w in filhos(form) if isinstance(w, CampoMoeda)]
         moedas[0].entrada.clipboard_clear()

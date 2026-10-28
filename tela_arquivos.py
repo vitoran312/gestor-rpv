@@ -100,6 +100,8 @@ class ArquivosMixin:
 
         def escolher():
             if not self.garantir_senha_backup(tela):
+                messagebox.showinfo('Backup automático', 'O backup automático não foi ativado: os backups só são '
+                                    'gravados com senha. Crie a senha para ativá-lo.', parent=tela)
                 return
             pasta = filedialog.askdirectory(parent=tela, title='Escolha a pasta do backup automático')
             if not pasta:
@@ -179,7 +181,7 @@ class ArquivosMixin:
 
         def salvar(_evento=None):
             try:
-                if atual and variaveis['atual'].get() != atual:
+                if atual and not cifra.mesma_senha(variaveis['atual'].get(), atual):
                     raise ValueError('A senha atual não confere.')
                 if variaveis['nova'].get() != variaveis['repetida'].get():
                     raise ValueError('As duas senhas novas não são iguais.')
@@ -227,9 +229,9 @@ class ArquivosMixin:
         messagebox.showinfo('Backup concluído', f'Backup salvo em:\n{arquivo}', parent=pai)
 
     def importar_dados(self):
-        if self.janela_formulario is not None and self.janela_formulario.winfo_exists():
-            messagebox.showinfo('Importar dados', 'Salve ou feche o formulário aberto antes de importar um backup.',
-                                parent=self.historico)
+        if self.janelas_de_edicao_abertas():
+            messagebox.showinfo('Importar dados', 'Salve ou feche os formulários abertos (entrada, recebimento, previsão '
+                                'ou conta) antes de importar um backup.', parent=self.historico)
             return
         arquivo = filedialog.askopenfilename(parent=self.historico, title='Importar backup do Gestor de RPV',
                                              filetypes=[('Backup do Gestor de RPV', '*.rpvbackup')])
@@ -243,13 +245,25 @@ class ArquivosMixin:
                     self.confirmar_importacao(pacote)
                 return
             except SenhaNecessaria as erro:
-                pedido = (f'{erro}\n\n' if digitada else '') + 'Digite a senha deste backup:'
+                motivo = 'Nenhuma senha foi digitada.' if digitada and not senha else str(erro)
+                pedido = (f'{motivo}\n\n' if digitada else '') + 'Digite a senha deste backup:'
                 senha, digitada = simpledialog.askstring('Importar dados', pedido, show='•', parent=self.historico), True
                 if senha is None:
                     return
             except (OSError, sqlite3.Error, ValueError, RuntimeError) as erro:
                 messagebox.showerror('Importar dados', 'Não foi possível importar o backup. ' + descrever_erro(erro), parent=self.historico)
                 return
+
+    def janelas_de_edicao_abertas(self):
+        """Janelas onde algo pode estar sendo digitado; calculadora, Sobre e lixeira não contam."""
+        livres = {self.sobre, self.janela_lixeira, self.calculadora.tela if self.calculadora is not None else None}
+
+        def toplevels(widget):
+            for filho in widget.winfo_children():
+                if isinstance(filho, tk.Toplevel):
+                    yield filho
+                yield from toplevels(filho)
+        return [w for w in toplevels(self.janela) if w not in livres and w.winfo_exists()]
 
     def confirmar_importacao(self, pacote):
         resumo = pacote.resumo

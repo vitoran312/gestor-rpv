@@ -61,19 +61,19 @@ class TestArquivos(TesteDeInterface):
             botao(tela, 'Salvar senha').invoke()
 
         # Senhas diferentes são recusadas; a janela continua aberta até acertar.
-        self.root.after(200, lambda: preencher('segredo1', 'segredo2'))
-        self.root.after(400, lambda: preencher('segredo1', 'segredo1'))
+        self.root.after(200, lambda: preencher('cofre azul 7', 'cofre azul 8'))
+        self.root.after(400, lambda: preencher('cofre azul 7', 'cofre azul 7'))
         with patch.object(filedialog, 'askdirectory', return_value=str(pasta)), patch.object(messagebox, 'showinfo'), \
                 patch.object(messagebox, 'showerror') as erro:
             self.programa.exportar_backup()
         self.assertIn('não são iguais', erro.call_args.args[1])
-        self.assertEqual(senha_salva(self.banco), 'segredo1')
+        self.assertEqual(senha_salva(self.banco), 'cofre azul 7')
         arquivo = next(pasta.glob('*.rpvbackup'))
         self.assertTrue(cifra.cifrado(arquivo))
         # Em outro computador, com outra senha salva, a importação pede a senha do arquivo.
         self.banco.salvar_configuracao('senha_backup', 'outra-senha')
         self.banco.salvar(dados_rpv(nome='Segunda'))
-        respostas = iter(['errada', 'segredo1'])
+        respostas = iter(['errada', 'cofre azul 7'])
         with patch.object(filedialog, 'askopenfilename', return_value=str(arquivo)), \
                 patch.object(tela_arquivos.simpledialog, 'askstring', side_effect=lambda *a, **k: next(respostas)) as pedido, \
                 patch.object(messagebox, 'askyesno', return_value=True), patch.object(messagebox, 'showinfo'):
@@ -131,7 +131,7 @@ class TestArquivos(TesteDeInterface):
         with patch.object(filedialog, 'askopenfilename') as escolher, patch.object(messagebox, 'showinfo') as aviso:
             self.programa.importar_dados()
         escolher.assert_not_called()
-        self.assertIn('feche o formulário', aviso.call_args.args[1])
+        self.assertIn('feche os formulários abertos', aviso.call_args.args[1])
 
     def test_anexar_visualizar_salvar_reabrir_e_cancelar_documentos(self):
         identificador = self.banco.salvar(dados_rpv())
@@ -321,15 +321,33 @@ class TestArquivos(TesteDeInterface):
         self.root.update()
         self.assertTrue(self.programa.aviso_demonstracao.winfo_ismapped())
         self.assertEqual(len(self.programa.tabela.get_children()), 13)
-        with patch.object(messagebox, 'askyesno', return_value=False):
+        # Uma operação fictícia que recebeu um comprovante de verdade passa a ser da pessoa.
+        comprovante = Path(self.pasta.name) / 'meu_comprovante.pdf'
+        comprovante.write_bytes(b'%PDF-comprovante-real')
+        ficticia = next(r for r in novo.listar() if not r['recebimento'])
+        self.programa.abrir_recebimento(ficticia['id'])
+        self.root.update()
+        self.anexar_e_salvar_recebimento(comprovante)
+        self.root.update()
+        with patch.object(messagebox, 'askyesno', return_value=False) as pergunta:
             botao(self.programa.historico, 'Apagar dados de demonstração').invoke()
         self.assertEqual(len(self.programa.tabela.get_children()), 13)
+        self.assertIn('usam uma conta fictícia', pergunta.call_args.args[1])
         with patch.object(messagebox, 'askyesno', return_value=True):
             botao(self.programa.historico, 'Apagar dados de demonstração').invoke()
         self.root.update()
-        self.assertEqual(self.programa.tabela.get_children(), ())
+        self.assertEqual(self.programa.tabela.get_children(), (str(ficticia['id']),))
+        documento = novo.documentos(ficticia['id'], tipo='recebimento')[0]
+        self.assertEqual(novo.caminho_documento(documento['id']).read_bytes(), b'%PDF-comprovante-real')
         self.assertEqual(novo.contas(), [])
         self.assertFalse(self.programa.aviso_demonstracao.winfo_ismapped())
+
+    def anexar_e_salvar_recebimento(self, arquivo):
+        from tkinter import filedialog
+        tela = next(w for w in filhos(self.root) if isinstance(w, tk.Toplevel) and w.title() == 'Recebimento')
+        with patch.object(filedialog, 'askopenfilenames', return_value=[str(arquivo)]):
+            botao(tela, 'Anexar documentos').invoke()
+        botao(tela, 'Salvar recebimento').invoke()
 
     def test_backup_automatico_ativar_desativar_e_falha_discreta(self):
         from backup import PASTA_AUTOMATICA

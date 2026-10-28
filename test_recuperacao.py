@@ -133,6 +133,39 @@ class TestRecuperacao(unittest.TestCase):
                 recuperacao.abrir_banco(None, self.caminho)
         self.assertIn('não foi encontrado', erro.call_args.args[1])
 
+    def test_anexos_presos_devolvem_o_banco_ao_lugar(self):
+        (self.caminho.parent / 'documentos').mkdir()
+        original = recuperacao.os.replace
+
+        def replace_que_falha_nos_anexos(origem, destino):
+            if Path(origem).name == 'documentos':
+                raise PermissionError(13, 'Arquivo em uso')
+            return original(origem, destino)
+
+        with patch.object(recuperacao.os, 'replace', replace_que_falha_nos_anexos), self.assertRaises(PermissionError):
+            recuperacao.restaurar_em_banco_novo(self.caminho, self.backup_com('Qualquer'), SENHA_TESTE)
+        self.assertEqual(self.caminho.read_bytes(), self.lixo)
+        self.assertEqual(list(self.caminho.parent.glob('*danificado*')), [])
+
+    def test_falha_so_ao_guardar_a_senha_nao_desfaz_a_restauracao(self):
+        with patch.object(recuperacao, 'salvar_senha', side_effect=OSError('DPAPI recusou')):
+            banco, guardado, _documentos, senha_guardada = recuperacao.restaurar_em_banco_novo(
+                self.caminho, self.backup_com('Recuperada'), SENHA_TESTE)
+        self.assertEqual([r['nome'] for r in banco.listar()], ['Recuperada'])
+        self.assertFalse(senha_guardada)
+        self.assertEqual(guardado.read_bytes(), self.lixo)
+
+    def test_escolher_o_proprio_arquivo_danificado_explica_o_engano(self):
+        respostas = iter([str(self.caminho), ''])
+        with patch.object(recuperacao.messagebox, 'askyesno', return_value=True), \
+                patch.object(recuperacao.filedialog, 'askopenfilename', side_effect=lambda **k: next(respostas)), \
+                patch.object(recuperacao.messagebox, 'showerror') as erro, \
+                patch.object(recuperacao.messagebox, 'showinfo'), patch.object(recuperacao, 'abrir_pasta'):
+            with self.assertRaises(SystemExit):
+                recuperacao.abrir_banco(None, self.caminho)
+        self.assertIn('próprio arquivo de dados', erro.call_args.args[1])
+        self.assertEqual(self.caminho.read_bytes(), self.lixo)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -10,6 +10,7 @@ import sqlite3
 import subprocess
 import sys
 from datetime import datetime
+from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog
 
 import cifra
@@ -34,37 +35,40 @@ def abrir_pasta(pasta):
 def restaurar_em_banco_novo(caminho, arquivo, senha=None):
     """Guarda o banco danificado e os anexos dele com outro nome, cria um banco vazio e restaura o backup nele.
 
-    Devolve o banco restaurado e o nome com que o arquivo danificado foi guardado. Se a restauração falhar,
-    o banco vazio e os anexos do backup são descartados e o banco e os anexos originais voltam ao lugar.
+    Devolve o banco restaurado, os nomes com que o banco e os anexos danificados foram guardados (None se não
+    havia anexos) e se a senha do backup ficou salva. Se a restauração falhar em qualquer ponto, o banco vazio
+    e os anexos do backup são descartados e o banco e os anexos originais voltam ao lugar.
     """
     marca = f'{datetime.now():%Y%m%d-%H%M%S-%f}'
     guardado = caminho.with_name(f'gestor-danificado-{marca}.sqlite3')
     documentos, documentos_guardados = caminho.parent / 'documentos', caminho.parent / f'documentos-danificado-{marca}'
-    tinha_arquivo, tinha_documentos = caminho.exists(), documentos.exists()
-    if tinha_arquivo:
-        os.replace(caminho, guardado)
-    if tinha_documentos:
-        os.replace(documentos, documentos_guardados)
+    movidos = []
     try:
+        for origem, destino in ((caminho, guardado), (documentos, documentos_guardados)):
+            if origem.exists():
+                os.replace(origem, destino)
+                movidos.append((origem, destino))
         with BackupPreparado(arquivo, senha, pasta_trabalho=caminho.parent) as preparado:
             # O banco vazio criado aqui não merece cópia de segurança: os dados antigos já estão guardados acima.
             preparado.restaurar(Banco(caminho), copia_de_seguranca=False)
         banco = Banco(caminho)
-        if senha:
-            # Quem acabou de digitar a senha do backup continua usando-a nos próximos.
-            try:
-                salvar_senha(banco, senha)
-            except ValueError:
-                log.info('Senha do backup restaurado fora das regras atuais; será pedida uma nova.')
-        return banco, guardado
-    except Exception:
+    except BaseException:
         caminho.unlink(missing_ok=True)
-        shutil.rmtree(documentos, ignore_errors=True)
-        if tinha_arquivo:
-            os.replace(guardado, caminho)
-        if tinha_documentos:
-            os.replace(documentos_guardados, documentos)
+        if any(origem == documentos for origem, _ in movidos):
+            shutil.rmtree(documentos, ignore_errors=True)
+        for origem, destino in reversed(movidos):
+            os.replace(destino, origem)
         raise
+    # Daqui em diante a restauração já deu certo: nada abaixo pode desfazê-la.
+    senha_salva = False
+    if senha:
+        # Quem acabou de digitar a senha do backup continua usando-a nos próximos, se ela seguir as regras atuais.
+        try:
+            salvar_senha(banco, senha)
+            senha_salva = True
+        except Exception:
+            log.warning('Senha do backup restaurado não foi guardada; será pedida uma nova no próximo backup.')
+    return banco, guardado, documentos_guardados if documentos_guardados.exists() else None, senha_salva
 
 
 def danificado(caminho):
@@ -72,22 +76,26 @@ def danificado(caminho):
     return caminho.exists() and caminho.stat().st_size == 0
 
 
-def pedir_backup(janela):
+def pedir_backup(janela, caminho):
     """Escolhe o arquivo e, se ele for protegido, a senha. Devolve (arquivo, senha) ou None se a pessoa desistir."""
     arquivo = filedialog.askopenfilename(parent=janela, title='Restaurar backup do Gestor de RPV',
                                          filetypes=[('Backup do Gestor de RPV', '*.rpvbackup')])
     if not arquivo:
         return None
+    if Path(arquivo).resolve() == Path(caminho).resolve():
+        messagebox.showerror(TITULO, 'Esse é o próprio arquivo de dados com problema. Escolha um backup '
+                             '(arquivo terminado em .rpvbackup).', parent=janela)
+        return pedir_backup(janela, caminho)
     try:
         protegido = cifra.cifrado(arquivo)
     except OSError as erro:
         messagebox.showerror(TITULO, f'Não foi possível ler o arquivo escolhido: {descrever_erro(erro)}', parent=janela)
-        return pedir_backup(janela)
+        return pedir_backup(janela, caminho)
     senha = None
     if protegido:
         senha = simpledialog.askstring(TITULO, 'Digite a senha deste backup:', show='•', parent=janela)
         if senha is None:
-            return pedir_backup(janela)
+            return pedir_backup(janela, caminho)
     return arquivo, senha
 
 
@@ -110,25 +118,29 @@ def abrir_banco(janela, caminho=None):
             f'Não foi possível abrir os dados do Gestor de RPV: {motivo}\n\n'
             'Deseja restaurar um backup agora? Se restaurar, o arquivo atual e os anexos dele não são apagados: '
             f'ficam guardados com o nome "...-danificado-..." na pasta:\n{caminho.parent}', parent=janela)
-        backup = pedir_backup(janela) if escolha else None
+        backup = pedir_backup(janela, caminho) if escolha else None
         while backup is not None:
             arquivo, senha = backup
             try:
-                banco, guardado = restaurar_em_banco_novo(caminho, arquivo, senha)
+                banco, guardado, documentos_guardados, senha_guardada = restaurar_em_banco_novo(caminho, arquivo, senha)
             except SenhaNecessaria as falha:
                 # Senha errada: pergunta de novo a senha, sem voltar à escolha do arquivo.
                 senha = simpledialog.askstring(TITULO, f'{falha}\n\nDigite a senha deste backup:', show='•',
                                                parent=janela)
-                backup = (arquivo, senha) if senha is not None else pedir_backup(janela)
+                backup = (arquivo, senha) if senha is not None else pedir_backup(janela, caminho)
                 continue
             except (sqlite3.Error, ValueError, OSError) as falha:
                 if not messagebox.askretrycancel(TITULO, f'Não foi possível restaurar o backup: {descrever_erro(falha)}',
                                                  parent=janela):
                     break
-                backup = pedir_backup(janela)
+                backup = pedir_backup(janela, caminho)
                 continue
-            messagebox.showinfo(TITULO, 'Backup restaurado. O arquivo com problema e os anexos dele foram guardados '
-                                f'como "{guardado.name}" e "documentos-danificado-…".', parent=janela)
+            guardados = f'"{guardado.name}"' + (f' e os anexos dele em "{documentos_guardados.name}"'
+                                                 if documentos_guardados else '')
+            aviso_senha = ('' if senha_guardada or not senha else
+                           '\n\nA senha desse backup é mais fraca que o exigido agora: crie uma nova senha no próximo backup.')
+            messagebox.showinfo(TITULO, f'Backup restaurado. O arquivo com problema foi guardado como {guardados}, '
+                                f'na pasta dos dados.{aviso_senha}', parent=janela)
             return banco
         messagebox.showinfo(TITULO, 'O programa será fechado sem alterar nada. Os dados ficam nesta pasta, que será '
                             f'aberta agora:\n{caminho.parent}', parent=janela)

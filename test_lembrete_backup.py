@@ -20,6 +20,8 @@ class TestLembreteBackup(unittest.TestCase):
         quando = '2026-10-28T12:00:00'
         self.assertEqual(aviso_backup(quando, date(2026, 10, 28)), '')
         self.assertEqual(aviso_backup(quando, date(2026, 10, 27)), '')
+        # Data muito no futuro (relógio adiantado ou backup adulterado) não cala o lembrete.
+        self.assertIn('inválida', aviso_backup('2999-12-31T00:00:00', date(2026, 10, 28)))
 
 
 if __name__ == '__main__':

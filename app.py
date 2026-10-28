@@ -33,10 +33,12 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
         janela.withdraw()
         self.banco = abrir_banco(janela)
         limpar_temporarios(self.banco.caminho.parent)
-        if demonstracao.deve_carregar(self.banco):
-            try:
+        try:
+            # Uma carga da demonstração interrompida (programa fechado à força) é limpa e feita de novo.
+            recomecar = demonstracao.limpar_carga_interrompida(self.banco)
+            if demonstracao.deve_carregar(self.banco, recomecar):
                 demonstracao.carregar(self.banco)
-            except (sqlite3.Error, ValueError):
+        except (sqlite3.Error, ValueError, OSError):
                 log.warning('Dados de demonstração não carregados; o programa abre vazio.', exc_info=True)
         janela.withdraw()
         janela.title('Gestor de RPV')

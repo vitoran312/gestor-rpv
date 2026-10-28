@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.31.0
+# Gestor de RPV — 0.32.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -17,7 +17,7 @@ O pacote `cryptography` protege os backups com senha; o executável já o traz e
 
 Mantenha todos os arquivos `.py` e a pasta `recursos` juntos. Essa pasta contém o ícone da Vitoran Tech.
 A tela inicial tem os botões **Nova entrada**, **Minhas operações**,
-**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.31.0**, acompanhada do emblema com 50% de opacidade,
+**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.32.0**, acompanhada do emblema com 50% de opacidade,
 aparece no canto inferior direito.
 O número é lido da versão do programa e acompanha cada atualização.
 O programa funciona em uma única janela, que abre maximizada. **Minhas operações**, **Contas de
@@ -247,8 +247,8 @@ Clique no aviso para escolher a pasta e fazer um backup. Ele desaparece após a
 gravação bem-sucedida; cancelar ou ocorrer uma falha mantém o lembrete.
 O prazo é recalculado ao abrir ou voltar às janelas principais, sem interromper o uso.
 
-1. Clique em **Arquivo → Fazer backup**. Na primeira vez, crie a **senha dos backups** (de 8 a 256
-   caracteres, sem espaço nas pontas e nada óbvio como "12345678") e anote-a: sem ela, não há como abrir
+1. Clique em **Arquivo → Fazer backup**. Na primeira vez, crie a **senha dos backups** (de 10 a 256
+   caracteres, sem espaço nas pontas e nada óbvio como "senha@123"; uma frase funciona bem) e anote-a: sem ela, não há como abrir
    os backups.
 2. Escolha uma pasta do Windows. O programa salva um arquivo `GestorRPV-data-hora.rpvbackup`.
 3. No outro computador, abra o aplicativo e escolha **Arquivo → Importar dados**.

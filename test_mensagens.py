@@ -45,6 +45,28 @@ class TestMensagens(unittest.TestCase):
         self.assertNotIn('529.982.247-25', texto)
         self.assertNotIn('fulano', texto)
 
+    def test_diario_nao_grava_caminhos_nem_mensagens_de_falhas_registradas(self):
+        import logging
+        import tempfile
+        from pathlib import Path
+        import diario
+        with tempfile.TemporaryDirectory() as pasta:
+            diario.ativar(Path(pasta))
+            try:
+                caminho = 'C:/Users/Maria ' + 'Sigilosa/OneDrive/backup'
+                try:
+                    raise FileNotFoundError(2, 'No such file', caminho)
+                except OSError:
+                    diario.log.warning('Backup automático não gravado.', exc_info=True)
+            finally:
+                for manipulador in list(diario.log.handlers):
+                    if not isinstance(manipulador, logging.NullHandler):
+                        diario.log.removeHandler(manipulador)
+                        manipulador.close()
+            texto = (Path(pasta) / 'gestor.log').read_text(encoding='utf-8')
+        self.assertIn('FileNotFoundError (código 2)', texto)
+        self.assertNotIn('Sigilosa', texto)
+
 
 if __name__ == '__main__':
     unittest.main()

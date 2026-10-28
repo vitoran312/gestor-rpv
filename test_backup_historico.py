@@ -9,7 +9,7 @@ import hashlib
 import json
 
 from backup import criar_backup, BackupPreparado, executar_backup_automatico, PASTA_AUTOMATICA
-from dados import Banco, limitar_backups
+from dados import Banco, VERSAO_BANCO, limitar_backups
 from apoio_testes import banco_com_contas, dados_rpv, dados_conta, SENHA_TESTE
 
 
@@ -331,7 +331,7 @@ class TestBackupHistorico(unittest.TestCase):
             con.execute('PRAGMA user_version=7')
         migrado = Banco(self.origem.caminho)
         with migrado.conectar() as con:
-            self.assertEqual(con.execute('PRAGMA user_version').fetchone()[0], 8)
+            self.assertEqual(con.execute('PRAGMA user_version').fetchone()[0], VERSAO_BANCO)
             self.assertIsNone(con.execute("SELECT 1 FROM sqlite_master WHERE name='historico_alteracoes'").fetchone())
         copias = list(migrado.caminho.parent.glob('backup-antes-0.21.0-*.sqlite3'))
         self.assertEqual(len(copias), 1)
@@ -341,6 +341,42 @@ class TestBackupHistorico(unittest.TestCase):
         finally:
             copia.close()
         self.assertEqual(migrado.obter(identificador)['nome'], 'Pessoa De Teste')
+
+    def test_copia_de_seguranca_nao_conta_como_ultimo_backup(self):
+        self.destino.registrar_backup('2020-01-01T12:00:00+00:00')
+        arquivo = criar_backup(self.origem, self.pasta / 'backups')
+        with patch('backup.copiar_banco', side_effect=sqlite3.OperationalError('Falha simulada')), \
+                BackupPreparado(arquivo, SENHA_TESTE) as preparado, self.assertRaises(sqlite3.OperationalError):
+            preparado.restaurar(self.destino)
+        self.assertEqual(self.destino.ultimo_backup(), '2020-01-01T12:00:00+00:00')
+
+    def test_restaurar_ja_grava_as_configuracoes_locais_no_banco_novo(self):
+        from backup import PASTA_AUTOMATICA
+        self.destino.salvar_configuracao(PASTA_AUTOMATICA, '/pasta/local')
+        arquivo = criar_backup(self.origem, self.pasta / 'backups')
+        # Mesmo sem nenhuma gravação depois da troca, o banco importado já vem com a pasta deste computador.
+        with patch.object(Banco, 'salvar_configuracao', side_effect=AssertionError('gravação depois da troca')), \
+                patch.object(Banco, 'remover_configuracao', side_effect=AssertionError('gravação depois da troca')), \
+                BackupPreparado(arquivo, SENHA_TESTE) as preparado:
+            preparado.restaurar(self.destino, copia_de_seguranca=False)
+        self.assertEqual(Banco(self.destino.caminho).configuracao(PASTA_AUTOMATICA), '/pasta/local')
+
+    def test_copias_interrompidas_na_pasta_escolhida_sao_limpas(self):
+        pasta = self.pasta / 'nuvem'
+        pasta.mkdir()
+        antiga, recente = pasta / '.GestorRPV-velho.rpvbackup.parcial', pasta / '.GestorRPV-agora.rpvbackup.parcial'
+        for sobra in (antiga, recente):
+            sobra.write_bytes(b'GRPVCIF1...')
+        os.utime(antiga, (0, 0))
+        criar_backup(self.origem, pasta)
+        self.assertFalse(antiga.exists())
+        self.assertTrue(recente.exists())  # Pode ser de um backup ainda em andamento.
+
+    def test_anexo_que_cresce_depois_de_conferido_e_recusado(self):
+        from backup import copiar_com_hash
+        import io
+        with self.assertRaisesRegex(ValueError, 'mudou durante a importação'):
+            copiar_com_hash(io.BytesIO(b'x' * 100), io.BytesIO(), limite=99)
 
 
 if __name__ == '__main__':

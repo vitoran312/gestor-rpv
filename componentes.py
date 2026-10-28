@@ -49,14 +49,14 @@ def formatar_digitacao_moeda(texto):
     return moeda(centavos(texto))
 
 
-def fechar_com_confirmacao(tela, estado):
+def fechar_com_confirmacao(tela, estado, perdido='O que foi digitado e os anexos ainda não salvos'):
     """Cancelar, Esc e o X da janela só descartam sem perguntar quando nada foi alterado."""
     inicial = estado()
 
     def fechar(_evento=None):
         if estado() != inicial and not messagebox.askyesno(
-                'Descartar alterações?', 'O que foi digitado e os anexos ainda não salvos serão perdidos. '
-                'Fechar mesmo assim?', parent=tela, icon='warning', default='no'):
+                'Descartar alterações?', f'{perdido} serão perdidos. Fechar mesmo assim?',
+                parent=tela, icon='warning', default='no'):
             return
         tela.destroy()
 
@@ -76,6 +76,7 @@ class CampoMoeda(ttk.Frame):
         self.entrada.pack(side='left', fill='x', expand=True)
         self.entrada.bind('<KeyPress>', self.tecla)
         self.entrada.bind('<<Paste>>', self.colar)
+        self.entrada.bind('<<PasteSelection>>', self.colar)  # Clique do meio (Linux): mesma conferência.
         self.entrada.bind('<<Cut>>', self.recortar)
         self.entrada.bind('<FocusOut>', self.formatar)
         self.entrada.bind('<FocusIn>', self.selecionar)

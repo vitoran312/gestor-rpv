@@ -115,6 +115,35 @@ class TestDemonstracao(unittest.TestCase):
         self.assertEqual((banco.listar(), banco.contas()), ([], []))
         self.assertFalse(demonstracao.ativa(banco))
 
+    def test_carga_interrompida_a_forca_e_limpa_e_refeita_na_abertura_seguinte(self):
+        banco = Banco(self.caminho)
+        with patch.object(banco, 'registrar_recebimento', side_effect=KeyboardInterrupt):
+            with self.assertRaises(KeyboardInterrupt):
+                demonstracao.carregar(banco)
+        self.assertEqual((banco.listar(), banco.contas()), ([], []))
+        # Encerramento sem chance de limpar (energia, Gerenciador de Tarefas): fica a anotação "carregando".
+        demonstracao.anotar(banco, [banco.salvar_conta(demonstracao.CONTAS[0])], [], carregando=True)
+        reaberto = Banco(self.caminho)
+        self.assertTrue(demonstracao.limpar_carga_interrompida(reaberto))
+        self.assertEqual(reaberto.contas(), [])
+        self.assertTrue(demonstracao.deve_carregar(reaberto, recomecar=True))
+
+    def test_anotacao_adulterada_nao_trava_quem_salva_nem_quem_apaga(self):
+        banco = Banco(self.caminho)
+        for anotacao in ('{"operacoes": "x"}', '[1, 2]', 'nao e json', '{"contas": [1, "2"]}'):
+            with self.subTest(anotacao=anotacao):
+                banco.salvar_configuracao(demonstracao.CHAVE, anotacao)
+                demonstracao.adotar(banco, operacao=1)
+                demonstracao.remover(banco)
+                self.assertFalse(demonstracao.ativa(banco))
+
+    def test_conta_ficticia_usada_por_operacao_propria_e_contada_antes_de_apagar(self):
+        banco = Banco(self.caminho)
+        demonstracao.carregar(banco)
+        propria = banco.salvar(dados_rpv(nome='Cliente Real', conta_id=banco.contas()[0]['id']))
+        demonstracao.adotar(banco, operacao=propria)
+        self.assertEqual(demonstracao.operacoes_proprias_em_contas_ficticias(banco), 1)
+
 
 if __name__ == '__main__':
     unittest.main()

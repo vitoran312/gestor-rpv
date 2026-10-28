@@ -78,7 +78,10 @@ class TestDados(unittest.TestCase):
                 with self.subTest(busca):
                     self.assertTrue(reaberto.listar(busca))
             self.assertEqual(reaberto.listar('%'), [])
-            self.assertEqual(reaberto.listar('ilva jos'), [])
+            reaberto.salvar(dict(dados, nome='Silva-José Pereira'))
+            self.assertEqual([r['nome'] for r in reaberto.listar('lva j')], [])        # Não atravessa palavras.
+            self.assertEqual([r['nome'] for r in reaberto.listar('ilva')], ['Silva-José Pereira'])
+            self.assertEqual([r['nome'] for r in reaberto.listar('silva jose')], ['Silva-José Pereira'])  # Hífen separa.
             self.assertTrue(reaberto.listar('josé d'))
             from ordenacao import ordenar
             nomes = [dict(nome=n) for n in ('Anabela', 'Ana Maria', 'Álvaro', 'ana luiza')]
@@ -118,6 +121,21 @@ class TestDados(unittest.TestCase):
             self.assertIsNotNone(reaberto.obter(primeiro)['lixeira_em'])
             self.assertEqual([r['id'] for r in reaberto.listar()], [segundo])
             self.assertEqual(reaberto.obter(segundo)['custo'], 1200000)
+
+    def test_valor_colado_de_planilha_em_outros_formatos(self):
+        for texto, esperado in (('1,500.00', 150000), ('1.500,00', 150000), ('R$\xa01.500,00', 150000),
+                                ('1\u202f500,00', 150000), ('1.000,5', 100050), ('2,5', 250)):
+            with self.subTest(texto=texto):
+                self.assertEqual(centavos(texto), esperado)
+
+    def test_conta_com_varios_problemas_lista_todos(self):
+        from apoio_testes import dados_conta
+        with tempfile.TemporaryDirectory() as pasta:
+            banco = banco_com_contas(Path(pasta) / 'contas.sqlite3')
+            with self.assertRaises(ValueError) as erro:
+                banco.salvar_conta(dados_conta(nome='', cidade='', estado='XX', cpf='111'))
+        for trecho in ('Preencha: Nome completo, Cidade.', 'estado brasileiro', 'CPF inválido'):
+            self.assertIn(trecho, str(erro.exception))
 
 
 if __name__ == '__main__':

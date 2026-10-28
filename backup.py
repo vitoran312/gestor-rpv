@@ -47,7 +47,7 @@ def limpar_temporarios(pasta, idade_segundos=24 * 60 * 60):
                 if sobra.is_dir() and not sobra.is_symlink() and sobra.stat().st_mtime < limite:
                     shutil.rmtree(sobra, ignore_errors=True)
             except OSError:
-                log.warning('Sobra de importação não removida: %s', sobra, exc_info=True)
+                log.warning('Sobra de importação não removida.', exc_info=True)
 
 
 def conferir_espaco(pasta, necessario):
@@ -74,15 +74,25 @@ def aviso_backup(quando, hoje=None):
     except (TypeError, ValueError):
         return 'Data do último backup indisponível. Clique aqui para fazer um novo.'
     dias = ((hoje or date.today()) - data_backup.date()).days
+    if dias < -2:
+        # Data bem no futuro (relógio muito adiantado ou arquivo adulterado) não pode calar o lembrete nem o
+        # backup automático. Um ou dois dias de diferença são só fuso ou relógio do computador.
+        return 'Data do último backup inválida. Clique aqui para fazer um novo.'
     if dias >= 7:
         return f'Há {dias} dias sem backup. Clique aqui para fazer um novo.'
     return ''
 
 
-def copiar_com_hash(entrada, saida=None):
-    """Lê em blocos de 1 MiB, grava em `saida` (se houver) e devolve o SHA-256 dos bytes lidos."""
-    digest = hashlib.sha256()
+def copiar_com_hash(entrada, saida=None, limite=None):
+    """Lê em blocos de 1 MiB, grava em `saida` (se houver) e devolve o SHA-256 dos bytes lidos.
+
+    Com `limite`, recusa passar desse número de bytes: o arquivo não pode crescer depois de conferido.
+    """
+    digest, lidos = hashlib.sha256(), 0
     for bloco in iter(lambda: entrada.read(BLOCO_LEITURA), b''):
+        lidos += len(bloco)
+        if limite is not None and lidos > limite:
+            raise ValueError('O arquivo de backup mudou durante a importação.')
         digest.update(bloco)
         if saida is not None:
             saida.write(bloco)
@@ -188,18 +198,31 @@ def gravar_documentos(pacote, documentos, vinculados):
     return hashes
 
 
-def criar_backup(banco, pasta, prefixo='GestorRPV-', exigir_senha=True):
+def limpar_parciais(pasta, idade_segundos=60 * 60):
+    """Cópias interrompidas (".…rpvbackup.parcial") deixadas na pasta escolhida; já cifradas, mas inúteis."""
+    limite = time.time() - idade_segundos
+    for sobra in Path(pasta).glob('.*.rpvbackup.parcial'):
+        try:
+            if sobra.is_file() and not sobra.is_symlink() and sobra.stat().st_mtime < limite:
+                sobra.unlink()
+        except OSError:
+            log.warning('Cópia interrompida não removida da pasta do backup.')
+
+
+def criar_backup(banco, pasta, prefixo='GestorRPV-', exigir_senha=True, registrar=True):
     """Grava um backup completo, cifrado com a senha dos backups deste computador.
 
     Todo o trabalho acontece na pasta dos dados do programa; na pasta escolhida (que pode ser sincronizada
     com a nuvem) só chega o arquivo final, já cifrado. Sem senha definida, só as cópias de segurança locais
-    (exigir_senha=False) saem sem criptografia.
+    (exigir_senha=False) saem sem criptografia. Cópias de segurança internas usam registrar=False: não contam
+    como "último backup" para o lembrete.
     """
     senha = senha_salva(banco)
     if exigir_senha and not senha:
         raise SenhaAusente('Defina a senha dos backups antes de criar um backup.')
     pasta = Path(pasta)
     pasta.mkdir(parents=True, exist_ok=True)
+    limpar_parciais(pasta)
     agora = datetime.now().astimezone()
     quando = agora.isoformat(timespec='seconds')
     destino = pasta / (prefixo + agora.strftime('%Y%m%d-%H%M%S-%f') + '.rpvbackup')
@@ -227,12 +250,21 @@ def criar_backup(banco, pasta, prefixo='GestorRPV-', exigir_senha=True):
             os.replace(parcial, destino)
         finally:
             parcial.unlink(missing_ok=True)
-    banco.registrar_backup(quando)
+    if registrar:
+        banco.registrar_backup(quando)
     return destino
 
 
 def senha_salva(banco):
-    return cifra.revelar_senha(banco.configuracao(SENHA_BACKUP))
+    guardada = banco.configuracao(SENHA_BACKUP)
+    senha = cifra.revelar_senha(guardada)
+    if cifra.legada(guardada):
+        # Senha da 0.30.0, gravada como texto: passa a ser guardada protegida na primeira leitura.
+        try:
+            banco.salvar_configuracao(SENHA_BACKUP, cifra.proteger_senha(senha))
+        except (OSError, sqlite3.Error):
+            log.warning('Senha antiga dos backups não pôde ser protegida agora; nova tentativa na próxima leitura.')
+    return senha
 
 
 def salvar_senha(banco, senha):
@@ -290,6 +322,19 @@ def copiar_dados(origem, destino):
         con.close()
 
 
+def gravar_configuracoes(caminho, valores):
+    con = sqlite3.connect(caminho)
+    try:
+        with con:
+            for chave, valor in valores.items():
+                if valor is None:
+                    con.execute('DELETE FROM configuracoes WHERE chave=?', (chave,))
+                else:
+                    con.execute('INSERT OR REPLACE INTO configuracoes (chave, valor) VALUES (?, ?)', (chave, valor))
+    finally:
+        con.close()
+
+
 def conferir_nomes(infos):
     """Nomes, tamanhos e caminhos do ZIP, antes de ler qualquer conteúdo."""
     nomes = [i.filename for i in infos]
@@ -321,13 +366,13 @@ def ler_manifesto(pacote, nomes):
     return manifesto, hashes
 
 
-def conferir_hash(pacote, nome, esperado, destino=None):
+def conferir_hash(pacote, nome, esperado, destino=None, limite=None):
     with pacote.open(nome) as entrada:
         if destino is None:
-            obtido = copiar_com_hash(entrada)
+            obtido = copiar_com_hash(entrada, limite=limite)
         else:
             with destino.open('wb') as saida:
-                obtido = copiar_com_hash(entrada, saida)
+                obtido = copiar_com_hash(entrada, saida, limite)
     if obtido != esperado:
         raise ValueError('Um arquivo do backup está danificado ou foi alterado.')
 
@@ -386,7 +431,7 @@ class BackupPreparado:
                     if nome.startswith('documentos/'):
                         conferir_hash(pacote, nome, hashes[nome])
                 self.documentos = {nome: hashes[nome] for nome in hashes if nome.startswith('documentos/')}
-                self.tamanho_documentos = sum(pacote.getinfo(nome).file_size for nome in self.documentos)
+                self.tamanhos = {nome: pacote.getinfo(nome).file_size for nome in self.documentos}
         except (BadZipFile, KeyError, json.JSONDecodeError, UnicodeDecodeError, TypeError, AttributeError) as erro:
             raise ValueError('O arquivo não é um backup válido do Gestor de RPV.') from erro
         validar_banco(banco)
@@ -406,14 +451,14 @@ class BackupPreparado:
         self.criado_em = manifesto.get('criado_em', '')
 
     def extrair_documentos(self, destino):
-        conferir_espaco(destino.parent, self.tamanho_documentos)
+        conferir_espaco(destino.parent, sum(self.tamanhos.values()))
         destino.mkdir()
         try:
             with ZipFile(self.pacote) as pacote:
                 for nome, esperado in self.documentos.items():
                     arquivo = destino.joinpath(*PurePosixPath(nome).parts[1:])
                     arquivo.parent.mkdir(parents=True, exist_ok=True)
-                    conferir_hash(pacote, nome, esperado, arquivo)
+                    conferir_hash(pacote, nome, esperado, arquivo, limite=self.tamanhos[nome])
         except BadZipFile as erro:
             raise ValueError('O arquivo de backup mudou durante a importação.') from erro
 
@@ -422,7 +467,8 @@ class BackupPreparado:
         seguranca = None
         if copia_de_seguranca:
             # Esta cópia permanece disponível mesmo se uma falha interromper a importação.
-            seguranca = criar_backup(banco, banco.caminho.parent / 'backups_automaticos', exigir_senha=False)
+            seguranca = criar_backup(banco, banco.caminho.parent / 'backups_automaticos', exigir_senha=False,
+                                     registrar=False)
             limitar_backups(seguranca.parent, 'GestorRPV-*.rpvbackup')
         locais = {chave: banco.configuracao(chave) for chave in CONFIGURACOES_LOCAIS}
         with tempfile.TemporaryDirectory(prefix=PREFIXO_RESTAURACAO, dir=banco.caminho.parent) as temporaria:
@@ -435,6 +481,9 @@ class BackupPreparado:
             # aplicativo, e os valores são copiados linha a linha. Nada do esquema do arquivo importado sobrevive.
             limpo = trabalho / 'banco_limpo.sqlite3'
             copiar_dados(self.pasta / 'banco.sqlite3', limpo)
+            # A pasta do backup automático e a senha pertencem a este computador, não ao arquivo importado. Elas
+            # já entram no banco novo, para que a troca abaixo seja uma só: ou tudo muda, ou nada muda.
+            gravar_configuracoes(limpo, locais)
             tinha_documentos = destino.exists()
             if tinha_documentos:
                 os.replace(destino, antigos)
@@ -442,13 +491,7 @@ class BackupPreparado:
                 os.replace(novos, destino)
                 # SQLite faz a substituição do banco em uma transação própria.
                 copiar_banco(limpo, banco.caminho)
-                # A pasta do backup automático e a senha pertencem a este computador, não ao arquivo importado.
-                for chave, valor in locais.items():
-                    if valor is None:
-                        banco.remover_configuracao(chave)
-                    else:
-                        banco.salvar_configuracao(chave, valor)
-            except Exception:
+            except BaseException:
                 if destino.exists():
                     os.replace(destino, trabalho / 'documentos_importados')
                 if tinha_documentos:

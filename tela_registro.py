@@ -255,14 +255,16 @@ class RegistroMixin:
 
         def salvar():
             dados = {chave: variavel.get().strip() for chave, variavel in campos.items()}
-            # Todos os campos são conferidos de uma vez, e cada problema diz em qual campo está.
-            problemas = [] if dados['nome'] else ['Nome do titular: informe o nome completo.']
+            # Todos os campos e todas as regras são conferidos de uma vez, numa mensagem só: primeiro o que está
+            # mal escrito (com o nome do campo), depois as regras que não dependem desses campos.
+            problemas, mal_preenchidos = [], set()
 
             def converter(chave, rotulo, funcao, *valores):
                 try:
                     dados[chave] = funcao(*valores)
                 except ValueError as erro:
                     problemas.append(f'{rotulo}: {erro}')
+                    mal_preenchidos.add(chave)
 
             converter('aquisicao', 'Data da aquisição', data_iso, dados['aquisicao'])
             if modo_previsao.get() == 'dias':
@@ -274,20 +276,22 @@ class RegistroMixin:
             dados['comissao'] = None
             if tem_comissao.get() == 'Sim':
                 converter('comissao', 'Comissão', centavos, valor_comissao.get())
+            dados['conta_id'] = mapa_contas.get(dados['conta'])
+            dados['observacoes'] = observacoes.get('1.0', 'end-1c').strip()
+            problemas += self.banco.problemas_da_entrada(dados, ignorar=mal_preenchidos)
             if problemas:
                 messagebox.showerror('Confira o cadastro', '\n'.join(problemas), parent=tela)
                 return
-            dados['conta_id'] = mapa_contas.get(dados['conta'])
-            dados['observacoes'] = observacoes.get('1.0', 'end-1c').strip()
             try:
                 salvo = self.banco.salvar(dados, identificador, anexos=anexos_pendentes)
-                demonstracao.adotar(self.banco, operacao=salvo)
             except ValueError as erro:
                 messagebox.showerror('Confira o cadastro', descrever_erro(erro), parent=tela)
                 return
             except (sqlite3.Error, OSError) as erro:
                 messagebox.showerror('Não foi possível salvar', descrever_erro(erro), parent=tela)
                 return
+            # Já salvo: a partir daqui, nenhuma falha pode reabrir o formulário (salvar de novo duplicaria a entrada).
+            demonstracao.adotar(self.banco, operacao=salvo)
             self.atualizar()
             tela.destroy()
 
@@ -482,14 +486,18 @@ class RegistroMixin:
         anexos_pendentes = self.criar_painel_documentos(painel_documentos, tela, identificador, tipo='recebimento')
 
         def salvar():
+            comprovantes = bool(anexos_pendentes)
             try:
                 self.banco.registrar_recebimento(identificador, data_iso(valor.get()), anexos=anexos_pendentes)
             except ValueError as erro:
                 messagebox.showerror('Confira o recebimento', descrever_erro(erro), parent=tela)
                 return
-            except (sqlite3.Error, OSError):
-                messagebox.showerror('Recebimento', 'Não foi possível salvar.', parent=tela)
+            except (sqlite3.Error, OSError) as erro:
+                messagebox.showerror('Recebimento', 'Não foi possível salvar. ' + descrever_erro(erro), parent=tela)
                 return
+            if comprovantes:
+                # Com um comprovante de verdade anexado, a operação deixa de ser só um exemplo.
+                demonstracao.adotar(self.banco, operacao=identificador)
             self.atualizar()
             tela.destroy()
 

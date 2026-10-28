@@ -246,7 +246,8 @@ class JanelaContas:
         ttk.Separator(tela).pack(fill='x', padx=24)
         botoes = ttk.Frame(tela, padding=(24, 8, 24, 12))
         botoes.pack(fill='x')
-        fechar = fechar_com_confirmacao(tela, lambda: tuple(variavel.get() for variavel in campos.values()))
+        fechar = fechar_com_confirmacao(tela, lambda: tuple(variavel.get() for variavel in campos.values()),
+                                        'Os dados digitados')
         ttk.Button(botoes, text='Cancelar', command=fechar).pack(side='left', expand=True, fill='x', padx=(0, 8))
         ttk.Button(botoes, text='Salvar conta', style='Salvar.TButton', command=salvar).pack(side='left', expand=True, fill='x')
         centralizar(tela)

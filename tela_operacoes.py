@@ -62,15 +62,23 @@ class OperacoesMixin:
         self.menus = {'Arquivo': arquivo, 'Editar': editar, 'Exibir': exibir, 'Ajuda': ajuda, 'barra': barra}
 
     def apagar_demonstracao(self):
+        try:
+            em_contas_ficticias = demonstracao.operacoes_proprias_em_contas_ficticias(self.banco)
+        except sqlite3.Error:
+            em_contas_ficticias = 0
+        aviso = ('' if not em_contas_ficticias else
+                 f'\n\n{em_contas_ficticias} operação(ões) suas usam uma conta fictícia. Elas continuam salvas, com a '
+                 'cópia dos dados bancários, mas aparecerão como "conta removida". Se preferir, troque a conta delas antes.')
         if not messagebox.askyesno('Apagar dados de demonstração',
             'Apagar as operações e contas fictícias?\n\n'
-            'O que você cadastrou continua salvo. Depois disso, o programa fica pronto para os seus dados.',
+            'O que você cadastrou continua salvo. Depois disso, o programa fica pronto para os seus dados.' + aviso,
             parent=self.historico, default='no'):
             return
         try:
             demonstracao.remover(self.banco)
-        except sqlite3.Error:
-            messagebox.showerror('Apagar dados de demonstração', 'Não foi possível apagar os dados.', parent=self.historico)
+        except (sqlite3.Error, OSError) as erro:
+            messagebox.showerror('Apagar dados de demonstração', 'Não foi possível apagar os dados. ' + descrever_erro(erro),
+                                 parent=self.historico)
             return
         self.atualizar()
         if self.janela_contas is not None and self.janela_contas.tela.winfo_exists():

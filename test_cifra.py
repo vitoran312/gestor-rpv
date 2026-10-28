@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import cifra
-from backup import SENHA_BACKUP, PASTA_AUTOMATICA, BackupPreparado, SenhaAusente, SenhaNecessaria, criar_backup
+from backup import SENHA_BACKUP, PASTA_AUTOMATICA, BackupPreparado, SenhaAusente, SenhaNecessaria, criar_backup, senha_salva
 from apoio_testes import SENHA_TESTE, banco_com_contas, dados_rpv
 
 
@@ -55,12 +55,18 @@ class TestCifra(unittest.TestCase):
                         self.decifrar(cifrado)
 
     def test_regras_da_senha(self):
-        for senha, trecho in (('1234567', '8 a 256'), ('x' * 257, '8 a 256'), (' segredo1', 'espaço'),
-                              ('segredo1 ', 'espaço'), ('        ', 'espaço'), ('aaaaaaaa', 'fácil'),
-                              ('12345678', 'fácil'), ('Password', 'fácil')):
+        for senha, trecho in (('123456789', '10 a 256'), ('x' * 257, '10 a 256'), (' cofre azul 7', 'espaço'),
+                              ('cofre azul 7 ', 'espaço'), ('          ', 'espaço'), ('aaaaaaaaaa', 'fácil'),
+                              ('1234567890', 'fácil'), ('Password123', 'fácil'), ('senha@12345', 'fácil'),
+                              ('qwerty12345', 'fácil'), ('brasil2026!', 'fácil'), ('abcabcab12', 'fácil')):
             with self.subTest(senha=senha), self.assertRaisesRegex(ValueError, trecho):
                 cifra.validar_senha(senha)
         self.assertEqual(cifra.validar_senha('cavalo bateria'), 'cavalo bateria')
+
+    def test_senha_atual_compara_acentos_compostos_de_jeitos_diferentes(self):
+        import unicodedata
+        self.assertTrue(cifra.mesma_senha(unicodedata.normalize('NFD', 'Café forte 9'), 'Café forte 9'))
+        self.assertFalse(cifra.mesma_senha('Cafe forte 9', 'Café forte 9'))
 
     def test_senha_guardada_e_lida_de_volta(self):
         guardada = cifra.proteger_senha('cavalo bateria')
@@ -111,6 +117,16 @@ class TestBackupComSenha(unittest.TestCase):
             finally:
                 con.close()
 
+    def test_senha_da_versao_030_passa_a_ser_protegida_na_primeira_leitura(self):
+        from backup import senha_salva
+        self.origem.salvar_configuracao(SENHA_BACKUP, 'senha-legada-030')
+        with patch.object(cifra, 'proteger_senha', lambda senha: 'dpapi:' + senha[::-1]), \
+                patch.object(cifra, 'revelar_senha', lambda g: g[6:][::-1] if g.startswith('dpapi:') else g):
+            self.assertEqual(senha_salva(self.origem), 'senha-legada-030')
+            self.assertEqual(self.origem.configuracao(SENHA_BACKUP), 'dpapi:030-adagel-ahnes')
+            criar_backup(self.origem, self.pasta / 'backups')
+        self.assertNotIn(b'senha-legada-030', self.origem.caminho.read_bytes())
+
     def test_sem_senha_definida_o_backup_nao_e_criado(self):
         self.origem.remover_configuracao(SENHA_BACKUP)
         with self.assertRaises(SenhaAusente):
@@ -138,7 +154,7 @@ class TestBackupComSenha(unittest.TestCase):
         destino.salvar_configuracao(PASTA_AUTOMATICA, '/pasta/do/destino')
         with BackupPreparado(arquivo, SENHA_TESTE) as preparado:
             seguranca = preparado.restaurar(destino)
-        self.assertEqual(destino.configuracao(SENHA_BACKUP), 'senha-do-destino')
+        self.assertEqual(senha_salva(destino), 'senha-do-destino')
         self.assertEqual(destino.configuracao(PASTA_AUTOMATICA), '/pasta/do/destino')
         self.assertEqual([r['nome'] for r in destino.listar()], ['Protegida'])
         # A cópia de segurança feita antes de importar usa a senha do destino.

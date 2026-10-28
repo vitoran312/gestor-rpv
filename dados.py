@@ -42,7 +42,7 @@ ETAPAS = (
     ('0.9.0', lambda e: 'lixeira_em' not in e['rpvs'] or e['cpf_unico']),
     ('0.10.0', lambda e: not e['tem_documentos']),
     ('0.11.0', lambda e: 'tipo' not in e['documentos']),
-    ('0.16.0', lambda e: e['versao'] < 7),
+    ('0.16.0', lambda e: e['versao'] < 7 or e['conta_obrigatoria']),
     ('0.21.0', lambda e: e['versao'] < VERSAO_BANCO),
 )
 
@@ -83,13 +83,18 @@ def limitar_backups(pasta, padrao, manter=MANTER_BACKUPS):
         try:
             antigo.unlink()
         except OSError:
-            log.warning('Backup antigo não removido: %s', antigo, exc_info=True)
+            log.warning('Backup antigo não removido.', exc_info=True)
 
 
 def centavos(texto):
-    texto = texto.strip().replace('R$', '').replace(' ', '')
-    if ',' in texto:
-        texto = texto.replace('.', '').replace(',', '.')
+    # Espaço comum e os espaços que Excel e navegadores põem em valores ("R$\xa01.500,00").
+    texto = re.sub(r'[\s\xa0\u202f]', '', texto.replace('R$', ''))
+    if ',' in texto and '.' in texto:
+        # Os dois separadores: o último é o decimal. "1.500,00" (Brasil) ou "1,500.00" (Estados Unidos).
+        milhar, decimal = ('.', ',') if texto.rfind(',') > texto.rfind('.') else (',', '.')
+        texto = texto.replace(milhar, '').replace(decimal, '.')
+    elif ',' in texto:
+        texto = texto.replace(',', '.')
     elif '.' in texto:
         partes = texto.split('.')
         if 1 <= len(partes[0]) <= 3 and all(len(p) == 3 and p.isdigit() for p in partes[1:]):
@@ -186,8 +191,21 @@ def normalizar(texto):
 
 
 def chave_texto(texto):
-    """Para ordenar: sem acentos nem maiúsculas, mas com os espaços ("Ana Maria" antes de "Anabela")."""
-    return ' '.join(normalizar(palavra) for palavra in texto.split())
+    """Para ordenar e buscar: palavras sem acentos nem maiúsculas, separadas por um espaço.
+
+    Espaço, hífen e outros sinais separam palavras ("Maria-José" = "maria jose"; "Ana Maria" antes de
+    "Anabela"); o apóstrofo não separa ("D'Ávila" = "davila").
+    """
+    texto = re.sub(r"['’`´]", '', texto)
+    return ' '.join(p for p in (normalizar(parte) for parte in re.split(r'[\W_]+', texto)) if p)
+
+
+def encontra(termo, texto):
+    """Busca por trecho: uma palavra pode estar no meio ("ilva" acha "Silva"); com mais de uma, a partir do
+    começo de uma palavra ("silva jo" acha "Silva José", mas "lva j" não)."""
+    if ' ' not in termo:
+        return termo in texto
+    return (' ' + texto).find(' ' + termo) >= 0
 
 
 def validar_cpf(texto):
@@ -263,6 +281,8 @@ class Banco:
         colunas = lambda tabela: {r['name'] for r in con.execute(f'PRAGMA table_info({tabela})')}
         return {'rpvs': colunas('rpvs'), 'contas': colunas('contas'), 'documentos': colunas('documentos'),
                 'tem_documentos': bool(colunas('documentos')), 'cpf_unico': cls.cpf_unico(con),
+                'conta_obrigatoria': any(r['name'] == 'conta_id' and r['notnull']
+                                         for r in con.execute('PRAGMA table_info(rpvs)')),
                 'versao': con.execute('PRAGMA user_version').fetchone()[0]}
 
     def copiar_antes_de_migrar(self, versao):
@@ -327,7 +347,7 @@ class Banco:
         for coluna in ('recebimento', 'previsao_atual_definida', 'lixeira_em'):  # 0.6.0, 0.7.0 e 0.9.0
             if coluna not in atuais:
                 con.execute(f'ALTER TABLE rpvs ADD COLUMN {coluna} TEXT')
-        if any(r['name'] == 'conta_id' and r['notnull'] for r in con.execute('PRAGMA table_info(rpvs)')):
+        if estado['conta_obrigatoria']:
             # 0.16.0: a conta removida deixa a operação sem conta, com a cópia dos dados bancários.
             self.criar_rpvs(con, 'rpvs_nova')
             self.trocar_tabela(con, 'rpvs', 'rpvs_nova')
@@ -390,6 +410,8 @@ class Banco:
         con = sqlite3.connect(self.caminho)
         con.row_factory = sqlite3.Row
         con.execute('PRAGMA foreign_keys=ON')
+        # O que é apagado ou substituído (uma senha trocada, um CPF corrigido) não fica legível nas sobras do arquivo.
+        con.execute('PRAGMA secure_delete=ON')
         try:
             with con:
                 yield con
@@ -411,18 +433,24 @@ class Banco:
 
     def salvar_conta(self, dados, identificador=None):
         dados = {k: dados.get(k, '').strip() for k in CAMPOS_CONTA}
-        for campo in CAMPOS_CONTA:
-            if campo != 'agencia' and not dados[campo]:  # A agência é a única informação opcional.
-                raise ValueError('Preencha identificação, nome completo, CPF, endereço, número, cidade, estado, banco, conta e chave Pix.')
+        # Tudo o que falta ou está errado vai numa mensagem só, com o nome de cada campo.
+        faltando = [TITULOS_CONTA[c] for c in CAMPOS_CONTA if c != 'agencia' and not dados[c]]  # Agência é opcional.
+        problemas = ['Preencha: ' + ', '.join(faltando) + '.'] if faltando else []
+        dados['estado'] = dados['estado'].upper()
+        if dados['estado'] and dados['estado'] not in ESTADOS:
+            problemas.append('Selecione um estado brasileiro válido.')
+        if dados['cpf']:
+            try:
+                dados['cpf'] = validar_cpf(dados['cpf'])
+            except ValueError as erro:
+                problemas.append(str(erro))
+        if problemas:
+            raise ValueError('\n'.join(problemas))
         dados['nome'] = nome_formatado(dados['nome'])
         dados['endereco'] = nome_formatado(dados['endereco'])
         dados['cidade'] = nome_formatado(dados['cidade'])
-        dados['estado'] = dados['estado'].upper()
-        if dados['estado'] not in ESTADOS:
-            raise ValueError('Selecione um estado brasileiro válido.')
         for campo in ('identificacao', 'endereco', 'banco'):
             dados[campo] = dados[campo][:1].upper() + dados[campo][1:]
-        dados['cpf'] = validar_cpf(dados['cpf'])
         dados['identificacao_chave'] = normalizar(dados['identificacao'])
         dados['banco_chave'] = normalizar(dados['banco'])
         dados['agencia_chave'] = (normalizar(dados['agencia']).lstrip('0') or '0') if dados['agencia'] else ''
@@ -474,11 +502,13 @@ class Banco:
             raise
 
     @staticmethod
-    def problemas_da_entrada(dados):
+    def problemas_da_entrada(dados, ignorar=()):
         """Todas as regras de uma entrada, conferidas de uma vez: devolve a lista do que está errado.
 
-        As regras ficam aqui, e não só na interface, para valerem em qualquer caminho de gravação.
+        As regras ficam aqui, e não só na interface, para valerem em qualquer caminho de gravação. `ignorar`
+        lista os campos que a tela já apontou como mal preenchidos: as regras que dependem deles são puladas.
         """
+        dados = dict(dados)
         problemas = []
         if not dados['nome']:
             problemas.append('Informe o nome completo do titular original.')
@@ -486,8 +516,10 @@ class Banco:
             problemas.append(f'O nome do titular pode ter até {LIMITE_NOME} caracteres.')
         if len(dados['observacoes']) > LIMITE_OBSERVACOES:
             problemas.append(f'As observações podem ter até {LIMITE_OBSERVACOES} caracteres.')
-        datas_validas = True
+        datas_validas = not {'aquisicao', 'previsao'} & set(ignorar)
         for chave, rotulo in (('aquisicao', 'Data da aquisição'), ('previsao', 'Previsão de recebimento')):
+            if chave in ignorar:
+                continue
             try:
                 dados[chave] = validar_data_iso(dados[chave], rotulo)
             except ValueError as erro:
@@ -498,13 +530,14 @@ class Banco:
                 problemas.append('A data da aquisição não pode estar no futuro.')
             if dados['previsao'] < dados['aquisicao']:
                 problemas.append('A previsão não pode ser anterior à aquisição.')
-        if dados['comissao'] is not None and dados['comissao'] < 0:
+        valores = not {'previsto', 'custo', 'comissao'} & set(ignorar)
+        if valores and dados['comissao'] is not None and dados['comissao'] < 0:
             problemas.append('A comissão não pode ser negativa.')
-        elif dados['comissao'] is not None and dados['comissao'] > dados['previsto']:
+        elif valores and dados['comissao'] is not None and dados['comissao'] > dados['previsto']:
             problemas.append('A comissão não pode superar o Valor Total RPV.')
-        if dados['custo'] <= 0:
+        if 'custo' not in ignorar and dados['custo'] <= 0:
             problemas.append('O valor de aquisição deve ser maior que zero.')
-        elif dados['custo'] > dados['previsto']:
+        elif valores and dados['custo'] > dados['previsto']:
             problemas.append('O valor de aquisição não pode superar o Valor Total RPV.')
         return problemas
 
@@ -514,6 +547,8 @@ class Banco:
         problemas = self.problemas_da_entrada(dados)
         if problemas:
             raise ValueError('\n'.join(problemas))
+        dados['aquisicao'] = validar_data_iso(dados['aquisicao'], 'Data da aquisição')
+        dados['previsao'] = validar_data_iso(dados['previsao'], 'Previsão de recebimento')
         # A maiúscula inicial vem depois da conferência do tamanho ("ß" vira "SS" e passaria do limite).
         dados['observacoes'] = dados['observacoes'][:1].upper() + dados['observacoes'][1:]
         with self.conectar() as con:
@@ -561,7 +596,7 @@ class Banco:
         termo = chave_texto(busca)
         if not termo:
             return [r for r in registros if busca.casefold() in r['nome'].casefold() or busca in data_br(r['aquisicao'])]
-        return [r for r in registros if termo in chave_texto(r['nome']) or termo in chave_texto(r['conta'])
+        return [r for r in registros if encontra(termo, chave_texto(r['nome'])) or encontra(termo, chave_texto(r['conta']))
                 or busca.strip() in data_br(r['aquisicao'])]
 
     def obter(self, identificador):

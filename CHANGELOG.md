@@ -1,5 +1,48 @@
 # Histórico de versões
 
+## 0.32.0
+
+Correções da terceira rodada da banca de revisão. Quatro itens da 0.31.0 não estavam completos e foram
+terminados aqui: a senha antiga agora é protegida de fato, o formulário mostra formato e regras numa
+mensagem só, a carga da demonstração resiste a encerramento forçado e a busca não atravessa palavras.
+
+**Dados e valores**
+- Colar "1,500.00" (formato americano) dá R$ 1.500,00; antes virava R$ 1,50 sem aviso. Valores com o espaço
+  que Excel e navegadores usam ("R$ 1.500,00" copiado de uma página) também são aceitos.
+- Importar um backup é uma troca única: a senha e a pasta do backup automático deste computador já entram no
+  banco novo antes da troca, então uma falha não deixa banco e anexos de épocas diferentes.
+- Recuperação de banco danificado: anexos presos (arquivo aberto) devolvem o banco ao lugar; um erro só ao
+  guardar a senha não desfaz uma restauração que deu certo; escolher o próprio arquivo danificado é
+  explicado; a mensagem final diz os nomes reais do que foi guardado e avisa se a senha precisa ser recriada.
+- Demonstração: a carga é anotada passo a passo e, se o programa for fechado à força no meio, é limpa e
+  refeita na próxima abertura; operação fictícia que recebeu um comprovante de verdade passa a ser da pessoa;
+  ao apagar, o programa avisa quantas operações suas usam contas fictícias; anotação adulterada não trava.
+- Cópias de segurança internas não contam como "último backup", e uma data de último backup muito no futuro
+  (relógio adiantado ou arquivo adulterado) não cala mais o lembrete nem o backup automático.
+
+**Senha e privacidade**
+- A senha gravada pela 0.30.0 passa a ser protegida (DPAPI) na primeira leitura, e o banco apaga de verdade
+  o que é removido (sem sobras legíveis no arquivo).
+- Senha com no mínimo 10 caracteres, recusando bases óbvias com números ou símbolos ("senha@123",
+  "password1", "brasil2026"); a senha atual é comparada sem diferença de acentuação.
+- O diário de erros grava só o tipo, o código e as linhas do programa, sem mensagens nem caminhos.
+- Cópias interrompidas (".…parcial") deixadas na pasta escolhida são limpas no backup seguinte; os anexos
+  extraídos não podem passar do tamanho conferido.
+
+**Uso**
+- O formulário de entrada mostra numa mensagem só os campos mal escritos e as regras não atendidas; o de conta
+  lista todos os campos que faltam, o estado e o CPF de uma vez.
+- Importar pede para fechar qualquer formulário aberto (entrada, recebimento, previsão ou conta); senha vazia
+  na importação diz que nada foi digitado; cancelar a senha ao ativar o backup automático explica o motivo.
+- Busca: com mais de uma palavra, procura a partir do começo das palavras ("silva jo" acha "Silva José",
+  "lva j" não); hífen separa palavras ("maria jose" acha "Maria-José"); apóstrofo não ("davila").
+- A confirmação de descartar no formulário de conta não fala mais em anexos; clique do meio (Linux) também
+  passa pela conferência de valores.
+
+**Manutenção**
+- A etapa de migração 0.16.0 usa a mesma condição para guardar a cópia e para migrar; a chamada DPAPI declara
+  os tipos; testes novos para cada correção (168 no total).
+
 ## 0.31.0
 
 Correções da segunda rodada da banca de revisão.
