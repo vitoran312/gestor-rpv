@@ -47,6 +47,14 @@ class TestInterface(unittest.TestCase):
             menu_sem_espera = patch.object(tk.Menu, 'tk_popup', lambda menu, x, y, entry='': None)
             menu_sem_espera.start()
             self.addCleanup(menu_sem_espera.stop)
+        # Uma caixa de diálogo de verdade travaria o teste esperando um clique: por padrão, todas respondem
+        # sozinhas (confirmações com "Sim") e ficam anotadas em self.dialogos. Cada teste pode trocar a resposta.
+        self.dialogos = []
+        for nome, resposta in (('askyesno', True), ('showerror', None), ('showinfo', None), ('showwarning', None)):
+            dialogo = patch.object(messagebox, nome, side_effect=lambda *a, n=nome, r=resposta, **k:
+                                   self.dialogos.append((n, a)) or r)
+            dialogo.start()
+            self.addCleanup(dialogo.stop)
         self.pasta = tempfile.TemporaryDirectory()
         self.banco = banco_com_contas(Path(self.pasta.name) / 'teste.sqlite3')
         self.root = tk.Tk()
@@ -593,6 +601,25 @@ class TestInterface(unittest.TestCase):
         self.root.update()
         tabela = next(w for w in filhos(lixeiras[0]) if isinstance(w, ttk.Treeview))
         self.assertEqual(tabela.get_children(), (str(identificador),))
+
+    def test_fechar_formulario_alterado_pergunta_antes_de_descartar(self):
+        form = self.formulario()
+        form.event_generate('<Escape>')
+        self.root.update()
+        self.assertFalse(form.winfo_exists())  # Sem alterações, fecha direto.
+        self.assertEqual(self.dialogos, [])
+        form = self.formulario()
+        next(w for w in filhos(form) if isinstance(w, ttk.Entry)).insert(0, 'Digitado')
+        with patch.object(messagebox, 'askyesno', return_value=False) as pergunta:
+            botao(form, 'Cancelar').invoke()
+            form.event_generate('<Escape>')
+            self.root.update()
+        self.assertEqual(pergunta.call_count, 2)
+        self.assertEqual(pergunta.call_args.args[0], 'Descartar alterações?')
+        self.assertTrue(form.winfo_exists())
+        with patch.object(messagebox, 'askyesno', return_value=True):
+            botao(form, 'Cancelar').invoke()
+        self.assertFalse(form.winfo_exists())
 
     def test_ordenacao_colunas_tres_cliques_e_filtro(self):
         ids = []

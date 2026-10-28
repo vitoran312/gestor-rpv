@@ -43,6 +43,22 @@ def pad(valor):
     return round(valor * AMPLIACAO) if isinstance(valor, int) else tuple(round(v * AMPLIACAO) for v in valor)
 
 
+
+def fechar_com_confirmacao(tela, estado):
+    """Cancelar, Esc e o X da janela só descartam sem perguntar quando nada foi alterado."""
+    inicial = estado()
+
+    def fechar(_evento=None):
+        if estado() != inicial and not messagebox.askyesno(
+                'Descartar alterações?', 'O que foi digitado e os anexos ainda não salvos serão perdidos. '
+                'Fechar mesmo assim?', parent=tela, icon='warning', default='no'):
+            return
+        tela.destroy()
+
+    tela.protocol('WM_DELETE_WINDOW', fechar)
+    tela.bind('<Escape>', fechar)
+    return fechar
+
 class RegistroMixin:
     def formulario(self, identificador=None):
         # Um formulário por vez: Ctrl+N repetido (ou a tecla presa) traz o que já está aberto,
@@ -258,9 +274,11 @@ class RegistroMixin:
             botoes.columnconfigure(coluna,weight=1,uniform='acoes')
         ttk.Button(botoes,text='Dados de recebimento',width=20,
                    command=lambda: self.ver_dados_recebimento(tela,registro,mapa_contas.get(campos['conta'].get()))).grid(row=0,column=0,sticky='ew',padx=pad((0,8)))
-        ttk.Button(botoes,text='Cancelar',width=20,command=tela.destroy).grid(row=0,column=1,sticky='ew',padx=pad((4,4)))
+        fechar = fechar_com_confirmacao(tela, lambda: (
+            tuple(variavel.get() for variavel in campos.values()), modo_previsao.get(), prazo.get(), tem_comissao.get(),
+            valor_comissao.get(), observacoes.get('1.0', 'end-1c'), len(anexos_pendentes)))
+        ttk.Button(botoes,text='Cancelar',width=20,command=fechar).grid(row=0,column=1,sticky='ew',padx=pad((4,4)))
         ttk.Button(botoes,text='Salvar registro',width=20,style='Salvar.TButton',command=salvar).grid(row=0,column=2,sticky='ew',padx=pad((8,0)))
-        tela.bind('<Escape>', lambda _: tela.destroy())
         ampliar_formulario(tela, self.fonte)
         centralizar(tela)
         tela.deiconify()
@@ -463,12 +481,12 @@ class RegistroMixin:
         botoes.pack(fill='x', pady=(15, 0))
         if registro['recebimento']:
             ttk.Button(botoes, text='Desmarcar recebimento', command=desmarcar).pack(side='left', padx=(0, 8))
-        ttk.Button(botoes, text='Cancelar', command=tela.destroy).pack(side='right')
+        fechar = fechar_com_confirmacao(tela, lambda: (valor.get(), len(anexos_pendentes)))
+        ttk.Button(botoes, text='Cancelar', command=fechar).pack(side='right')
         ttk.Button(botoes, text='Salvar recebimento', style='Salvar.TButton', command=salvar).pack(side='right', padx=8)
         centralizar(tela)
         tela.deiconify()
         tela.grab_set()
-        tela.bind('<Escape>', lambda _: tela.destroy())
 
     def editar_previsao(self, identificador):
         registro = self.banco.obter(identificador)
@@ -517,9 +535,9 @@ class RegistroMixin:
 
         rodape = ttk.Frame(corpo)
         rodape.pack(fill='x', pady=(15, 0))
-        ttk.Button(rodape, text='Cancelar', command=tela.destroy).pack(side='right')
+        fechar = fechar_com_confirmacao(tela, valor.get)
+        ttk.Button(rodape, text='Cancelar', command=fechar).pack(side='right')
         ttk.Button(rodape, text='Salvar previsão', style='Salvar.TButton', command=salvar).pack(side='right', padx=8)
         centralizar(tela)
         tela.deiconify()
         tela.grab_set()
-        tela.bind('<Escape>', lambda _: tela.destroy())
