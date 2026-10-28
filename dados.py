@@ -43,8 +43,11 @@ ETAPAS = (
     ('0.21.0', lambda e: e['versao'] < VERSAO_BANCO),
 )
 
-CAMPOS_CONTA = ('identificacao', 'nome', 'cpf', 'endereco', 'numero_endereco', 'cidade', 'estado', 'banco',
-                'agencia', 'numero', 'pix')
+# Campos de uma conta de recebimento, na ordem do formulário, com o rótulo de cada um.
+TITULOS_CONTA = {'identificacao': 'Identificação', 'nome': 'Nome completo', 'cpf': 'CPF', 'endereco': 'Endereço',
+                 'numero_endereco': 'Número', 'cidade': 'Cidade', 'estado': 'Estado (UF)', 'banco': 'Nome do banco',
+                 'agencia': 'Agência', 'numero': 'Conta bancária', 'pix': 'Chave Pix'}
+CAMPOS_CONTA = tuple(TITULOS_CONTA)
 # Esquema atual, em um lugar só: colunas que cada tabela precisa ter. A importação de backup confere por ele.
 ESQUEMA = {
     'rpvs': {'id', 'nome', 'aquisicao', 'previsto', 'custo', 'conta', 'previsao', 'comissao', 'observacoes',
@@ -104,6 +107,10 @@ def moeda(valor):
     inteiro, fracao = divmod(abs(valor), 100)
     prefixo = '-' if valor < 0 else ''
     return prefixo + f'{inteiro:,}'.replace(',', '.') + f',{fracao:02d}'
+
+
+def reais(valor):
+    return 'R$ ' + moeda(valor)
 
 
 def previsao_por_prazo(aquisicao, prazo):
@@ -350,6 +357,10 @@ class Banco:
             observacoes TEXT NOT NULL DEFAULT '',
             conta_id INTEGER REFERENCES contas(id) ON DELETE SET NULL, conta_snapshot TEXT NOT NULL, recebimento TEXT, previsao_atual_definida TEXT, lixeira_em TEXT)''')
 
+    @property
+    def pasta_documentos(self):
+        return self.caminho.parent / 'documentos'
+
     @contextmanager
     def conectar(self):
         con = sqlite3.connect(self.caminho)
@@ -363,8 +374,7 @@ class Banco:
 
     @staticmethod
     def snapshot(conta):
-        campos = ('identificacao', 'nome', 'cpf', 'endereco', 'numero_endereco', 'cidade', 'estado', 'banco', 'agencia', 'numero', 'pix')
-        return json.dumps({k: conta[k] for k in campos}, ensure_ascii=False)
+        return json.dumps({k: conta[k] for k in CAMPOS_CONTA}, ensure_ascii=False)
 
     def contas(self, somente_ativas=False):
         with self.conectar() as con:
@@ -376,10 +386,9 @@ class Banco:
             return con.execute('SELECT * FROM contas WHERE id=?', (identificador,)).fetchone()
 
     def salvar_conta(self, dados, identificador=None):
-        dados = {k: dados.get(k, '').strip() for k in
-                 ('identificacao', 'nome', 'cpf', 'endereco', 'numero_endereco', 'cidade', 'estado', 'banco', 'agencia', 'numero', 'pix')}
-        for campo in ('identificacao', 'nome', 'cpf', 'endereco', 'numero_endereco', 'cidade', 'estado', 'banco', 'numero', 'pix'):
-            if not dados[campo]:
+        dados = {k: dados.get(k, '').strip() for k in CAMPOS_CONTA}
+        for campo in CAMPOS_CONTA:
+            if campo != 'agencia' and not dados[campo]:  # A agência é a única informação opcional.
                 raise ValueError('Preencha identificação, nome completo, CPF, endereço, número, cidade, estado, banco, conta e chave Pix.')
         dados['nome'] = nome_formatado(dados['nome'])
         dados['endereco'] = nome_formatado(dados['endereco'])
@@ -524,12 +533,17 @@ class Banco:
         ids = list(dict.fromkeys(int(i) for i in identificadores))
         with self.conectar() as con:
             con.execute('BEGIN IMMEDIATE')
-            for identificador in ids:
-                registro = con.execute('SELECT lixeira_em FROM rpvs WHERE id=?',(identificador,)).fetchone()
-                if registro is None or registro['lixeira_em']:
-                    raise ValueError('Uma entrada não está mais na lista ativa. Atualize a lista e tente novamente.')
+            self.conferir_lixeira(con, ids, False, 'Uma entrada não está mais na lista ativa. Atualize a lista e tente novamente.')
             agora = datetime.now().astimezone().isoformat(timespec='seconds')
             con.executemany('UPDATE rpvs SET lixeira_em=? WHERE id=?',[(agora,i) for i in ids])
+
+    @staticmethod
+    def conferir_lixeira(con, ids, na_lixeira, mensagem):
+        """Todas as entradas precisam existir e estar (ou não) na lixeira; senão nada é alterado."""
+        for identificador in ids:
+            registro = con.execute('SELECT lixeira_em FROM rpvs WHERE id=?', (identificador,)).fetchone()
+            if registro is None or bool(registro['lixeira_em']) != na_lixeira:
+                raise ValueError(mensagem)
 
     def listar_lixeira(self):
         with self.conectar() as con:
@@ -542,10 +556,7 @@ class Banco:
         ids = list(dict.fromkeys(int(i) for i in identificadores))
         with self.conectar() as con:
             con.execute('BEGIN IMMEDIATE')
-            for identificador in ids:
-                registro = con.execute('SELECT lixeira_em FROM rpvs WHERE id=?',(identificador,)).fetchone()
-                if registro is None or not registro['lixeira_em']:
-                    raise ValueError('Uma entrada não está mais na lixeira. Reabra a lista e tente novamente.')
+            self.conferir_lixeira(con, ids, True, 'Uma entrada não está mais na lixeira. Reabra a lista e tente novamente.')
             con.executemany('UPDATE rpvs SET lixeira_em=NULL WHERE id=?',[(i,) for i in ids])
 
     def prorrogacoes(self, identificador):
@@ -615,7 +626,7 @@ class Banco:
             relativo = f'{identificador}/{uuid.uuid4().hex}{origem.suffix.lower()}'
             if tipo == 'recebimento':
                 relativo = 'recebimentos/' + relativo
-            destino = self.caminho.parent / 'documentos' / relativo
+            destino = self.pasta_documentos / relativo
             destino.parent.mkdir(parents=True, exist_ok=True)
             criados.append(destino)
             shutil.copyfile(origem, destino)
@@ -631,7 +642,7 @@ class Banco:
             documento = con.execute('SELECT * FROM documentos WHERE id=?',(identificador,)).fetchone()
         if documento is None:
             raise ValueError('Documento não encontrado.')
-        raiz = (self.caminho.parent / 'documentos').resolve()
+        raiz = self.pasta_documentos.resolve()
         caminho = (raiz / documento['caminho']).resolve()
         if not caminho.is_relative_to(raiz) or not caminho.is_file():
             raise ValueError('O arquivo deste documento não está disponível.')
@@ -666,7 +677,7 @@ class Banco:
         movidos=[]
         with tempfile.TemporaryDirectory(prefix='.excluir-rpv-',dir=self.caminho.parent) as pasta:
             def preparar(documentos):
-                raiz=(self.caminho.parent/'documentos').resolve()
+                raiz=self.pasta_documentos.resolve()
                 for documento in documentos:
                     arquivo=(raiz/documento['caminho']).resolve()
                     if not arquivo.is_relative_to(raiz):
@@ -697,10 +708,7 @@ class Banco:
         with self.arquivos_para_excluir() as preparar:
             with self.conectar() as con:
                 con.execute('BEGIN IMMEDIATE')
-                for identificador in ids:
-                    registro=con.execute('SELECT lixeira_em FROM rpvs WHERE id=?',(identificador,)).fetchone()
-                    if registro is None or not registro['lixeira_em']:
-                        raise ValueError('Somente entradas na lixeira podem ser excluídas permanentemente.')
+                self.conferir_lixeira(con, ids, True, 'Somente entradas na lixeira podem ser excluídas permanentemente.')
                 for identificador in ids:
                     preparar(con.execute('SELECT * FROM documentos WHERE rpv_id=?',(identificador,)).fetchall())
                 con.executemany('DELETE FROM rpvs WHERE id=?',[(i,) for i in ids])

@@ -4,7 +4,7 @@ import tkinter as tk
 from datetime import datetime
 from tkinter import messagebox, ttk, font as tkfont
 
-from dados import moeda, data_br, situacao
+from dados import data_br, reais, situacao
 from grafico import JanelaGrafico
 import demonstracao
 from componentes import centralizar
@@ -14,6 +14,16 @@ from ordenacao import ordenar
 from selecao import habilitar_selecao, pressionar_linha, arrastar
 from interacao import aplicar_formato, capitalizar_inicio, novo_menu, mostrar_menu, copiar_texto
 from mensagens import descrever_erro
+
+
+# Colunas de Minhas operações: título e alinhamento. Texto à esquerda, valores à direita e datas
+# centralizadas, como em uma planilha. A ordem aqui é a ordem na tela e nos valores de cada linha.
+COLUNAS_OPERACOES = {
+    'nome': ('Titular original', 'w'), 'data': ('Data de Aquisição', 'center'),
+    'custo': ('Valor de aquisição', 'e'), 'comissao': ('Comissão', 'e'), 'previsto': ('Valor Total RPV', 'e'),
+    'lucro': ('Lucro previsto', 'e'), 'conta': ('Conta de destino', 'w'), 'previsao': ('Previsão inicial', 'center'),
+    'previsao_atual': ('Previsão atual', 'center'), 'recebido': ('Recebido', 'center'),
+}
 
 
 class OperacoesMixin:
@@ -87,6 +97,17 @@ class OperacoesMixin:
                   text='Você está vendo dados de demonstração, com nomes e valores fictícios.').pack(side='left')
         ttk.Button(self.aviso_demonstracao,text='Apagar dados de demonstração',style='Demonstracao.TButton',
                    command=self.apagar_demonstracao).pack(side='right')
+        entrada_busca = self.criar_busca_e_filtros(corpo)
+        quadro = self.criar_tabela(corpo)
+        self.criar_rodape(corpo, quadro)
+        # Atalhos ficam na janela principal e só agem com a página de operações à frente.
+        for sequencia, acao in (('<Control-f>', entrada_busca.focus_set), ('<Control-n>', self.formulario),
+                                ('<F5>', self.atualizar)):
+            self.janela.bind(sequencia, lambda _, a=acao: a() if self.pagina_atual() is self.historico else None)
+        self.atualizar()
+        self.abrir_pagina(self.historico, 'Minhas operações')
+
+    def criar_busca_e_filtros(self, corpo):
         barra = self.barra_busca = ttk.Frame(corpo)
         barra.pack(fill='x', pady=(0, 12))
         ttk.Label(barra, text='Buscar nome ou data:').pack(side='left', padx=(0, 6))
@@ -104,19 +125,16 @@ class OperacoesMixin:
                                     command=self.atualizar, takefocus=False)
             botao.pack(side='left', padx=(0, 8))
             self.botoes_filtro[valor] = botao
+        return entrada_busca
 
+    def criar_tabela(self, corpo):
         quadro = ttk.Frame(corpo)
         quadro.pack(fill='both', expand=True)
-        colunas = ('nome', 'data', 'custo', 'comissao', 'previsto', 'lucro', 'conta', 'previsao', 'previsao_atual', 'recebido')
-        self.tabela = ttk.Treeview(quadro, style='Operacoes.Treeview', columns=colunas, show='headings', selectmode='browse')
-        titulos = ('Titular original', 'Data de Aquisição', 'Valor de aquisição', 'Comissão', 'Valor Total RPV',
-                   'Lucro previsto', 'Conta de destino', 'Previsão inicial', 'Previsão atual', 'Recebido')
+        self.tabela = ttk.Treeview(quadro, style='Operacoes.Treeview', columns=tuple(COLUNAS_OPERACOES),
+                                   show='headings', selectmode='browse')
         self.ordenacao = None
-        self.titulos_colunas = dict(zip(colunas, titulos))
-        # Texto à esquerda, valores à direita e datas centralizadas, como em uma planilha.
-        alinhamentos = {'nome': 'w', 'conta': 'w', 'custo': 'e', 'comissao': 'e', 'previsto': 'e', 'lucro': 'e'}
-        for coluna, titulo in zip(colunas, titulos):
-            alinhamento = alinhamentos.get(coluna, 'center')
+        self.titulos_colunas = {coluna: titulo for coluna, (titulo, _alinhamento) in COLUNAS_OPERACOES.items()}
+        for coluna, (titulo, alinhamento) in COLUNAS_OPERACOES.items():
             self.tabela.heading(coluna, text=titulo, anchor=alinhamento, command=lambda c=coluna: self.ordenar_coluna(c))
             largura = max(px(self.janela,280 if coluna=='nome' else 160),tkfont.Font(font=(self.fonte,18)).measure(titulo)+px(self.janela,40))
             self.tabela.column(coluna,width=largura,minwidth=100,anchor=alinhamento)
@@ -143,6 +161,9 @@ class OperacoesMixin:
         self.tabela.bind('<Button-3>', self.menu_historico)
         self.tabela.bind('<ButtonRelease-1>', self.clicar_historico)
         self.tabela.bind('<Double-1>', self.duplo_clique_historico)
+        return quadro
+
+    def criar_rodape(self, corpo, quadro):
         rodape = ttk.Frame(corpo)
         rodape.pack(side='bottom',fill='x',pady=(12,0),before=quadro)
         rodape.columnconfigure(0,weight=1)
@@ -172,12 +193,6 @@ class OperacoesMixin:
         aviso = ttk.Label(rodape,textvariable=self.texto_aviso_backup,style='BackupAviso.TLabel',cursor='hand2',wraplength=px(rodape,760))
         aviso.grid(row=2,column=0,sticky='w',padx=6)
         aviso.bind('<Button-1>',lambda _: self.exportar_backup())
-        # Atalhos ficam na janela principal e só agem com a página de operações à frente.
-        for sequencia, acao in (('<Control-f>', entrada_busca.focus_set), ('<Control-n>', self.formulario),
-                                ('<F5>', self.atualizar)):
-            self.janela.bind(sequencia, lambda _, a=acao: a() if self.pagina_atual() is self.historico else None)
-        self.atualizar()
-        self.abrir_pagina(self.historico, 'Minhas operações')
 
     def organizar_resumo(self, evento):
         colunas = 4 if evento.width >= 1100 else 2
@@ -195,6 +210,13 @@ class OperacoesMixin:
             rotulo.configure(wraplength=largura)
             for valor in cartao.winfo_children()[1:]:
                 valor.configure(wraplength=largura)
+
+    def colorir_linhas(self):
+        """Cores das linhas no tema atual: alternada, atrasada (vermelha) e recebida (verde)."""
+        c = cores()
+        self.tabela.tag_configure('alternada', background=c['linha'])
+        self.tabela.tag_configure('atrasada', foreground=c['vermelho'], background=c['atraso'])
+        self.tabela.tag_configure('recebida', foreground=c['verde'], background=c['recebida'])
 
     def atualizar(self):
         if self.historico is None or not self.historico.winfo_exists():
@@ -227,17 +249,15 @@ class OperacoesMixin:
                 widget.destroy()
         self.acoes_linhas.clear()
         self.tabela.delete(*self.tabela.get_children())
-        self.tabela.tag_configure('alternada',background=cores()['linha'])
-        self.tabela.tag_configure('atrasada',foreground=cores()['vermelho'],background=cores()['atraso'])
-        self.tabela.tag_configure('recebida',foreground=cores()['verde'],background=cores()['recebida'])
+        self.colorir_linhas()
         for indice,r in enumerate(registros):
             # Linha atrasada inteira em vermelho e recebida inteira em verde; o tom alternado não se aplica a elas.
             etiquetas = (('atrasada',) if str(r['id']) in self.atrasadas else ('recebida',) if r['recebimento']
                          else ('alternada',) if indice%2 else ())
             self.tabela.insert('', 'end', iid=str(r['id']), tags=etiquetas, values=(
-                r['nome'], data_br(r['aquisicao']), 'R$ ' + moeda(r['custo']),
-                'R$ ' + moeda(r['comissao'] or 0),
-                'R$ ' + moeda(r['previsto']), 'R$ ' + moeda(r['previsto'] - r['custo']),
+                r['nome'], data_br(r['aquisicao']), reais(r['custo']),
+                reais(r['comissao'] or 0),
+                reais(r['previsto']), reais(r['previsto'] - r['custo']),
                 r['conta'], data_br(r['previsao']), data_br(r['previsao_atual']),
                 ''))
         disponiveis = set(self.tabela.get_children())
@@ -246,9 +266,9 @@ class OperacoesMixin:
             self.tabela.focus(foco)
         self.agendar_acoes()
         self.indicadores_resumo['registros'].set(str(len(registros)))
-        self.indicadores_resumo['previsto'].set('R$ '+moeda(sum(r['previsto']-r['custo'] for r in registros)))
-        self.indicadores_resumo['realizado'].set('R$ '+moeda(sum(r['previsto']-r['custo'] for r in registros if r['recebimento'])))
-        self.indicadores_resumo['aberto'].set('R$ '+moeda(sum(r['custo'] for r in registros if not r['recebimento'])))
+        self.indicadores_resumo['previsto'].set(reais(sum(r['previsto']-r['custo'] for r in registros)))
+        self.indicadores_resumo['realizado'].set(reais(sum(r['previsto']-r['custo'] for r in registros if r['recebimento'])))
+        self.indicadores_resumo['aberto'].set(reais(sum(r['custo'] for r in registros if not r['recebimento'])))
         # Com a lixeira aberta ao lado, o que acabou de ser excluído aparece nela na hora.
         if self.janela_lixeira is not None and self.janela_lixeira.winfo_exists():
             self.janela_lixeira.atualizar_lista()

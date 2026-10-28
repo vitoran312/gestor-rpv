@@ -23,6 +23,10 @@ class NavegacaoMixin:
         while self.paginas and self.paginas[-1] is not pagina:
             self.paginas[-1].destroy()
 
+    def janela_ativa(self):
+        """Janela onde abrir diálogos: Minhas operações, se estiver aberta, ou a janela principal."""
+        return self.historico if self.historico is not None and self.historico.winfo_exists() else self.janela
+
     def voltar(self, _evento=None):
         if self.paginas:
             self.paginas[-1].destroy()

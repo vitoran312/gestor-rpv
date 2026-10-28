@@ -7,16 +7,23 @@ from tkinter import ttk, messagebox
 from componentes import centralizar, AreaRolavel
 from visual import px
 from selecao import habilitar_selecao, pressionar_linha, arrastar
-from dados import validar_cpf, ESTADOS
+from dados import ESTADOS, TITULOS_CONTA, validar_cpf
 from interacao import aplicar_formato, aplicar_cpf, capitalizar_inicio, formatar_cpf, novo_menu, mostrar_menu, copiar_texto
 from mensagens import descrever_erro
 
 
 def dados_para_copiar(conta):
-    campos = (('nome', 'Nome completo'), ('cpf', 'CPF'), ('endereco', 'Endereço'),
-              ('numero_endereco', 'Número do endereço'), ('cidade', 'Cidade'), ('estado', 'Estado'),
-              ('banco', 'Banco'), ('agencia', 'Agência'), ('numero', 'Conta'), ('pix', 'Chave Pix'))
-    return '\n'.join(f'{titulo}: {(formatar_cpf(conta[chave]) if chave == "cpf" and conta.get(chave) else conta.get(chave)) or "Não informado"}' for chave, titulo in campos)
+    # Fora do formulário, alguns rótulos precisam dizer mais (o "Número" sozinho seria ambíguo no texto copiado).
+    rotulos = dict(TITULOS_CONTA, numero_endereco='Número do endereço', estado='Estado', banco='Banco', numero='Conta')
+    linhas = []
+    for chave, titulo in rotulos.items():
+        if chave == 'identificacao':
+            continue  # O apelido da conta não é um dado bancário.
+        valor = conta.get(chave)
+        if chave == 'cpf' and valor:
+            valor = formatar_cpf(valor)
+        linhas.append(f'{titulo}: {valor or "Não informado"}')
+    return '\n'.join(linhas)
 
 
 class JanelaContas:
@@ -202,11 +209,9 @@ class JanelaContas:
         area.pack(fill='both',expand=True)
         quadro = area.conteudo
         campos = {}
-        definicoes = (('identificacao', 'Identificação (ex.: Vitor)'), ('nome', 'Nome completo'),
-                      ('cpf', 'CPF'), ('endereco', 'Endereço'), ('numero_endereco', 'Número'),
-                      ('cidade', 'Cidade'), ('estado', 'Estado (UF)'), ('banco', 'Nome do banco'),
-                      ('agencia', 'Agência'), ('numero', 'Conta bancária'), ('pix', 'Chave Pix'))
-        for linha, (chave, titulo) in enumerate(definicoes):
+        for linha, (chave, titulo) in enumerate(TITULOS_CONTA.items()):
+            if chave == 'identificacao':
+                titulo += ' (ex.: Conta principal)'
             ttk.Label(quadro, text=titulo).grid(row=linha, column=0, sticky='w', padx=(0, 16), pady=6)
             campos[chave] = tk.StringVar(value=(conta[chave] or '') if conta else '')
             if chave == 'estado':
@@ -219,7 +224,7 @@ class JanelaContas:
             elif chave in ('identificacao', 'nome', 'endereco', 'cidade', 'banco'):
                 aplicar_formato(entrada, campos[chave], str.title if chave in ('nome', 'endereco', 'cidade') else capitalizar_inicio)
         ttk.Label(quadro, text='Alterações não modificam os dados de recebimento guardados nas RPVs antigas.',
-                  wraplength=px(quadro, 600)).grid(row=11, column=0, columnspan=2, pady=12)
+                  wraplength=px(quadro, 600)).grid(row=len(TITULOS_CONTA), column=0, columnspan=2, pady=12)
 
         def salvar():
             try:

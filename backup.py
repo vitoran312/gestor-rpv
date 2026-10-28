@@ -171,7 +171,7 @@ def criar_backup(banco, pasta, prefixo='GestorRPV-', exigir_senha=True):
         zip_temporario = trabalho / 'pacote.tmp'
         with ZipFile(zip_temporario, 'w', ZIP_DEFLATED) as pacote:
             pacote.write(copia, 'banco.sqlite3')
-            documentos = banco.caminho.parent / 'documentos'
+            documentos = banco.pasta_documentos
             if documentos.is_symlink():
                 raise ValueError('A pasta de documentos não pode ser um atalho simbólico.')
             # Só entram os anexos cadastrados; arquivos soltos na pasta não fazem parte dos dados.
@@ -364,7 +364,7 @@ class BackupPreparado:
             trabalho = Path(temporaria)
             novos = trabalho / 'documentos_novos'
             antigos = trabalho / 'documentos_anteriores'
-            destino = banco.caminho.parent / 'documentos'
+            destino = banco.pasta_documentos
             if destino.is_symlink():
                 raise ValueError('A pasta atual de documentos não pode ser um atalho simbólico.')
             shutil.copytree(self.pasta / 'documentos', novos)

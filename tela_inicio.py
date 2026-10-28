@@ -12,7 +12,7 @@ from arte_inicio import ArteVidro, LuzesFundo, Relogio
 from dados import situacao
 from tema import cores, modo_atual, PALETAS
 from versao import VERSAO
-from visual import Icone, _png_arredondado, px
+from visual import Icone, _png_arredondado, misturar, px
 
 # Tamanho máximo da composição da tela inicial (em pixels a 100% de escala), nas proporções de referência.
 COMPOSICAO = (1420, 900)
@@ -22,12 +22,6 @@ ATALHOS = (
     ('historico', 'Tudo sob controle', 'Consulte valores, acompanhe prazos\ne confirme seus recebimentos.', 'Minhas operações'),
     ('contas', 'Contas de recebimento', 'Mantenha seus dados bancários\norganizados e sempre à mão.', 'Contas de recebimento'),
 )
-
-
-def misturar(base, destino, peso):
-    a = tuple(int(base[i:i + 2], 16) for i in (1, 3, 5))
-    b = tuple(int(destino[i:i + 2], 16) for i in (1, 3, 5))
-    return '#%02x%02x%02x' % tuple(round(x + (y - x) * peso) for x, y in zip(a, b))
 
 
 def cores_superficie(paleta, tipo):

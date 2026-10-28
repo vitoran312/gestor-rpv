@@ -4,7 +4,7 @@ from datetime import date
 from tkinter import ttk
 
 from tema import cores
-from visual import familia_fonte, px
+from visual import familia_fonte, misturar, px
 
 MESES = ('jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez')
 LARGURA_MAXIMA = 1000  # O gráfico não estica além disso, mesmo com a janela maximizada.
@@ -46,11 +46,6 @@ def escala(maximo):
             if fator * potencia * 4 >= maximo:
                 return fator * potencia * 4
         potencia *= 10
-
-
-def misturar(cor, destino, peso):
-    a, b = (int(cor[i:i + 2], 16) for i in (1, 3, 5)), (int(destino[i:i + 2], 16) for i in (1, 3, 5))
-    return '#' + ''.join(f'{round(x + (y - x) * peso):02x}' for x, y in zip(a, b))
 
 
 class GraficoMensal(tk.Canvas):

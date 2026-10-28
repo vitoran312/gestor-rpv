@@ -150,7 +150,7 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
         tela.withdraw()
         tela.title('Sobre o Gestor de RPV')
         tela.resizable(False,False)
-        tela.transient(self.historico if self.historico is not None and self.historico.winfo_exists() else self.janela)
+        tela.transient(self.janela_ativa())
         corpo = ttk.Frame(tela,padding=30)
         corpo.pack(fill='both',expand=True)
         ttk.Label(corpo,image=self.janela._marca_vitoran).pack(pady=(0,12))
@@ -202,9 +202,7 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
         if self.icone_lixeira is not None:
             self.desenhar_icone_lixeira()
         if self.tabela is not None and self.tabela.winfo_exists():
-            self.tabela.tag_configure('alternada',background=c['linha'])
-            self.tabela.tag_configure('atrasada',foreground=c['vermelho'],background=c['atraso'])
-            self.tabela.tag_configure('recebida',foreground=c['verde'],background=c['recebida'])
+            self.colorir_linhas()
         if self.janela_contas is not None and self.janela_contas.tela.winfo_exists():
             self.janela_contas.atualizar_situacoes()
 

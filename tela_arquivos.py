@@ -65,7 +65,7 @@ class ArquivosMixin:
             self.janela.after_cancel(agendamento)
 
     def configurar_backup_automatico(self):
-        pai = self.historico if self.historico is not None and self.historico.winfo_exists() else self.janela
+        pai = self.janela_ativa()
         tela = tk.Toplevel(pai)
         tela.withdraw()
         tela.title('Backup automático')
@@ -196,7 +196,7 @@ class ArquivosMixin:
         return bool(salva)
 
     def exportar_backup(self):
-        pai = self.historico if self.historico is not None and self.historico.winfo_exists() else self.janela
+        pai = self.janela_ativa()
         if not self.garantir_senha_backup(pai):
             return
         pasta = filedialog.askdirectory(parent=pai, title='Escolha onde salvar o backup')
@@ -259,7 +259,7 @@ class ArquivosMixin:
                             parent=self.historico)
 
     def exportar_excel(self):
-        pai = self.historico if self.historico is not None and self.historico.winfo_exists() else self.janela
+        pai = self.janela_ativa()
         registros = self.banco.listar()
         if not registros:
             messagebox.showinfo('Exportar para Excel', 'Ainda não há operações para exportar.', parent=pai)
@@ -279,9 +279,9 @@ class ArquivosMixin:
                             f'{len(registros)} operação(ões) exportada(s) para:\n{destino}', parent=pai)
 
     def abrir_pasta_documentos(self):
-        pai = self.historico if self.historico is not None and self.historico.winfo_exists() else self.janela
+        pai = self.janela_ativa()
         try:
-            pasta = self.banco.caminho.parent / 'documentos'
+            pasta = self.banco.pasta_documentos
             pasta.mkdir(parents=True,exist_ok=True)
             abrir_pasta(pasta)
         except (OSError,ValueError) as erro:

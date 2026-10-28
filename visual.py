@@ -34,6 +34,11 @@ def _rgb(cor):
     return tuple(int(cor[i:i+2],16) for i in (1,3,5))
 
 
+def misturar(cor, destino, peso):
+    """Cor entre `cor` (peso 0) e `destino` (peso 1), em #rrggbb."""
+    return '#' + ''.join(f'{round(x + (y - x) * peso):02x}' for x, y in zip(_rgb(cor), _rgb(destino)))
+
+
 @lru_cache(maxsize=8)
 def _mascara_arredondada(largura,altura,raio):
     """Cobertura do preenchimento e do contorno de 1 px, calculada uma vez por geometria."""
