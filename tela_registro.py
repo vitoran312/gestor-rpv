@@ -7,12 +7,13 @@ from tkinter import messagebox, ttk, filedialog
 
 from dados import centavos, moeda, data_iso, data_br, previsao_por_prazo, reais
 from visual import px
-from componentes import CampoMoeda, CampoData, centralizar, AreaRolavel, BalaoAjuda
+from componentes import CampoMoeda, CampoData, centralizar, AreaRolavel, BalaoAjuda, fechar_com_confirmacao
 from contas import dados_para_copiar
 from tema import cores
 from documentos import validar_anexo, abrir_arquivo
 from interacao import aplicar_formato, capitalizar_inicio, menu_copia
 from mensagens import descrever_erro
+import demonstracao
 
 
 # A janela de entrada é cerca de 30% maior que as demais: fontes de 10 para 13 pontos, campos e
@@ -43,22 +44,6 @@ def ampliar_formulario(widget, fonte):
 def pad(valor):
     return round(valor * AMPLIACAO) if isinstance(valor, int) else tuple(round(v * AMPLIACAO) for v in valor)
 
-
-
-def fechar_com_confirmacao(tela, estado):
-    """Cancelar, Esc e o X da janela só descartam sem perguntar quando nada foi alterado."""
-    inicial = estado()
-
-    def fechar(_evento=None):
-        if estado() != inicial and not messagebox.askyesno(
-                'Descartar alterações?', 'O que foi digitado e os anexos ainda não salvos serão perdidos. '
-                'Fechar mesmo assim?', parent=tela, icon='warning', default='no'):
-            return
-        tela.destroy()
-
-    tela.protocol('WM_DELETE_WINDOW', fechar)
-    tela.bind('<Escape>', fechar)
-    return fechar
 
 
 def criar_campos_principais(quadro, registro, conta_inicial, mapa_contas, modo_previsao):
@@ -228,10 +213,7 @@ class RegistroMixin:
     def formulario(self, identificador=None):
         # Um formulário por vez: Ctrl+N repetido (ou a tecla presa) traz o que já está aberto,
         # em vez de abrir outro e salvar a mesma entrada duas vezes.
-        if self.janela_formulario is not None and self.janela_formulario.winfo_exists():
-            self.janela_formulario.deiconify()
-            self.janela_formulario.lift()
-            self.janela_formulario.focus_set()
+        if self.trazer_se_aberta(self.janela_formulario):
             return
         registro = self.banco.obter(identificador) if identificador else None
         contas=list(self.banco.contas(somente_ativas=True))
@@ -298,12 +280,13 @@ class RegistroMixin:
             dados['conta_id'] = mapa_contas.get(dados['conta'])
             dados['observacoes'] = observacoes.get('1.0', 'end-1c').strip()
             try:
-                self.banco.salvar(dados, identificador, anexos=anexos_pendentes)
+                salvo = self.banco.salvar(dados, identificador, anexos=anexos_pendentes)
+                demonstracao.adotar(self.banco, operacao=salvo)
             except ValueError as erro:
                 messagebox.showerror('Confira o cadastro', descrever_erro(erro), parent=tela)
                 return
-            except (sqlite3.Error,OSError):
-                messagebox.showerror('Não foi possível salvar', 'Confira o acesso à pasta de dados e tente novamente.', parent=tela)
+            except (sqlite3.Error,OSError) as erro:
+                messagebox.showerror('Não foi possível salvar', descrever_erro(erro), parent=tela)
                 return
             self.atualizar()
             tela.destroy()
@@ -479,7 +462,9 @@ class RegistroMixin:
         if registro is None:
             self.atualizar()
             return
-        tela = tk.Toplevel(self.historico)
+        if self.trazer_se_aberta(self.janela_recebimento):
+            return
+        tela = self.janela_recebimento = tk.Toplevel(self.historico)
         tela.withdraw()
         tela.title('Recebimento')
         tela.configure(bg=cores()['fundo'])
@@ -536,7 +521,9 @@ class RegistroMixin:
         if registro is None:
             self.atualizar()
             return
-        tela = tk.Toplevel(self.historico)
+        if self.trazer_se_aberta(self.janela_previsao):
+            return
+        tela = self.janela_previsao = tk.Toplevel(self.historico)
         tela.withdraw()
         tela.title('Previsão atual')
         tela.configure(bg=cores()['fundo'])

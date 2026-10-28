@@ -68,11 +68,16 @@ class TestContas(unittest.TestCase):
                 self.banco.salvar_conta(dados_conta(cpf=cpf))
 
     def test_pix_de_telefone_com_ou_sem_ddi_e_a_mesma_chave(self):
-        from dados import chave_pix
-        self.assertEqual(chave_pix('+55 (11) 99999-9999'), chave_pix('(11) 99999-9999'))
-        self.assertEqual(chave_pix('55 11 3333-4444'), chave_pix('11 3333-4444'))
-        self.assertEqual(chave_pix('529.982.247-25'), '52998224725')        # CPF continua igual.
-        self.assertEqual(chave_pix('55.123.456/0001-00'.replace('/', '')), '55123456000100')  # CNPJ também.
+        from dados import mesma_chave_pix
+        for uma, outra, mesma in (('+55 (11) 99999-9999', '(11) 99999-9999', True),
+                                  ('55 11 3333-4444', '11 3333-4444', True),
+                                  ('529.982.247-25', '52998224725', True),
+                                  ('12.345.678/0001-95', '12345678000195', True),
+                                  ('123.456.789-09', '(12) 34567-8909', False),   # CPF e celular com os mesmos dígitos.
+                                  ('Teste@Exemplo.com', 'teste@exemplo.com', True),
+                                  ('', '', False)):
+            with self.subTest(uma=uma, outra=outra):
+                self.assertEqual(mesma_chave_pix(uma, outra), mesma)
         self.banco.salvar_conta(dados_conta(pix='+55 (11) 99999-9999'))
         with self.assertRaisesRegex(ValueError, 'chave Pix já está cadastrada'):
             self.banco.salvar_conta(dados_conta(identificacao='Outra', numero='999-1', cpf='11144477735',

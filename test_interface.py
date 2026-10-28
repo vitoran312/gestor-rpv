@@ -366,6 +366,20 @@ class TestInterface(unittest.TestCase):
         custo.entrada.event_generate('<<Paste>>')
         self.root.update()
         self.assertEqual(custo.variavel.get(), '15.236,59')
+        # Colar troca o valor inteiro, mesmo com o cursor no fim do campo; número sem vírgula são reais.
+        for colado, resultado in (('5,00', '5,00'), ('1500', '1.500,00'), ('15.236,59', '15.236,59')):
+            custo.entrada.selection_clear()
+            custo.entrada.icursor(tk.END)
+            custo.entrada.clipboard_clear()
+            custo.entrada.clipboard_append(colado)
+            custo.entrada.event_generate('<<Paste>>')
+            self.root.update()
+            self.assertEqual(custo.variavel.get(), resultado)
+        custo.entrada.clipboard_clear()
+        custo.entrada.clipboard_append('9' * 20)
+        with patch.object(messagebox, 'showwarning') as aviso:
+            custo.entrada.event_generate('<<Paste>>')
+        self.assertIn('valor máximo', aviso.call_args.args[1])
         nome = next(w for w in filhos(form) if isinstance(w, ttk.Entry))
         nome.insert(0, 'Titular Teste')
         datas = [w for w in filhos(form) if isinstance(w, CampoData)]
@@ -619,7 +633,7 @@ class TestInterface(unittest.TestCase):
         moedas[0].entrada.clipboard_append('1e9')
         with patch.object(messagebox, 'showwarning') as aviso:
             moedas[0].entrada.event_generate('<<Paste>>')
-        self.assertIn('não é um valor em reais', aviso.call_args.args[1])
+        self.assertIn('não foi colado', aviso.call_args.args[1])
         self.assertEqual(moedas[0].variavel.get(), '0,00')
 
     def test_fechar_formulario_alterado_pergunta_antes_de_descartar(self):

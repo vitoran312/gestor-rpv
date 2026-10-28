@@ -88,6 +88,33 @@ class TestDemonstracao(unittest.TestCase):
         self.assertEqual([c['identificacao'] for c in banco.contas()], ['Minha conta'])
         self.assertFalse(arquivo.exists())
 
+    def test_registro_editado_ou_cadastrado_pela_pessoa_deixa_de_ser_ficticio(self):
+        banco = Banco(self.caminho)
+        demonstracao.carregar(banco)
+        editada = banco.listar()[0]
+        banco.salvar(dict(editada, observacoes='Meu cliente de verdade'), editada['id'])
+        demonstracao.adotar(banco, operacao=editada['id'])
+        # Número reaproveitado com o mesmo nome fictício: o cadastro é da pessoa.
+        ultima = max(r['id'] for r in banco.listar())
+        nome = banco.obter(ultima)['nome']
+        banco.excluir(ultima)
+        banco.excluir_permanentemente([ultima])
+        conta = banco.contas()[0]
+        recadastrada = banco.salvar(dados_rpv(nome=nome, conta_id=conta['id']))
+        demonstracao.adotar(banco, operacao=recadastrada)
+        demonstracao.adotar(banco, conta=conta['id'])
+        demonstracao.remover(banco)
+        self.assertEqual(sorted(r['id'] for r in banco.listar()), sorted([editada['id'], recadastrada]))
+        self.assertEqual([c['id'] for c in banco.contas()], [conta['id']])
+
+    def test_carga_que_falha_no_meio_nao_deixa_nada_ficticio(self):
+        banco = Banco(self.caminho)
+        with patch.object(banco, 'registrar_recebimento', side_effect=ValueError('falha simulada')):
+            with self.assertRaises(ValueError):
+                demonstracao.carregar(banco)
+        self.assertEqual((banco.listar(), banco.contas()), ([], []))
+        self.assertFalse(demonstracao.ativa(banco))
+
 
 if __name__ == '__main__':
     unittest.main()

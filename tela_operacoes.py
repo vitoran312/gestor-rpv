@@ -449,11 +449,8 @@ class OperacoesMixin:
             self.icone_lixeira.put(cor,to=retangulo)
 
     def mostrar_lixeira(self):
-        if self.janela_lixeira is not None and self.janela_lixeira.winfo_exists():
+        if self.trazer_se_aberta(self.janela_lixeira):
             self.janela_lixeira.atualizar_lista()
-            self.janela_lixeira.deiconify()
-            self.janela_lixeira.lift()
-            self.janela_lixeira.focus_set()
             return
         tela = self.janela_lixeira = tk.Toplevel(self.historico)
         tela.withdraw()

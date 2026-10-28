@@ -51,6 +51,8 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
         self.grafico_mensal = None
         self.janela_formulario = None
         self.janela_lixeira = None
+        self.janela_recebimento = None
+        self.janela_previsao = None
         # Criados pelas telas quando são abertas; até lá, quem os usa confere se já existem.
         self.texto_alternar_tema = None   # Tela inicial.
         self.tabela = None                # Minhas operações.
@@ -137,18 +139,12 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
         self.janela_contas = JanelaContas(self)
 
     def abrir_calculadora(self):
-        if self.calculadora is not None and self.calculadora.tela.winfo_exists():
-            self.calculadora.tela.deiconify()
-            self.calculadora.tela.lift()
-            self.calculadora.tela.focus_set()
+        if self.calculadora is not None and self.trazer_se_aberta(self.calculadora.tela):
             return
         self.calculadora = JanelaCalculadora(self.janela)
 
     def mostrar_sobre(self):
-        if self.sobre is not None and self.sobre.winfo_exists():
-            self.sobre.deiconify()
-            self.sobre.lift()
-            self.sobre.focus_set()
+        if self.trazer_se_aberta(self.sobre):
             return
         tela = self.sobre = tk.Toplevel(self.janela)
         tela.withdraw()

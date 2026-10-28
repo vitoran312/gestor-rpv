@@ -49,6 +49,22 @@ def formatar_digitacao_moeda(texto):
     return moeda(centavos(texto))
 
 
+def fechar_com_confirmacao(tela, estado):
+    """Cancelar, Esc e o X da janela só descartam sem perguntar quando nada foi alterado."""
+    inicial = estado()
+
+    def fechar(_evento=None):
+        if estado() != inicial and not messagebox.askyesno(
+                'Descartar alterações?', 'O que foi digitado e os anexos ainda não salvos serão perdidos. '
+                'Fechar mesmo assim?', parent=tela, icon='warning', default='no'):
+            return
+        tela.destroy()
+
+    tela.protocol('WM_DELETE_WINDOW', fechar)
+    tela.bind('<Escape>', fechar)
+    return fechar
+
+
 class CampoMoeda(ttk.Frame):
     def __init__(self, pai, variavel):
         super().__init__(pai, style='Dinheiro.TFrame', padding=(8, 1))
@@ -120,15 +136,19 @@ class CampoMoeda(ttk.Frame):
     def colar(self, _evento=None):
         try:
             texto = self.entrada.clipboard_get().strip()
-            valor = formatar_digitacao_moeda(texto)
+            # Colado vem como está escrito em outro lugar: "1500" são mil e quinhentos reais, não centavos.
+            valor = moeda(centavos(texto))
         except tk.TclError:
             self.entrada.bell()
             return 'break'
-        except ValueError:
-            messagebox.showwarning('Valor colado', f'"{texto[:40]}" não é um valor em reais. Use, por exemplo, '
-                                   '1.500,00.', parent=self.entrada.winfo_toplevel())
+        except ValueError as erro:
+            messagebox.showwarning('Valor colado', f'"{texto[:40]}" não foi colado. {erro} '
+                                   'Exemplo de valor aceito: 1.500,00.', parent=self.entrada.winfo_toplevel())
             return 'break'
-        return self.editar('Inserir', ''.join(c for c in valor if c.isdigit()).lstrip('0') or '0')
+        # Colar troca o valor inteiro: juntar os dígitos colados aos que já estavam criaria outro valor sem aviso.
+        self.variavel.set(valor)
+        self.entrada.icursor(tk.END)
+        return 'break'
 
     def recortar(self, _evento=None):
         if self.entrada.selection_present():

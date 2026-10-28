@@ -23,6 +23,15 @@ class NavegacaoMixin:
         while self.paginas and self.paginas[-1] is not pagina:
             self.paginas[-1].destroy()
 
+    def trazer_se_aberta(self, janela):
+        """Janelas de uma instância só: se `janela` ainda está aberta, vem para a frente e devolve True."""
+        if janela is None or not janela.winfo_exists():
+            return False
+        janela.deiconify()
+        janela.lift()
+        janela.focus_set()
+        return True
+
     def janela_ativa(self):
         """Janela onde abrir diálogos: Minhas operações, se estiver aberta, ou a janela principal."""
         return self.historico if self.historico is not None and self.historico.winfo_exists() else self.janela

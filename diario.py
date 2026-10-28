@@ -5,6 +5,7 @@ pôde ser apagado, erro inesperado num botão — ficam anotadas aqui para quem 
 No executável não há console, então sem este arquivo esses erros sumiriam.
 """
 import logging
+import traceback
 from logging.handlers import RotatingFileHandler
 
 log = logging.getLogger('gestor')
@@ -20,5 +21,8 @@ def ativar(pasta):
 
 
 def erro_na_interface(tipo, valor, rastro):
-    """Para Tk.report_callback_exception: anota erros não tratados dos botões e eventos."""
-    log.error('Erro não tratado na interface', exc_info=(tipo, valor, rastro))
+    """Para Tk.report_callback_exception: anota erros não tratados dos botões e eventos.
+
+    Só o tipo do erro e as linhas do programa: a mensagem pode conter o que a pessoa digitou (nomes, CPFs).
+    """
+    log.error('Erro não tratado na interface (%s):\n%s', tipo.__name__, ''.join(traceback.format_tb(rastro)).rstrip())

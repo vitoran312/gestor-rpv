@@ -2,6 +2,8 @@
 import errno
 import sqlite3
 
+from diario import log
+
 TEXTOS_OSERROR = {
     errno.ENOSPC: 'Não há espaço livre suficiente no disco.',
     errno.EACCES: 'Sem permissão para usar este local. Se o arquivo estiver aberto em outro programa, feche-o e tente de novo.',
@@ -17,7 +19,12 @@ TEXTOS_OSERROR = {
 
 
 def descrever_erro(erro):
-    """Texto para mostrar ao usuário. ValueError já sai do aplicativo em português."""
+    """Texto para mostrar ao usuário. ValueError já sai do aplicativo em português.
+
+    Falhas do sistema e do banco ficam anotadas no diário (só o tipo e o código, sem dados digitados).
+    """
+    if not isinstance(erro, ValueError):
+        log.warning('Falha mostrada na tela: %s (código %s)', type(erro).__name__, getattr(erro, 'errno', '-'))
     if isinstance(erro, ValueError):
         return str(erro)
     if isinstance(erro, sqlite3.Error):

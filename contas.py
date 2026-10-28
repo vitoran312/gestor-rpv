@@ -4,12 +4,13 @@ import sqlite3
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-from componentes import centralizar, AreaRolavel
+from componentes import centralizar, AreaRolavel, fechar_com_confirmacao
 from visual import px
 from selecao import habilitar_selecao, pressionar_linha, arrastar
 from dados import ESTADOS, TITULOS_CONTA, validar_cpf
 from interacao import aplicar_formato, aplicar_cpf, capitalizar_inicio, formatar_cpf, novo_menu, mostrar_menu, copiar_texto
 from mensagens import descrever_erro
+import demonstracao
 
 
 def dados_para_copiar(conta):
@@ -228,15 +229,16 @@ class JanelaContas:
 
         def salvar():
             try:
-                self.banco.salvar_conta({k: v.get() for k, v in campos.items()}, identificador)
+                salva = self.banco.salvar_conta({k: v.get() for k, v in campos.items()}, identificador)
+                demonstracao.adotar(self.banco, conta=salva)
             except ValueError as erro:
                 messagebox.showerror('Confira a conta', descrever_erro(erro), parent=tela)
                 return
             except sqlite3.IntegrityError:
                 messagebox.showerror('Confira a conta', 'Já existe uma conta com esses dados únicos.', parent=tela)
                 return
-            except sqlite3.Error:
-                messagebox.showerror('Contas de recebimento', 'Não foi possível salvar a conta.', parent=tela)
+            except sqlite3.Error as erro:
+                messagebox.showerror('Contas de recebimento', 'Não foi possível salvar a conta. ' + descrever_erro(erro), parent=tela)
                 return
             self.atualizar()
             tela.destroy()
@@ -244,9 +246,9 @@ class JanelaContas:
         ttk.Separator(tela).pack(fill='x',padx=24)
         botoes = ttk.Frame(tela,padding=(24,8,24,12))
         botoes.pack(fill='x')
-        ttk.Button(botoes, text='Cancelar', command=tela.destroy).pack(side='left',expand=True,fill='x',padx=(0,8))
+        fechar = fechar_com_confirmacao(tela, lambda: tuple(variavel.get() for variavel in campos.values()))
+        ttk.Button(botoes, text='Cancelar', command=fechar).pack(side='left',expand=True,fill='x',padx=(0,8))
         ttk.Button(botoes, text='Salvar conta', style='Salvar.TButton', command=salvar).pack(side='left',expand=True,fill='x')
         centralizar(tela)
         tela.deiconify()
         tela.grab_set()
-        tela.bind('<Escape>', lambda _: tela.destroy())

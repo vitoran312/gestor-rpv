@@ -26,6 +26,7 @@ CONSULTA_RPVS = '''SELECT r.*,
 
 
 MANTER_BACKUPS = 10
+VALOR_MAXIMO = Decimal('999999999999.99')
 PREFIXO_EXCLUSAO = '.excluir-rpv-'  # Pasta de trabalho da exclusão de anexos; sobras são limpas na abertura.
 LIMITE_NOME, LIMITE_OBSERVACOES = 150, 5000
 VERSAO_BANCO = 8  # PRAGMA user_version gravado pela versão atual do esquema.
@@ -99,12 +100,16 @@ def centavos(texto):
         if not re.fullmatch(r'[0-9]+(\.[0-9]+)?', texto):
             raise ValueError
         valor = Decimal(texto)
-        if not valor.is_finite() or valor < 0 or valor > Decimal('999999999999.99'):
-            raise ValueError
+        if valor > VALOR_MAXIMO:
+            raise ValueError(f'O valor máximo é R$ {moeda(int(VALOR_MAXIMO * 100))}.')
         if valor != valor.quantize(Decimal('.01')):
             raise ValueError
         return int(valor * 100)
-    except (InvalidOperation, ValueError):
+    except ValueError as erro:
+        if str(erro):
+            raise
+        raise ValueError('Informe um valor positivo ou zero, com até duas casas decimais.') from None
+    except InvalidOperation:
         raise ValueError('Informe um valor positivo ou zero, com até duas casas decimais.') from None
 
 
@@ -201,15 +206,29 @@ def validar_cpf(texto):
 
 
 def chave_pix(texto):
+    """Forma comparável de uma chave Pix: (tipo, valor).
+
+    Chaves só com números são comparadas pelos dígitos. O tipo vem da pontuação: "." ou "/" indicam CPF ou
+    CNPJ; parênteses, "+" ou espaços indicam telefone; só dígitos (e hífen) podem ser qualquer um dos dois.
+    """
     texto = texto.strip().casefold()
-    if re.fullmatch(r'[0-9+ ().-]+', texto):
-        digitos = re.sub(r'\D', '', texto)
-        # Telefone com DDI do Brasil (12 ou 13 dígitos começando por 55) é a mesma chave sem o +55.
-        # CPF (11) e CNPJ (14) têm outros tamanhos e não são afetados.
-        if len(digitos) in (12, 13) and digitos.startswith('55'):
-            digitos = digitos[2:]
-        return digitos
-    return texto
+    if not re.fullmatch(r'[0-9+ ().\-/]+', texto):
+        return 'texto', texto
+    digitos = re.sub(r'\D', '', texto)
+    tipo = 'documento' if re.search(r'[./]', texto) else 'telefone' if re.search(r'[()+ ]', texto) else 'numero'
+    # Telefone com DDI do Brasil (12 ou 13 dígitos começando por 55) é a mesma chave sem o +55.
+    # CPF (11) e CNPJ (14) têm outros tamanhos e não são afetados.
+    if tipo != 'documento' and len(digitos) in (12, 13) and digitos.startswith('55'):
+        digitos = digitos[2:]
+    return tipo, digitos
+
+
+def mesma_chave_pix(uma, outra):
+    (tipo_a, valor_a), (tipo_b, valor_b) = chave_pix(uma), chave_pix(outra)
+    if not valor_a or valor_a != valor_b:
+        return False
+    # CPF e celular podem ter os mesmos 11 dígitos sem serem a mesma chave.
+    return tipo_a == tipo_b or 'numero' in (tipo_a, tipo_b)
 
 
 class Banco:
@@ -418,7 +437,7 @@ class Banco:
                 if (conta['banco_chave'] == dados['banco_chave'] and conta['numero_chave'] == dados['numero_chave']
                     and (not conta['agencia_chave'] or not dados['agencia_chave'] or conta['agencia_chave'] == dados['agencia_chave'])):
                     raise ValueError('Essa conta bancária já está cadastrada.')
-                if chave_pix(conta['pix']) and chave_pix(conta['pix']) == chave_pix(dados['pix']):
+                if mesma_chave_pix(conta['pix'], dados['pix']):
                     raise ValueError('Essa chave Pix já está cadastrada em outra conta.')
             if identificador is None:
                 campos = ','.join(dados)
@@ -454,29 +473,49 @@ class Banco:
                 arquivo.unlink(missing_ok=True)
             raise
 
+    @staticmethod
+    def problemas_da_entrada(dados):
+        """Todas as regras de uma entrada, conferidas de uma vez: devolve a lista do que está errado.
+
+        As regras ficam aqui, e não só na interface, para valerem em qualquer caminho de gravação.
+        """
+        problemas = []
+        if not dados['nome']:
+            problemas.append('Informe o nome completo do titular original.')
+        elif len(dados['nome']) > LIMITE_NOME:
+            problemas.append(f'O nome do titular pode ter até {LIMITE_NOME} caracteres.')
+        if len(dados['observacoes']) > LIMITE_OBSERVACOES:
+            problemas.append(f'As observações podem ter até {LIMITE_OBSERVACOES} caracteres.')
+        datas_validas = True
+        for chave, rotulo in (('aquisicao', 'Data da aquisição'), ('previsao', 'Previsão de recebimento')):
+            try:
+                dados[chave] = validar_data_iso(dados[chave], rotulo)
+            except ValueError as erro:
+                problemas.append(str(erro))
+                datas_validas = False
+        if datas_validas:
+            if dados['aquisicao'] > date.today().isoformat():
+                problemas.append('A data da aquisição não pode estar no futuro.')
+            if dados['previsao'] < dados['aquisicao']:
+                problemas.append('A previsão não pode ser anterior à aquisição.')
+        if dados['comissao'] is not None and dados['comissao'] < 0:
+            problemas.append('A comissão não pode ser negativa.')
+        elif dados['comissao'] is not None and dados['comissao'] > dados['previsto']:
+            problemas.append('A comissão não pode superar o Valor Total RPV.')
+        if dados['custo'] <= 0:
+            problemas.append('O valor de aquisição deve ser maior que zero.')
+        elif dados['custo'] > dados['previsto']:
+            problemas.append('O valor de aquisição não pode superar o Valor Total RPV.')
+        return problemas
+
     def _salvar(self, dados, identificador, anexos, criados):
         dados = dict(dados)
         dados['nome'] = nome_formatado(dados['nome'])
+        problemas = self.problemas_da_entrada(dados)
+        if problemas:
+            raise ValueError('\n'.join(problemas))
+        # A maiúscula inicial vem depois da conferência do tamanho ("ß" vira "SS" e passaria do limite).
         dados['observacoes'] = dados['observacoes'][:1].upper() + dados['observacoes'][1:]
-        if not dados['nome']:
-            raise ValueError('Informe o nome completo do titular original.')
-        if len(dados['nome']) > LIMITE_NOME:
-            raise ValueError(f'O nome do titular pode ter até {LIMITE_NOME} caracteres.')
-        if len(dados['observacoes']) > LIMITE_OBSERVACOES:
-            raise ValueError(f'As observações podem ter até {LIMITE_OBSERVACOES} caracteres.')
-        # As regras ficam aqui, e não só na interface, para valerem em qualquer caminho de gravação.
-        dados['aquisicao'] = validar_data_iso(dados['aquisicao'], 'Data da aquisição')
-        dados['previsao'] = validar_data_iso(dados['previsao'], 'Previsão de recebimento')
-        if dados['aquisicao'] > date.today().isoformat():
-            raise ValueError('A data da aquisição não pode estar no futuro.')
-        if dados['previsao'] < dados['aquisicao']:
-            raise ValueError('A previsão não pode ser anterior à aquisição.')
-        if dados['comissao'] is not None and dados['comissao'] > dados['previsto']:
-            raise ValueError('A comissão não pode superar o Valor Total RPV.')
-        if dados['custo'] <= 0:
-            raise ValueError('O valor de aquisição deve ser maior que zero.')
-        if dados['custo'] > dados['previsto']:
-            raise ValueError('O valor de aquisição não pode superar o Valor Total RPV.')
         with self.conectar() as con:
             con.execute('BEGIN IMMEDIATE')
             anterior = con.execute('SELECT * FROM rpvs WHERE id=?', (identificador,)).fetchone() if identificador else None

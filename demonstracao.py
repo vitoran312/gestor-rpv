@@ -49,18 +49,43 @@ def carregar(banco, hoje=None):
     def data(iso):
         return (date.fromisoformat(iso) + deslocamento).isoformat() if iso else None
 
-    contas = [banco.salvar_conta(conta) for conta in CONTAS]
-    operacoes = []
+    contas, operacoes = [], []
+    try:
+        _carregar(banco, data, contas, operacoes)
+    except Exception:
+        # Carga pela metade: o que já entrou fica registrado e é removido, para não sobrar nada fictício.
+        banco.salvar_configuracao(CHAVE, json.dumps({'operacoes': operacoes, 'contas': contas}))
+        remover(banco)
+        raise
+    banco.salvar_configuracao(CHAVE, json.dumps({'operacoes': operacoes, 'contas': contas}))
+
+
+def _carregar(banco, data, contas, operacoes):
+    for conta in CONTAS:
+        contas.append(banco.salvar_conta(conta))
     for nome, aquisicao, custo, total, conta, previsao, atual, recebimento in OPERACOES:
         identificador = banco.salvar(dict(nome=nome, aquisicao=data(aquisicao), custo=custo, previsto=total,
                                           conta_id=contas[conta], conta='', previsao=data(previsao),
                                           comissao=None, observacoes='Operação fictícia de demonstração.'))
+        operacoes.append(identificador)
         if atual:
             banco.atualizar_previsao(identificador, data(atual))
         if recebimento:
             banco.registrar_recebimento(identificador, data(recebimento))
-        operacoes.append(identificador)
-    banco.salvar_configuracao(CHAVE, json.dumps({'operacoes': operacoes, 'contas': contas}))
+
+
+def adotar(banco, operacao=None, conta=None):
+    """Registro editado ou cadastrado pela pessoa deixa de ser fictício: "Apagar dados de demonstração" o preserva.
+
+    Cobre também o número reaproveitado pelo SQLite depois de uma exclusão definitiva.
+    """
+    registro = banco.configuracao(CHAVE)
+    if not registro:
+        return
+    ids = json.loads(registro)
+    novo = {'operacoes': [i for i in ids['operacoes'] if i != operacao], 'contas': [i for i in ids['contas'] if i != conta]}
+    if novo != ids:
+        banco.salvar_configuracao(CHAVE, json.dumps(novo))
 
 
 def ativa(banco):
@@ -71,8 +96,8 @@ def remover(banco):
     """Apaga só o que a demonstração criou; operações cadastradas pela pessoa continuam intactas.
 
     Os números guardados na carga não bastam: depois de uma exclusão definitiva, o SQLite pode dar o mesmo
-    número a um cadastro novo. Por isso só sai o registro que ainda tem o nome fictício (operações) ou o CPF
-    fictício (contas) da demonstração. Os anexos das operações apagadas saem junto.
+    número a um cadastro novo. Por isso só sai o registro que ainda está na lista (o que a pessoa salva pelo
+    formulário sai dela, em adotar) e ainda tem o nome fictício (operações) ou o CPF fictício (contas). Os anexos das operações apagadas saem junto.
     Se uma operação própria usar uma conta de demonstração, ela preserva a cópia dos dados bancários,
     como em qualquer conta removida.
     """
