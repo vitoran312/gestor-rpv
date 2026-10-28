@@ -24,7 +24,7 @@ class ArquivosMixin:
     def atualizar_ultimo_backup(self):
         quando=self.banco.ultimo_backup()
         aviso = aviso_backup(quando)
-        if aviso and getattr(self,'falha_backup_automatico',False):
+        if aviso and self.falha_backup_automatico:
             aviso = ('Defina a senha dos backups em Arquivo → Backup automático. ' if self.falha_backup_automatico == 'senha'
                      else 'O backup automático não conseguiu gravar na pasta escolhida. ') + aviso
         self.texto_aviso_backup.set(aviso)
@@ -32,7 +32,7 @@ class ArquivosMixin:
             data = datetime.fromisoformat(quando).astimezone().strftime('%d/%m/%Y') if quando else 'ainda não realizado'
         except (ValueError,TypeError):
             data = 'não disponível'
-        if hasattr(self,'texto_ultimo_backup'):
+        if self.texto_ultimo_backup is not None:
             automatico = ' · Backup automático semanal ativo' if self.banco.configuracao(PASTA_AUTOMATICA) else ''
             self.texto_ultimo_backup.set('Último backup: '+data+automatico)
 
@@ -264,7 +264,7 @@ class ArquivosMixin:
         if not registros:
             messagebox.showinfo('Exportar para Excel', 'Ainda não há operações para exportar.', parent=pai)
             return
-        if getattr(self, 'ordenacao', None):
+        if self.ordenacao:
             registros = ordenar(registros, *self.ordenacao)
         arquivo = filedialog.asksaveasfilename(parent=pai, title='Exportar operações para Excel',
             defaultextension='.xlsx', initialfile=nome_sugerido(), filetypes=[('Planilha do Excel', '*.xlsx')])

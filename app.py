@@ -48,6 +48,14 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
         self.grafico_mensal = None
         self.janela_formulario = None
         self.janela_lixeira = None
+        # Criados pelas telas quando são abertas; até lá, quem os usa confere se já existem.
+        self.texto_alternar_tema = None   # Tela inicial.
+        self.tabela = None                # Minhas operações.
+        self.menus = None
+        self.texto_ultimo_backup = None
+        self.icone_lixeira = None
+        self.ordenacao = None
+        self.falha_backup_automatico = False
         tema_salvo = self.banco.configuracao('tema', 'claro')
         self.modo_tema = tk.StringVar(value=tema_salvo if tema_salvo in ('claro', 'escuro') else 'claro')
         self.configurar_tema()
@@ -63,7 +71,6 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
         self.data_exibida = date.today()
         self.agendamento_data = janela.after(60 * 1000,self.vigiar_data)
         self.agendamento_tema = janela.after(1200,self.preparar_outro_tema)
-        self.falha_backup_automatico = False
         self.agendamento_backup = janela.after(1500,self.verificar_backup_automatico)
         janela.bind('<Destroy>',self.cancelar_agendamento_backup,add='+')
         centralizar(janela, 1480, 980)
@@ -109,7 +116,7 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
             pass  # Sem gravar a preferência, o tema escolhido continua valendo nesta execução.
 
     def atualizar_alternador_tema(self):
-        if hasattr(self,'texto_alternar_tema'):
+        if self.texto_alternar_tema is not None:
             self.texto_alternar_tema.set('Modo escuro' if self.modo_tema.get()=='claro' else 'Modo claro')
             self.botao_alternar_tema.configure(image=icone_tema(self.janela,self.modo_tema.get()))
 
@@ -192,9 +199,9 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
         self.janela.option_add('*TCombobox*Listbox.selectForeground',c['texto_selecao'])
         atualizar_widgets(self.janela)
         self.atualizar_alternador_tema()
-        if hasattr(self,'icone_lixeira'):
+        if self.icone_lixeira is not None:
             self.desenhar_icone_lixeira()
-        if hasattr(self,'tabela') and self.tabela.winfo_exists():
+        if self.tabela is not None and self.tabela.winfo_exists():
             self.tabela.tag_configure('alternada',background=c['linha'])
             self.tabela.tag_configure('atrasada',foreground=c['vermelho'],background=c['atraso'])
             self.tabela.tag_configure('recebida',foreground=c['verde'],background=c['recebida'])

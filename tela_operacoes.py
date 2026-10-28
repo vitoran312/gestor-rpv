@@ -19,7 +19,7 @@ from mensagens import descrever_erro
 class OperacoesMixin:
     def criar_barra_historico(self):
         # A barra pertence à janela principal e só é exibida enquanto a página de operações está à frente.
-        anterior = getattr(self, 'menus', None)
+        anterior = self.menus
         if anterior and anterior['barra'].winfo_exists():
             anterior['barra'].destroy()
         barra = novo_menu(self.janela)
@@ -288,10 +288,9 @@ class OperacoesMixin:
                     widget.destroy()
                 continue
             if linha not in self.acoes_linhas:
-                valores = self.tabela.item(linha, 'values')
                 atrasada = linha in self.atrasadas
                 adiada = linha in self.adiadas
-                botao = ttk.Label(self.tabela, text=valores[-2], anchor='center', cursor='hand2',
+                botao = ttk.Label(self.tabela, text=self.tabela.set(linha, 'previsao_atual'), anchor='center', cursor='hand2',
                                   style='PrevisaoAtrasada.TLabel' if atrasada else
                                   'PrevisaoRecebida.TLabel' if self.recebimentos[linha] else
                                   'PrevisaoAdiada.TLabel' if adiada else 'Previsao.TLabel')
@@ -349,21 +348,15 @@ class OperacoesMixin:
         menu.add_command(label='Nova entrada', command=self.formulario)
         return mostrar_menu(menu, evento)
 
-    def copiar_linha(self, linha):
-        valores = list(self.tabela.item(linha, 'values'))
+    def texto_da_linha(self, linha):
+        """Colunas da linha separadas por tabulação, com o recebimento por extenso (a célula fica vazia na tela)."""
         data = self.recebimentos.get(linha)
-        valores[-1] = data_br(data) if data else 'Não recebido'
-        copiar_texto(self.tabela, '\t'.join(valores))
+        return '\t'.join(data_br(data) if data else 'Não recebido' if coluna == 'recebido' else self.tabela.set(linha, coluna)
+                         for coluna in self.tabela['columns'])
 
     def copiar_selecao(self):
         selecionados = set(self.tabela.selection())
-        linhas = []
-        for linha in self.tabela.get_children():
-            if linha in selecionados:
-                valores = list(self.tabela.item(linha,'values'))
-                data = self.recebimentos.get(linha)
-                valores[-1] = data_br(data) if data else 'Não recebido'
-                linhas.append('\t'.join(valores))
+        linhas = [self.texto_da_linha(linha) for linha in self.tabela.get_children() if linha in selecionados]
         if linhas:
             copiar_texto(self.tabela,'\n'.join(linhas))
 
@@ -418,7 +411,7 @@ class OperacoesMixin:
         self.atualizar()
 
     def desenhar_icone_lixeira(self):
-        if not hasattr(self,'icone_lixeira'):
+        if self.icone_lixeira is None:
             self.icone_lixeira = tk.PhotoImage(master=self.janela,width=24,height=24)
         self.icone_lixeira.blank()
         cor = cores()['texto']

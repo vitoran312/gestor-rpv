@@ -48,7 +48,7 @@ class NavegacaoMixin:
         atual = self.pagina_atual()
         self.janela.title('Gestor de RPV' + (f' — {atual.titulo_pagina}' if self.paginas else ''))
         # A barra de menus age sobre a tabela de operações, por isso só aparece nessa página.
-        menus = getattr(self, 'menus', None)
+        menus = self.menus
         self.janela.configure(menu=menus['barra'] if menus and atual is self.historico else '')
 
     def pagina_reexibida(self):
