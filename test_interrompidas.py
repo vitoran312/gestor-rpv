@@ -72,12 +72,42 @@ class TestOperacoesInterrompidas(unittest.TestCase):
         with BackupPreparado(self.backup_de_outro(), SENHA_TESTE, pasta_trabalho=self.pasta) as preparado:
             with patch.object(backup.tempfile, 'TemporaryDirectory', PastaQueFica):
                 preparado.restaurar(self.banco, copia_de_seguranca=False)  # A pasta de trabalho sobra no disco.
-        recuperar_interrompidas(self.banco)
-        novo = self.banco.listar()[0]
-        self.assertEqual(novo['nome'], 'Outra')
-        caminho = self.banco.documentos(novo['id'])[0]['caminho']
-        self.assertEqual((self.banco.pasta_documentos / caminho).read_bytes(), b'%PDF outro')
-        self.assertIsNone(self.banco.configuracao(backup.RESTAURACAO))
+        self.assertImportacaoMantida()
+
+    def test_queda_logo_depois_da_troca_do_banco_mantem_a_importacao(self):
+        def replace(origem, destino):
+            if Path(destino).name == backup.DESCARTAR:
+                raise Interrompido  # O banco já foi trocado; o processo morre antes de marcar a conclusão.
+            os.rename(origem, destino)
+
+        with BackupPreparado(self.backup_de_outro(), SENHA_TESTE, pasta_trabalho=self.pasta) as preparado:
+            with patch.object(backup.tempfile, 'TemporaryDirectory', PastaQueFica), \
+                    patch.object(backup.os, 'replace', replace), self.assertRaises(Interrompido):
+                preparado.restaurar(self.banco, copia_de_seguranca=False)
+        self.assertImportacaoMantida()
+
+    def assertImportacaoMantida(self):
+        """Abre duas vezes: a sobra da pasta de trabalho nunca desfaz uma importação que terminou."""
+        for _abertura in range(2):
+            recuperar_interrompidas(self.banco)
+            novo = self.banco.listar()[0]
+            self.assertEqual(novo['nome'], 'Outra')
+            caminho = self.banco.documentos(novo['id'])[0]['caminho']
+            self.assertEqual((self.banco.pasta_documentos / caminho).read_bytes(), b'%PDF outro')
+
+    def test_segunda_execucao_nao_abre_enquanto_a_primeira_esta_aberta(self):
+        import subprocess
+        import sys
+        import instancia
+        dados_app = self.pasta / 'trava'
+        self.assertTrue(instancia.travar(dados_app))
+        self.assertTrue(instancia.travar(dados_app))  # A própria execução pode pedir de novo.
+        outra = subprocess.run([sys.executable, '-c', 'import sys, instancia; sys.exit(0 if instancia.travar(sys.argv[1]) '
+                                'else 3)', str(dados_app)], cwd=Path(__file__).parent)
+        self.assertEqual(outra.returncode, 3)
+        livre = subprocess.run([sys.executable, '-c', 'import sys, instancia; sys.exit(0 if instancia.travar(sys.argv[1]) '
+                                'else 3)', str(self.pasta / 'outra')], cwd=Path(__file__).parent)
+        self.assertEqual(livre.returncode, 0)
 
     def test_exclusao_interrompida_antes_do_banco_devolve_o_anexo(self):
         with patch.object(dados.tempfile, 'TemporaryDirectory', PastaQueFica), self.assertRaises(Interrompido):

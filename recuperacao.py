@@ -20,6 +20,10 @@ from mensagens import descrever_erro
 from diario import log
 
 TITULO = 'Gestor de RPV'
+# Existe só enquanto uma restauração desta tela está em andamento. Se o programa for fechado à força no meio,
+# o banco novo pode ter ficado vazio; com a marca, a próxima abertura oferece a restauração de novo em vez de
+# abrir o programa sem dados (o banco original continua guardado como "gestor-danificado-...").
+MARCA_EM_ANDAMENTO = '.recuperacao-em-andamento'
 
 
 def abrir_pasta(pasta):
@@ -36,13 +40,16 @@ def restaurar_em_banco_novo(caminho, arquivo, senha=None):
     """Guarda o banco danificado e os anexos dele com outro nome, cria um banco vazio e restaura o backup nele.
 
     Devolve o banco restaurado, os nomes com que o banco e os anexos danificados foram guardados (None se não
-    havia anexos), se a senha do backup ficou salva e quantos anexos citados no backup não estavam nele. Se a restauração falhar em qualquer ponto, o banco vazio
-    e os anexos do backup são descartados e o banco e os anexos originais voltam ao lugar.
+    havia anexos), se a senha do backup ficou salva e quantos anexos citados no backup não estavam nele. Se a
+    restauração falhar em qualquer ponto, o banco vazio e os anexos do backup são descartados e o banco e os
+    anexos originais voltam ao lugar.
     """
     marca = f'{datetime.now():%Y%m%d-%H%M%S-%f}'
     guardado = caminho.with_name(f'gestor-danificado-{marca}.sqlite3')
     documentos, documentos_guardados = caminho.parent / 'documentos', caminho.parent / f'documentos-danificado-{marca}'
     movidos = []
+    marca_em_andamento = caminho.with_name(MARCA_EM_ANDAMENTO)
+    marca_em_andamento.touch()
     try:
         for origem, destino in ((caminho, guardado), (documentos, documentos_guardados)):
             if origem.exists():
@@ -59,7 +66,9 @@ def restaurar_em_banco_novo(caminho, arquivo, senha=None):
             shutil.rmtree(documentos, ignore_errors=True)
         for origem, destino in reversed(movidos):
             os.replace(destino, origem)
+        marca_em_andamento.unlink(missing_ok=True)
         raise
+    marca_em_andamento.unlink(missing_ok=True)
     # Daqui em diante a restauração já deu certo: nada abaixo pode desfazê-la.
     senha_salva = False
     if senha:
@@ -106,6 +115,9 @@ def abrir_banco(janela, caminho=None):
     try:
         if danificado(caminho):
             raise ValueError('o arquivo de dados está vazio.')
+        if caminho.with_name(MARCA_EM_ANDAMENTO).exists():
+            raise ValueError('a última restauração de backup foi interrompida antes de terminar. Os dados de antes '
+                             'continuam guardados com o nome "gestor-danificado-...".')
         return Banco(caminho)
     except VersaoMaisNova as erro:
         # Os dados estão íntegros: só falta atualizar o programa. Nada é renomeado nem restaurado.

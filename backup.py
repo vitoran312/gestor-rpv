@@ -27,6 +27,7 @@ SENHA_BACKUP = 'senha_backup'
 # Marca, no banco novo, qual restauração o gravou: se o programa for fechado à força no meio de uma, a próxima
 # abertura sabe se a troca do banco chegou ao fim e devolve os anexos que combinam com ele.
 RESTAURACAO = 'restauracao_em_andamento'
+DESCARTAR = 'descartar'
 CONFIGURACOES_LOCAIS = (PASTA_AUTOMATICA, SENHA_BACKUP, RESTAURACAO)
 
 
@@ -57,22 +58,25 @@ def recuperar_interrompidas(banco):
     """Desfaz o que um encerramento forçado deixou pela metade, antes de limpar_temporarios apagar as sobras.
 
     Restauração: o SQLite desfaz sozinho a troca do banco que não terminou, mas a pasta de anexos já pode ter
-    sido trocada. Se o banco atual não é o da restauração, os anexos anteriores voltam ao lugar. Exclusão: os
-    anexos cujo cadastro continua no banco voltam para a pasta de documentos.
+    sido trocada. Logo depois da troca do banco, os anexos anteriores passam a se chamar "descartar": pasta
+    com "documentos_anteriores" é restauração sem esse passo. Se o banco atual é o daquela restauração
+    (marca RESTAURACAO), ela terminou e só falta renomear; senão, os anexos anteriores voltam ao lugar.
+    Exclusão: os anexos cujo cadastro continua no banco voltam para a pasta de documentos.
     """
     try:
         concluida = banco.configuracao(RESTAURACAO)
         for pasta in sorted(banco.caminho.parent.glob(PREFIXO_RESTAURACAO + '*')):
             antigos = pasta / 'documentos_anteriores'
-            if pasta.is_symlink() or not antigos.is_dir() or antigos.is_symlink() or pasta.name == concluida:
+            if pasta.is_symlink() or not antigos.is_dir() or antigos.is_symlink():
+                continue
+            if pasta.name == concluida:
+                os.replace(antigos, pasta / DESCARTAR)
                 continue
             destino = banco.pasta_documentos
             if destino.exists():
                 os.replace(destino, Path(tempfile.mkdtemp(prefix='documentos_importados-', dir=pasta)) / 'documentos')
             os.replace(antigos, destino)
             log.warning('Anexos de uma restauração interrompida devolvidos à pasta de documentos.')
-        if concluida:
-            banco.remover_configuracao(RESTAURACAO)
         banco.devolver_exclusoes()
     except (OSError, sqlite3.Error):
         log.error('Sobras de uma restauração ou exclusão interrompida não foram conferidas.', exc_info=True)
@@ -270,7 +274,8 @@ def criar_backup(banco, pasta, prefixo='GestorRPV-', exigir_senha=True, registra
     agora = datetime.now().astimezone()
     quando = agora.isoformat(timespec='seconds')
     destino = pasta / (prefixo + agora.strftime('%Y%m%d-%H%M%S-%f') + '.rpvbackup')
-    with tempfile.TemporaryDirectory(prefix=PREFIXO_BACKUP, dir=banco.caminho.parent) as temporaria:
+    with tempfile.TemporaryDirectory(prefix=PREFIXO_BACKUP, dir=banco.caminho.parent,
+                                     ignore_cleanup_errors=True) as temporaria:
         trabalho = Path(temporaria)
         copia = trabalho / 'banco.sqlite3'
         vinculados = copia_para_backup(banco, copia, quando)
@@ -445,7 +450,8 @@ class BackupPreparado:
     def __enter__(self):
         if self.pasta_trabalho is not None:
             Path(self.pasta_trabalho).mkdir(parents=True, exist_ok=True)
-        self.temporario = tempfile.TemporaryDirectory(prefix=PREFIXO_TEMPORARIO, dir=self.pasta_trabalho)
+        self.temporario = tempfile.TemporaryDirectory(prefix=PREFIXO_TEMPORARIO, dir=self.pasta_trabalho,
+                                                      ignore_cleanup_errors=True)
         self.pasta = Path(self.temporario.name)
         try:
             self.pacote = self.decifrar()
@@ -527,7 +533,10 @@ class BackupPreparado:
                                      registrar=False)
             limitar_backups(seguranca.parent, 'GestorRPV-*.rpvbackup')
         locais = {chave: banco.configuracao(chave) for chave in CONFIGURACOES_LOCAIS}
-        with tempfile.TemporaryDirectory(prefix=PREFIXO_RESTAURACAO, dir=banco.caminho.parent) as temporaria:
+        # Depois da troca, uma falha ao apagar a pasta de trabalho (antivírus segurando um arquivo) não pode
+        # aparecer como importação que falhou: a sobra sai na limpeza de uma próxima abertura.
+        with tempfile.TemporaryDirectory(prefix=PREFIXO_RESTAURACAO, dir=banco.caminho.parent,
+                                         ignore_cleanup_errors=True) as temporaria:
             trabalho = Path(temporaria)
             novos, antigos, destino = trabalho / 'documentos_novos', trabalho / 'documentos_anteriores', banco.pasta_documentos
             if destino.is_symlink():
@@ -554,6 +563,9 @@ class BackupPreparado:
                 if tinha_documentos:
                     os.replace(antigos, destino)
                 raise
+            if tinha_documentos:
+                # A troca terminou: a partir daqui, recuperar_interrompidas nunca devolve estes anexos.
+                os.replace(antigos, trabalho / DESCARTAR)
         # A marca da restauração fica no banco até a próxima abertura (recuperar_interrompidas a apaga): nada é
         # gravado depois da troca. Ela nunca vai para um backup, por estar em CONFIGURACOES_LOCAIS.
         return seguranca

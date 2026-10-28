@@ -1,3 +1,4 @@
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -5,7 +6,7 @@ from unittest.mock import patch
 
 import recuperacao
 from backup import criar_backup, senha_salva
-from dados import VERSAO_BANCO
+from dados import VERSAO_BANCO, Banco
 from apoio_testes import SENHA_TESTE, banco_com_contas, dados_rpv
 
 
@@ -68,6 +69,16 @@ class TestRecuperacao(unittest.TestCase):
         self.assertIn('inesperado', erro.call_args.args[1])
         self.assertEqual(self.caminho.read_bytes(), self.lixo)
         self.assertEqual(list(self.caminho.parent.glob('gestor-danificado-*')), [])
+
+    def test_restauracao_interrompida_na_tela_de_recuperacao_oferece_restaurar_de_novo(self):
+        Banco(self.caminho.with_name('vazio.sqlite3'))
+        os.replace(self.caminho.with_name('vazio.sqlite3'), self.caminho)  # Banco válido, mas vazio.
+        self.caminho.with_name(recuperacao.MARCA_EM_ANDAMENTO).touch()
+        with patch.object(recuperacao.messagebox, 'askyesno', return_value=False) as pergunta, \
+                patch.object(recuperacao.messagebox, 'showinfo'), patch.object(recuperacao, 'abrir_pasta'):
+            with self.assertRaises(SystemExit):
+                recuperacao.abrir_banco(None, self.caminho)
+        self.assertIn('interrompida', pergunta.call_args.args[1])
 
     def test_banco_de_versao_mais_nova_nao_e_aberto_nem_rebaixado(self):
         self.caminho.unlink()

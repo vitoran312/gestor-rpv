@@ -739,7 +739,9 @@ class Banco:
     @contextmanager
     def arquivos_para_excluir(self):
         movidos = []
-        with tempfile.TemporaryDirectory(prefix=PREFIXO_EXCLUSAO, dir=self.caminho.parent) as pasta:
+        # Sobra que o antivírus segure sai na limpeza de uma próxima abertura; a exclusão já valeu.
+        with tempfile.TemporaryDirectory(prefix=PREFIXO_EXCLUSAO, dir=self.caminho.parent,
+                                         ignore_cleanup_errors=True) as pasta:
             def preparar(documentos):
                 raiz = self.pasta_documentos.resolve()
                 for documento in documentos:

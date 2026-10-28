@@ -1,5 +1,21 @@
 # Histórico de versões
 
+## 0.34.0
+
+Correções do segundo veredito do chefe da banca, sobre a 0.33.0.
+
+- Uma importação que terminou nunca é desfeita na abertura seguinte. A conclusão agora fica marcada na
+  própria pasta de trabalho, logo depois da troca do banco; antes, se essa pasta sobrasse (antivírus
+  segurando um arquivo), a segunda abertura trocava os anexos importados pelos antigos.
+- O programa só abre uma vez: abrir de novo enquanto ele está aberto (por exemplo, com a janela parada
+  durante uma importação) mostra um aviso, em vez de uma segunda execução mexer nos mesmos dados.
+- Falha só ao apagar a pasta temporária, depois de uma importação, exclusão ou backup que deu certo, não
+  aparece mais como erro: a sobra é limpa numa próxima abertura.
+- Restauração interrompida à força na tela de recuperação: a abertura seguinte oferece restaurar de novo,
+  em vez de abrir o programa vazio.
+- O aviso de backup mostra quantos anexos sumiram da pasta de documentos (o backup automático também os
+  deixa de fora).
+
 ## 0.33.0
 
 Correções do veredito do chefe da banca sobre a 0.32.0.

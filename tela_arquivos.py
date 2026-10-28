@@ -28,6 +28,14 @@ class ArquivosMixin:
         if aviso and self.falha_backup_automatico:
             aviso = ('Defina a senha dos backups em Arquivo → Backup automático. ' if self.falha_backup_automatico == 'senha'
                      else 'O backup automático não conseguiu gravar na pasta escolhida. ') + aviso
+        try:
+            sumidos = len(documentos_sem_arquivo(self.banco))
+        except (OSError, sqlite3.Error):
+            sumidos = 0
+        if sumidos:
+            # O backup automático também deixa de fora o anexo sumido; sem este aviso, ninguém saberia.
+            aviso = (f'{sumidos} anexo(s) sumiram da pasta de documentos e ficam fora dos backups. '
+                     + (aviso or 'Clique aqui para fazer um backup.'))
         self.texto_aviso_backup.set(aviso)
         try:
             data = datetime.fromisoformat(quando).astimezone().strftime('%d/%m/%Y') if quando else 'ainda não realizado'

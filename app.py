@@ -3,9 +3,10 @@ import sqlite3
 import tkinter as tk
 import webbrowser
 from datetime import date
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
 import demonstracao
+import instancia
 from backup import limpar_temporarios, recuperar_interrompidas
 from recuperacao import abrir_banco
 from componentes import centralizar, maximizar
@@ -215,5 +216,10 @@ if __name__ == '__main__':
     diario.ativar(pasta_dados())
     janela = tk.Tk()
     janela.report_callback_exception = diario.erro_na_interface
+    if not instancia.travar(pasta_dados()):
+        janela.withdraw()
+        messagebox.showinfo('Gestor de RPV', 'O Gestor de RPV já está aberto neste computador. Use a janela que '
+                            'já está aberta (veja a barra de tarefas).')
+        raise SystemExit(0)
     Aplicativo(janela)
     janela.mainloop()
