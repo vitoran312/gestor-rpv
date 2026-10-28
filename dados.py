@@ -25,6 +25,11 @@ CONSULTA_RPVS = '''SELECT r.*,
 
 
 MANTER_BACKUPS = 10
+VERSAO_BANCO = 8  # PRAGMA user_version gravado pela versão atual do esquema.
+
+
+class VersaoMaisNova(ValueError):
+    """O banco foi gravado por uma versão mais nova do aplicativo e não deve ser aberto por esta."""
 
 
 def pasta_dados():
@@ -143,9 +148,13 @@ class Banco:
             tem_documentos = con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='documentos'").fetchone() is not None
             colunas_documentos = {r['name'] for r in con.execute('PRAGMA table_info(documentos)')}
             versao_atual=con.execute('PRAGMA user_version').fetchone()[0]
+        if versao_atual > VERSAO_BANCO:
+            # Abrir e regravar como versão antiga apagaria em silêncio o que a versão nova acrescentou.
+            raise VersaoMaisNova('Estes dados foram gravados por uma versão mais nova do Gestor de RPV. '
+                                 'Atualize o programa para abri-los.')
         migrar = ('previsao_atual_definida' not in colunas or 'recebimento' not in colunas or
                   not {'numero_endereco', 'cidade', 'estado'}.issubset(colunas_contas) or
-                  'lixeira_em' not in colunas or cpf_unico or not tem_documentos or 'tipo' not in colunas_documentos or versao_atual<8)
+                  'lixeira_em' not in colunas or cpf_unico or not tem_documentos or 'tipo' not in colunas_documentos or versao_atual<VERSAO_BANCO)
         if colunas and migrar:
             versao_backup = ('0.4.0' if 'conta_id' not in colunas else
                              '0.6.0' if 'recebimento' not in colunas else
@@ -243,7 +252,7 @@ class Banco:
             con.execute('CREATE TABLE IF NOT EXISTS configuracoes (chave TEXT PRIMARY KEY,valor TEXT NOT NULL)')
             if con.execute('PRAGMA foreign_key_check').fetchall():
                 raise ValueError('Não foi possível migrar o banco: vínculos inconsistentes.')
-            con.execute('PRAGMA user_version=8')
+            con.execute(f'PRAGMA user_version={VERSAO_BANCO}')
 
     @staticmethod
     def cpf_unico(con):

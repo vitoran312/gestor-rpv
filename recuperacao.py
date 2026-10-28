@@ -11,7 +11,7 @@ from datetime import datetime
 from tkinter import filedialog, messagebox
 
 from backup import BackupPreparado
-from dados import Banco, pasta_dados
+from dados import Banco, VersaoMaisNova, pasta_dados
 
 
 def abrir_pasta(pasta):
@@ -50,6 +50,10 @@ def abrir_banco(janela, caminho=None):
     caminho = caminho or pasta_dados() / 'gestor.sqlite3'
     try:
         return Banco(caminho)
+    except VersaoMaisNova as erro:
+        # Os dados estão íntegros: só falta atualizar o programa. Nada é renomeado nem restaurado.
+        messagebox.showerror('Gestor de RPV', f'{erro}\n\nOs dados estão em:\n{caminho.parent}', parent=janela)
+        raise SystemExit(1) from None
     except (sqlite3.Error, ValueError, OSError) as erro:
         motivo = erro if isinstance(erro, ValueError) else 'o arquivo de dados está danificado ou inacessível.'
         restaurar = messagebox.askyesno(

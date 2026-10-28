@@ -54,6 +54,19 @@ class TestRecuperacao(unittest.TestCase):
         self.assertEqual(self.caminho.read_bytes(), self.lixo)
         self.assertEqual(list(self.caminho.parent.glob('gestor-danificado-*')), [])
 
+    def test_banco_de_versao_mais_nova_nao_e_aberto_nem_rebaixado(self):
+        self.caminho.unlink()
+        banco = banco_com_contas(self.caminho)
+        with banco.conectar() as con:
+            con.execute('PRAGMA user_version=9')
+        with patch.object(recuperacao.messagebox, 'showerror') as erro:
+            with self.assertRaises(SystemExit):
+                recuperacao.abrir_banco(None, self.caminho)
+        self.assertIn('versão mais nova', erro.call_args.args[1])
+        with banco.conectar() as con:
+            self.assertEqual(con.execute('PRAGMA user_version').fetchone()[0], 9)
+        self.assertEqual(list(self.caminho.parent.glob('gestor-danificado-*')), [])
+
 
 if __name__ == '__main__':
     unittest.main()

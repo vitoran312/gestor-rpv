@@ -12,7 +12,7 @@ from datetime import date, datetime
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED, BadZipFile
 
 from versao import VERSAO
-from dados import Banco, limitar_backups
+from dados import VERSAO_BANCO, Banco, limitar_backups
 
 
 FORMATO = 'gestor-rpv-backup'
@@ -72,7 +72,7 @@ def validar_banco(caminho):
                 raise ValueError('O banco do backup está danificado.')
             verificar_estruturas(con)
             versao_banco = con.execute('PRAGMA user_version').fetchone()[0]
-            if versao_banco not in (4,5,6,7,8):
+            if not 4 <= versao_banco <= VERSAO_BANCO:
                 raise ValueError('Este backup exige outra versão do Gestor de RPV.')
             requisitos = {
                 'rpvs': {'id','nome','aquisicao','previsto','custo','conta','previsao','comissao',
