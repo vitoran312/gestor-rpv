@@ -382,6 +382,12 @@ class Banco:
     def remover_conta(self, identificador):
         self.remover_contas([identificador])
 
+    def operacoes_da_conta(self, identificadores):
+        """Quantas operações (inclusive na lixeira) usam alguma das contas."""
+        ids = [int(i) for i in identificadores]
+        with self.conectar() as con:
+            return con.execute(f'SELECT COUNT(*) FROM rpvs WHERE conta_id IN ({",".join("?" * len(ids))})', ids).fetchone()[0]
+
     def remover_contas(self, identificadores):
         ids = list(dict.fromkeys(int(i) for i in identificadores))
         with self.conectar() as con:

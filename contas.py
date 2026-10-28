@@ -167,8 +167,15 @@ class JanelaContas:
         if not selecao:
             messagebox.showinfo('Remover contas','Selecione uma ou mais contas.',parent=self.tela)
             return
-        if not messagebox.askyesno('Remover contas',f'Remover permanentemente {len(selecao)} conta(s)?\n\n'
-            'As entradas das operações e os dados bancários já guardados nelas continuarão existentes.',parent=self.tela,icon='warning',default='no'):
+        try:
+            em_uso = self.banco.operacoes_da_conta(selecao)
+        except sqlite3.Error:
+            em_uso = 0
+        aviso = ('As entradas das operações e os dados bancários já guardados nelas continuarão existentes.' if not em_uso else
+                 f'{em_uso} operação(ões) usam esta(s) conta(s). Elas guardam os dados bancários, mas a conta não '
+                 'poderá ser escolhida de novo nem reativada. Se for só parar de usar, prefira Desativar.')
+        if not messagebox.askyesno('Remover contas',f'Remover permanentemente {len(selecao)} conta(s)?\n\n'+aviso,
+                                   parent=self.tela,icon='warning',default='no'):
             return
         try:
             self.banco.remover_contas(selecao)

@@ -72,6 +72,15 @@ class TestContas(unittest.TestCase):
             self.banco.salvar_conta(dados_conta(identificacao='Outra', numero='999-1', cpf='11144477735',
                                                 pix='(11) 99999-9999'))
 
+    def test_conta_em_uso_conta_operacoes_inclusive_na_lixeira(self):
+        conta = self.banco.salvar_conta(dados_conta())
+        livre = self.banco.salvar_conta(dados_conta(identificacao='Livre', numero='999-1', cpf='11144477735', pix='livre@x.com'))
+        self.banco.salvar(dados_rpv(conta_id=conta))
+        self.banco.excluir(self.banco.salvar(dados_rpv(conta_id=conta)))
+        self.assertEqual(self.banco.operacoes_da_conta([conta]), 2)
+        self.assertEqual(self.banco.operacoes_da_conta([livre]), 0)
+        self.assertEqual(self.banco.operacoes_da_conta([conta, livre]), 2)
+
     def test_snapshot_desativacao_reativacao_e_nome(self):
         identificador = self.banco.salvar_conta(dados_conta())
         rpv = self.banco.salvar(dados_rpv(conta_id=identificador))
