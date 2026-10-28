@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from dados import Banco, centavos, data_br, moeda, data_iso, previsao_por_prazo
-from test_contas import banco_com_contas
+from apoio_testes import banco_com_contas, dados_rpv
 
 
 class TestDados(unittest.TestCase):
@@ -76,7 +76,6 @@ class TestDados(unittest.TestCase):
 
     def test_regras_da_entrada_valem_na_gravacao_sem_depender_da_tela(self):
         from datetime import date, timedelta
-        from test_contas import dados_rpv
         with tempfile.TemporaryDirectory() as pasta:
             banco = banco_com_contas(Path(pasta) / 'teste.sqlite3')
             amanha = (date.today() + timedelta(days=1)).isoformat()

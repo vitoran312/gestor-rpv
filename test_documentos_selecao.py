@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from dados import Banco
 from backup import criar_backup, BackupPreparado
-from test_contas import banco_com_contas, dados_rpv, SENHA_TESTE
+from apoio_testes import banco_com_contas, dados_rpv, SENHA_TESTE
 
 
 class TestDocumentos(unittest.TestCase):

@@ -8,8 +8,8 @@ from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from backup import BackupPreparado, criar_backup
-from dados import Banco
-from test_contas import SENHA_TESTE, banco_com_contas, dados_conta, dados_rpv
+from dados import VERSAO_BANCO, Banco
+from apoio_testes import SENHA_TESTE, banco_com_contas, dados_conta, dados_rpv
 
 
 class TestRecusasDoBackup(unittest.TestCase):
@@ -50,7 +50,7 @@ class TestRecusasDoBackup(unittest.TestCase):
     def test_cada_problema_tem_sua_recusa(self):
         documento = 'documentos/1/' + 'a' * 32 + '.pdf'
         casos = (
-            ('versão futura do banco', self.pacote('v9.rpvbackup', versao_banco=9), 'outra versão'),
+            ('versão futura do banco', self.pacote('futura.rpvbackup', versao_banco=VERSAO_BANCO + 1), 'outra versão'),
             ('formato desconhecido', self.pacote('f2.rpvbackup', manifesto={'versao_formato': 2}), 'Formato de backup'),
             ('sem manifesto', self.pacote('sm.rpvbackup', sem_manifesto=True), 'Manifesto'),
             ('manifesto que não é objeto', self.pacote('mo.rpvbackup', manifesto={'arquivos': [1, 2]}), 'incompleta'),

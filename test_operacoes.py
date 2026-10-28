@@ -10,7 +10,7 @@ import hashlib
 
 from dados import Banco
 from backup import criar_backup, BackupPreparado, FORMATO
-from test_contas import banco_com_contas, dados_conta, dados_rpv, SENHA_TESTE
+from apoio_testes import banco_com_contas, dados_conta, dados_rpv, SENHA_TESTE
 
 
 class TestOperacoes016(unittest.TestCase):

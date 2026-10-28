@@ -5,7 +5,8 @@ from unittest.mock import patch
 
 import recuperacao
 from backup import criar_backup, senha_salva
-from test_contas import SENHA_TESTE, banco_com_contas, dados_rpv
+from dados import VERSAO_BANCO
+from apoio_testes import SENHA_TESTE, banco_com_contas, dados_rpv
 
 
 class TestRecuperacao(unittest.TestCase):
@@ -60,13 +61,13 @@ class TestRecuperacao(unittest.TestCase):
         self.caminho.unlink()
         banco = banco_com_contas(self.caminho)
         with banco.conectar() as con:
-            con.execute('PRAGMA user_version=9')
+            con.execute(f'PRAGMA user_version={VERSAO_BANCO + 1}')
         with patch.object(recuperacao.messagebox, 'showerror') as erro:
             with self.assertRaises(SystemExit):
                 recuperacao.abrir_banco(None, self.caminho)
         self.assertIn('versão mais nova', erro.call_args.args[1])
         with banco.conectar() as con:
-            self.assertEqual(con.execute('PRAGMA user_version').fetchone()[0], 9)
+            self.assertEqual(con.execute('PRAGMA user_version').fetchone()[0], VERSAO_BANCO + 1)
         self.assertEqual(list(self.caminho.parent.glob('gestor-danificado-*')), [])
 
     def backup_com(self, nome, anexo=None):

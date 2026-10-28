@@ -5,7 +5,7 @@ from xml.etree import ElementTree
 from zipfile import ZipFile
 
 from exportacao import COLUNAS, coluna_letra, exportar_excel, serial_excel
-from test_contas import banco_com_contas, dados_rpv
+from apoio_testes import banco_com_contas, dados_rpv
 
 NS = {'x': 'http://schemas.openxmlformats.org/spreadsheetml/2006/main'}
 

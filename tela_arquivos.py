@@ -67,7 +67,7 @@ class ArquivosMixin:
         # Qualquer tarefa ainda agendada (redesenhos com after_idle, relógio da animação, backup) é
         # cancelada: depois de fechar a janela, ela chamaria funções que não existem mais.
         for agendamento in self.janela.tk.splitlist(self.janela.tk.call('after', 'info')):
-            self.janela.after_cancel(agendamento)
+            self.janela.tk.call('after', 'cancel', agendamento)  # after_cancel falha com tarefas criadas pelo próprio Tk.
 
     def configurar_backup_automatico(self):
         pai = self.janela_ativa()

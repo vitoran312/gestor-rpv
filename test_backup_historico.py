@@ -10,7 +10,7 @@ import json
 
 from backup import criar_backup, BackupPreparado, executar_backup_automatico, PASTA_AUTOMATICA
 from dados import Banco, limitar_backups
-from test_contas import banco_com_contas, dados_rpv, dados_conta, SENHA_TESTE
+from apoio_testes import banco_com_contas, dados_rpv, dados_conta, SENHA_TESTE
 
 
 def adulterar_banco(arquivo, destino, sql):

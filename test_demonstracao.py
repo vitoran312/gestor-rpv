@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import demonstracao
 from dados import Banco, situacao
-from test_contas import dados_conta, dados_rpv
+from apoio_testes import dados_conta, dados_rpv
 
 
 class TestDemonstracao(unittest.TestCase):

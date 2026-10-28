@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import cifra
 from backup import SENHA_BACKUP, PASTA_AUTOMATICA, BackupPreparado, SenhaAusente, SenhaNecessaria, criar_backup
-from test_contas import SENHA_TESTE, banco_com_contas, dados_rpv
+from apoio_testes import SENHA_TESTE, banco_com_contas, dados_rpv
 
 
 class TestCifra(unittest.TestCase):
