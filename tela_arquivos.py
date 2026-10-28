@@ -13,6 +13,7 @@ from tema import cores
 from documentos import abrir_pasta
 from exportacao import exportar_excel, nome_sugerido
 from ordenacao import ordenar
+from mensagens import descrever_erro
 
 
 class ArquivosMixin:
@@ -109,7 +110,7 @@ class ArquivosMixin:
                 except sqlite3.Error:
                     pass
                 self.atualizar_ultimo_backup()
-                messagebox.showerror('Backup automático', 'Não foi possível usar esta pasta. ' + str(erro), parent=tela)
+                messagebox.showerror('Backup automático', 'Não foi possível usar esta pasta. ' + descrever_erro(erro), parent=tela)
                 atualizar()
                 return
             atualizar()
@@ -171,7 +172,7 @@ class ArquivosMixin:
                     raise ValueError('As duas senhas não são iguais.')
                 self.banco.salvar_configuracao(SENHA_BACKUP, senha.get())
             except (ValueError, sqlite3.Error) as erro:
-                messagebox.showerror('Senha dos backups', str(erro), parent=tela)
+                messagebox.showerror('Senha dos backups', descrever_erro(erro), parent=tela)
                 return
             salva.append(True)
             if self.falha_backup_automatico == 'senha':
@@ -202,7 +203,7 @@ class ArquivosMixin:
         try:
             arquivo = criar_backup(self.banco, pasta)
         except (OSError, sqlite3.Error, ValueError) as erro:
-            messagebox.showerror('Backup', 'Não foi possível criar o backup. ' + str(erro), parent=pai)
+            messagebox.showerror('Backup', 'Não foi possível criar o backup. ' + descrever_erro(erro), parent=pai)
             return
         self.atualizar_ultimo_backup()
         messagebox.showinfo('Backup concluído', f'Backup salvo em:\n{arquivo}', parent=pai)
@@ -225,7 +226,7 @@ class ArquivosMixin:
                 if senha is None:
                     return
             except (OSError, sqlite3.Error, ValueError, RuntimeError) as erro:
-                messagebox.showerror('Importar dados', 'Não foi possível importar o backup. ' + str(erro), parent=self.historico)
+                messagebox.showerror('Importar dados', 'Não foi possível importar o backup. ' + descrever_erro(erro), parent=self.historico)
                 return
 
     def confirmar_importacao(self, pacote):
@@ -270,7 +271,7 @@ class ArquivosMixin:
         try:
             destino = exportar_excel(registros, arquivo)
         except (OSError, sqlite3.Error, ValueError) as erro:
-            messagebox.showerror('Exportar para Excel', 'Não foi possível exportar. ' + str(erro), parent=pai)
+            messagebox.showerror('Exportar para Excel', 'Não foi possível exportar. ' + descrever_erro(erro), parent=pai)
             return
         messagebox.showinfo('Exportação concluída',
                             f'{len(registros)} operação(ões) exportada(s) para:\n{destino}', parent=pai)
@@ -283,4 +284,4 @@ class ArquivosMixin:
             abrir_pasta(pasta)
         except (OSError,ValueError) as erro:
             messagebox.showerror('Abrir pasta dos documentos',
-                'Não foi possível abrir a pasta dos documentos. ' + str(erro),parent=pai)
+                'Não foi possível abrir a pasta dos documentos. ' + descrever_erro(erro),parent=pai)

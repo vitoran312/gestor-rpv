@@ -9,6 +9,7 @@ from visual import px
 from selecao import habilitar_selecao, pressionar_linha, arrastar
 from dados import validar_cpf, ESTADOS
 from interacao import aplicar_formato, aplicar_cpf, capitalizar_inicio, formatar_cpf, novo_menu, mostrar_menu, copiar_texto
+from mensagens import descrever_erro
 
 
 def dados_para_copiar(conta):
@@ -172,7 +173,7 @@ class JanelaContas:
         try:
             self.banco.remover_contas(selecao)
         except ValueError as erro:
-            messagebox.showinfo('Preservar histórico',str(erro),parent=self.tela)
+            messagebox.showinfo('Preservar histórico',descrever_erro(erro),parent=self.tela)
             return
         except sqlite3.Error:
             messagebox.showerror('Remover contas','Não foi possível remover as contas.',parent=self.tela)
@@ -217,7 +218,7 @@ class JanelaContas:
             try:
                 self.banco.salvar_conta({k: v.get() for k, v in campos.items()}, identificador)
             except ValueError as erro:
-                messagebox.showerror('Confira a conta', str(erro), parent=tela)
+                messagebox.showerror('Confira a conta', descrever_erro(erro), parent=tela)
                 return
             except sqlite3.IntegrityError:
                 messagebox.showerror('Confira a conta', 'Já existe uma conta com esses dados únicos.', parent=tela)

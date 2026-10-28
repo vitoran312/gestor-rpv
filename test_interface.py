@@ -602,6 +602,24 @@ class TestInterface(unittest.TestCase):
         tabela = next(w for w in filhos(lixeiras[0]) if isinstance(w, ttk.Treeview))
         self.assertEqual(tabela.get_children(), (str(identificador),))
 
+    def test_formulario_lista_todos_os_problemas_com_o_nome_do_campo(self):
+        form = self.formulario()
+        datas = [w for w in filhos(form) if isinstance(w, CampoData)]
+        datas[0].variavel.set('31/02/2026')
+        datas[1].variavel.set('01/01/0001')
+        with patch.object(messagebox, 'showerror') as erro:
+            botao(form, 'Salvar registro').invoke()
+        texto = erro.call_args.args[1]
+        for trecho in ('Nome do titular', 'Data da aquisição: Informe uma data válida', 'Previsão inicial: Informe uma data entre'):
+            self.assertIn(trecho, texto)
+        moedas = [w for w in filhos(form) if isinstance(w, CampoMoeda)]
+        moedas[0].entrada.clipboard_clear()
+        moedas[0].entrada.clipboard_append('1e9')
+        with patch.object(messagebox, 'showwarning') as aviso:
+            moedas[0].entrada.event_generate('<<Paste>>')
+        self.assertIn('não é um valor em reais', aviso.call_args.args[1])
+        self.assertEqual(moedas[0].variavel.get(), '0,00')
+
     def test_fechar_formulario_alterado_pergunta_antes_de_descartar(self):
         form = self.formulario()
         form.event_generate('<Escape>')

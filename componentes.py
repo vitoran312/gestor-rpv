@@ -3,7 +3,7 @@ from tema import cores
 import calendar
 import tkinter as tk
 from datetime import date, datetime
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
 from dados import moeda, centavos
 
@@ -121,8 +121,12 @@ class CampoMoeda(ttk.Frame):
         try:
             texto = self.entrada.clipboard_get().strip()
             valor = formatar_digitacao_moeda(texto)
-        except (tk.TclError, ValueError):
+        except tk.TclError:
             self.entrada.bell()
+            return 'break'
+        except ValueError:
+            messagebox.showwarning('Valor colado', f'"{texto[:40]}" não é um valor em reais. Use, por exemplo, '
+                                   '1.500,00.', parent=self.entrada.winfo_toplevel())
             return 'break'
         return self.editar('Inserir', ''.join(c for c in valor if c.isdigit()).lstrip('0') or '0')
 

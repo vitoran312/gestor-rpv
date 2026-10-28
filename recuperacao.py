@@ -13,6 +13,7 @@ from tkinter import filedialog, messagebox, simpledialog
 import cifra
 from backup import SENHA_BACKUP, BackupPreparado
 from dados import Banco, VersaoMaisNova, pasta_dados
+from mensagens import descrever_erro
 
 
 def abrir_pasta(pasta):
@@ -79,7 +80,7 @@ def abrir_banco(janela, caminho=None):
             try:
                 banco, guardado = restaurar_em_banco_novo(caminho, arquivo, senha)
             except (sqlite3.Error, ValueError, OSError) as falha:
-                restaurar = messagebox.askretrycancel('Gestor de RPV', f'Não foi possível restaurar o backup: {falha}',
+                restaurar = messagebox.askretrycancel('Gestor de RPV', f'Não foi possível restaurar o backup: {descrever_erro(falha)}',
                                                       parent=janela)
                 continue
             messagebox.showinfo('Gestor de RPV', 'Backup restaurado. O arquivo com problema foi guardado como '

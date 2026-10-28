@@ -12,6 +12,7 @@ from contas import dados_para_copiar
 from tema import cores
 from documentos import validar_anexo, abrir_arquivo
 from interacao import aplicar_formato, capitalizar_inicio, menu_copia
+from mensagens import descrever_erro
 
 
 # A janela de entrada é cerca de 30% maior que as demais: fontes de 10 para 13 pontos, campos e
@@ -246,20 +247,35 @@ class RegistroMixin:
         anexos_pendentes = self.criar_painel_documentos(painel_documentos, tela, identificador)
 
         def salvar():
+            dados = {chave: variavel.get().strip() for chave, variavel in campos.items()}
+            # Todos os campos são conferidos de uma vez, e cada problema diz em qual campo está.
+            problemas = [] if dados['nome'] else ['Nome do titular: informe o nome completo.']
+
+            def converter(chave, rotulo, funcao, *valores):
+                try:
+                    dados[chave] = funcao(*valores)
+                except ValueError as erro:
+                    problemas.append(f'{rotulo}: {erro}')
+
+            converter('aquisicao', 'Data da aquisição', data_iso, dados['aquisicao'])
+            if modo_previsao.get() == 'dias':
+                converter('previsao', 'Prazo em dias', lambda: data_iso(previsao_por_prazo(campos['aquisicao'].get(), prazo.get())))
+            else:
+                converter('previsao', 'Previsão inicial', data_iso, dados['previsao'])
+            converter('previsto', 'Valor Total RPV', centavos, dados['previsto'])
+            converter('custo', 'Valor de aquisição', centavos, dados['custo'])
+            dados['comissao'] = None
+            if tem_comissao.get() == 'Sim':
+                converter('comissao', 'Comissão', centavos, valor_comissao.get())
+            if problemas:
+                messagebox.showerror('Confira o cadastro', '\n'.join(problemas), parent=tela)
+                return
+            dados['conta_id'] = mapa_contas.get(dados['conta'])
+            dados['observacoes'] = observacoes.get('1.0', 'end-1c').strip()
             try:
-                dados = {chave: variavel.get().strip() for chave, variavel in campos.items()}
-                if modo_previsao.get() == 'dias':
-                    dados['previsao'] = previsao_por_prazo(dados['aquisicao'],prazo.get())
-                for chave in ('aquisicao', 'previsao'):
-                    dados[chave] = data_iso(dados[chave])
-                for chave in ('previsto', 'custo'):
-                    dados[chave] = centavos(dados[chave])
-                dados['conta_id'] = mapa_contas.get(dados['conta'])
-                dados['comissao'] = centavos(valor_comissao.get()) if tem_comissao.get() == 'Sim' else None
-                dados['observacoes'] = observacoes.get('1.0', 'end-1c').strip()
                 self.banco.salvar(dados, identificador, anexos=anexos_pendentes)
             except ValueError as erro:
-                messagebox.showerror('Confira o cadastro', str(erro), parent=tela)
+                messagebox.showerror('Confira o cadastro', descrever_erro(erro), parent=tela)
                 return
             except (sqlite3.Error,OSError):
                 messagebox.showerror('Não foi possível salvar', 'Confira o acesso à pasta de dados e tente novamente.', parent=tela)
@@ -298,7 +314,7 @@ class RegistroMixin:
             try:
                 novos = [validar_anexo(arquivo) for arquivo in arquivos]
             except (OSError,ValueError) as erro:
-                messagebox.showerror('Anexar documentos',str(erro),parent=tela)
+                messagebox.showerror('Anexar documentos',descrever_erro(erro),parent=tela)
                 return
             for arquivo in novos:
                 if arquivo not in anexos_pendentes:
@@ -343,7 +359,7 @@ class RegistroMixin:
                     caminho = self.banco.caminho_documento(valor) if tipo == 'salvo' else valor
                     abrir_arquivo(caminho)
                 except (OSError,ValueError) as erro:
-                    messagebox.showerror('Abrir documento',str(erro),parent=janela)
+                    messagebox.showerror('Abrir documento',descrever_erro(erro),parent=janela)
 
             def retirar():
                 selecao = lista.selection()
@@ -359,7 +375,7 @@ class RegistroMixin:
                     try:
                         self.banco.remover_documento(valor)
                     except (OSError,sqlite3.Error,ValueError) as erro:
-                        messagebox.showerror('Excluir anexo',str(erro),parent=janela)
+                        messagebox.showerror('Excluir anexo',descrever_erro(erro),parent=janela)
                         return
                 else:
                     anexos_pendentes.remove(valor)
@@ -457,7 +473,7 @@ class RegistroMixin:
             try:
                 self.banco.registrar_recebimento(identificador, data_iso(valor.get()), anexos=anexos_pendentes)
             except ValueError as erro:
-                messagebox.showerror('Confira o recebimento', str(erro), parent=tela)
+                messagebox.showerror('Confira o recebimento', descrever_erro(erro), parent=tela)
                 return
             except (sqlite3.Error,OSError):
                 messagebox.showerror('Recebimento', 'Não foi possível salvar.', parent=tela)
@@ -525,7 +541,7 @@ class RegistroMixin:
             try:
                 self.banco.atualizar_previsao(identificador, data_iso(valor.get()))
             except ValueError as erro:
-                messagebox.showerror('Confira a previsão', str(erro), parent=tela)
+                messagebox.showerror('Confira a previsão', descrever_erro(erro), parent=tela)
                 return
             except sqlite3.Error:
                 messagebox.showerror('Previsão atual', 'Não foi possível salvar.', parent=tela)

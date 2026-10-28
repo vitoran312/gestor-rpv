@@ -58,6 +58,13 @@ class TestExportacao(unittest.TestCase):
         self.assertEqual(recebida[11], 'Linha extra')
         self.assertEqual(atrasada[11], 'Abc')
 
+    def test_extensao_de_outra_planilha_e_trocada_por_xlsx(self):
+        self.banco.salvar(dados_rpv())
+        for nome, esperado in (('relatorio.csv', 'relatorio.xlsx'), ('relatorio.XLS', 'relatorio.xlsx'),
+                               ('relatorio', 'relatorio.xlsx'), ('mes.10', 'mes.10.xlsx')):
+            with self.subTest(nome):
+                self.assertEqual(exportar_excel(self.banco.listar(), self.pasta / nome).name, esperado)
+
     def test_celula_respeita_o_limite_do_excel(self):
         from exportacao import LIMITE_CELULA, limitar_celula
         self.assertEqual(limitar_celula('curto'), 'curto')

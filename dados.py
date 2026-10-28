@@ -82,11 +82,11 @@ def previsao_por_prazo(aquisicao, prazo):
     """Soma dias corridos à aquisição e retorna a previsão em DD/MM/AAAA."""
     if not re.fullmatch(r'[0-9]+', prazo.strip()):
         raise ValueError('Informe o prazo em dias como um número inteiro maior ou igual a zero.')
+    inicio = date.fromisoformat(data_iso(aquisicao))
     try:
-        inicio = date.fromisoformat(data_iso(aquisicao))
         resultado = inicio + timedelta(days=int(prazo))
-    except (OverflowError, ValueError):
-        raise ValueError('Confira a data de aquisição e o prazo informado.') from None
+    except OverflowError:
+        resultado = date.max
     if not ANO_MINIMO <= resultado.year <= ANO_MAXIMO:
         raise ValueError(f'O prazo leva a previsão para depois de {ANO_MAXIMO}. Confira o número de dias.')
     return data_br(resultado.isoformat())

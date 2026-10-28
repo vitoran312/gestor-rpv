@@ -13,6 +13,7 @@ from tema import cores
 from ordenacao import ordenar
 from selecao import habilitar_selecao, pressionar_linha, arrastar
 from interacao import aplicar_formato, capitalizar_inicio, novo_menu, mostrar_menu, copiar_texto
+from mensagens import descrever_erro
 
 
 class OperacoesMixin:
@@ -412,7 +413,7 @@ class OperacoesMixin:
         try:
             self.banco.excluir_varios(selecao)
         except (sqlite3.Error,ValueError) as erro:
-            messagebox.showerror('Lixeira',str(erro),parent=self.historico)
+            messagebox.showerror('Lixeira',descrever_erro(erro),parent=self.historico)
             return
         self.atualizar()
 
@@ -464,7 +465,7 @@ class OperacoesMixin:
             try:
                 self.banco.restaurar_varios(selecao)
             except (sqlite3.Error,ValueError) as erro:
-                messagebox.showerror('Lixeira',str(erro),parent=tela)
+                messagebox.showerror('Lixeira',descrever_erro(erro),parent=tela)
                 return
             atualizar()
             self.atualizar()
@@ -481,7 +482,7 @@ class OperacoesMixin:
             try:
                 self.banco.excluir_permanentemente(selecao)
             except (OSError,sqlite3.Error,ValueError) as erro:
-                messagebox.showerror('Exclusão permanente',str(erro),parent=tela)
+                messagebox.showerror('Exclusão permanente',descrever_erro(erro),parent=tela)
                 return
             atualizar()
             self.atualizar()

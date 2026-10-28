@@ -142,7 +142,9 @@ def nome_sugerido():
 def exportar_excel(registros, destino):
     """Grava a planilha em um arquivo temporário e só então substitui o destino."""
     destino = Path(destino)
-    if destino.suffix.casefold() != '.xlsx':
+    if destino.suffix.casefold() in ('.csv', '.xls', '.ods', '.txt'):
+        destino = destino.with_suffix('.xlsx')  # "relatorio.csv" vira "relatorio.xlsx", e não "relatorio.csv.xlsx".
+    elif destino.suffix.casefold() != '.xlsx':
         destino = destino.with_name(destino.name + '.xlsx')
     destino.parent.mkdir(parents=True, exist_ok=True)
     registros = list(registros)
