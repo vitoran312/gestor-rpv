@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## 0.37.0
+
+- App do celular instalável: no Safari do iPhone, Compartilhar → Adicionar à Tela de Início cria o ícone
+  "Gestor RPV", que abre em tela cheia. O código do app fica guardado no aparelho e abre também sem
+  internet; os dados continuam só na memória enquanto o app está aberto. Cada publicação atualiza o app na
+  próxima abertura com internet.
+
 ## 0.36.0
 
 - App do celular, primeiras telas (só consulta): Início com indicadores e situação das operações, Operações em

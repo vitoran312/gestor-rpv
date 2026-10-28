@@ -26,7 +26,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Separar o que vai para o site (sem os testes)
-        run: rsync -a --exclude testes celular/ _site/
+        run: |
+          rsync -a --exclude testes celular/ _site/
+          # Cada publicação tem a sua versão no service worker: os aparelhos trocam a cópia guardada do app.
+          sed -i "s/__VERSAO__/${GITHUB_SHA::12}/" _site/sw.js
+          grep -q "${GITHUB_SHA::12}" _site/sw.js
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
       - uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
         with:

@@ -81,6 +81,16 @@ const { chromium } = require('playwright');
       tela_vazia: document.getElementById('tela').childElementCount === 0,
       senha_vazia: document.getElementById('senha').value === '',
     }));
+    // App na Tela de Início: o service worker guarda o código, e o app abre de novo sem internet.
+    resultados.service_worker = await pagina.evaluate(() => Promise.race([
+      navigator.serviceWorker.ready.then(() => true),
+      new Promise((ok) => setTimeout(() => ok(false), 15000)),
+    ]));
+    await pagina.context().setOffline(true);
+    await pagina.reload();
+    resultados.sem_internet = await pagina.evaluate(() => Boolean(document.getElementById('formulario'))
+      && typeof GestorDados === 'object' && typeof LeitorBackup === 'object' && typeof initSqlJs === 'function');
+    await pagina.context().setOffline(false);
     resultados.erros = erros;
     process.stdout.write(JSON.stringify(resultados));
   } finally {

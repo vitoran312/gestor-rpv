@@ -183,8 +183,42 @@ class TestAppDoCelular(unittest.TestCase):
         self.assertIn('Linha 2 <b>sem HTML</b>', detalhe)  # Nada do backup vira HTML na página.
         self.assertIn('30/11/2026', detalhe)              # Prorrogação antiga define a previsão atual.
 
+    def test_service_worker_guarda_o_app_para_abrir_sem_internet(self):
+        self.assertTrue(self.resultados['service_worker'])
+        self.assertTrue(self.resultados['sem_internet'])
+
     def test_fechar_dados_limpa_a_tela(self):
         self.assertEqual(self.resultados['fechado'], {'abertura': True, 'tela_vazia': True, 'senha_vazia': True})
+
+
+class TestArquivosDoApp(unittest.TestCase):
+    """Conferências que não precisam de navegador: rodam também no CI."""
+
+    def test_service_worker_lista_arquivos_que_existem(self):
+        import re
+        texto = (RAIZ / 'celular' / 'sw.js').read_text(encoding='utf-8')
+        lista = re.search(r'const ARQUIVOS = \[(.*?)\];', texto, re.S).group(1)
+        arquivos = re.findall(r"'([^']+)'", lista)
+        for arquivo in arquivos:
+            with self.subTest(arquivo):
+                self.assertTrue(arquivo == './' or (RAIZ / 'celular' / arquivo).is_file())
+        # Todo arquivo do app (fora os testes) precisa estar na lista, senão não abre sem internet.
+        publicados = {str(c.relative_to(RAIZ / 'celular')).replace(os.sep, '/') for c in (RAIZ / 'celular').rglob('*')
+                      if c.is_file() and 'testes' not in c.parts and c.name not in ('sw.js', 'LICENCAS.txt')}
+        self.assertEqual(publicados - set(arquivos), set())
+
+    def test_manifesto_e_icones(self):
+        import struct
+        manifesto = json.loads((RAIZ / 'celular' / 'manifest.webmanifest').read_text(encoding='utf-8'))
+        self.assertEqual(manifesto['display'], 'standalone')
+        for icone in manifesto['icons'] + [{'src': 'icones/apple-touch-icon.png', 'sizes': '180x180'}]:
+            with self.subTest(icone['src']):
+                # Cabeçalho do PNG: assinatura, bloco IHDR com largura, altura, bits e tipo de cor.
+                cabecalho = (RAIZ / 'celular' / icone['src']).read_bytes()[:26]
+                self.assertEqual(cabecalho[:8], b'\x89PNG\r\n\x1a\n')
+                largura, altura = struct.unpack('>II', cabecalho[16:24])
+                self.assertEqual(f'{largura}x{altura}', icone['sizes'])
+                self.assertEqual(cabecalho[25], 2)  # RGB, sem transparência: o iPhone pintaria o fundo de preto.
 
 
 if __name__ == '__main__':

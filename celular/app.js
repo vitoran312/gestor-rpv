@@ -356,4 +356,13 @@
 
   $('voltar').addEventListener('click', () => history.back());
   window.addEventListener('hashchange', desenhar);
+
+  // ---- App na Tela de Início -----------------------------------------------------------------------------
+  const instalado = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+  $('instalar').hidden = instalado;
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {
+      // Sem o service worker o app funciona igual, só não abre sem internet.
+    });
+  }
 })();

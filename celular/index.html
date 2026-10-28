@@ -9,6 +9,16 @@
   <meta name="referrer" content="no-referrer">
   <meta name="color-scheme" content="light dark">
   <title>Gestor de RPV</title>
+  <!-- App na Tela de Início do iPhone: nome, ícone e abertura em tela cheia. -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png">
+  <link rel="icon" type="image/png" href="icones/icone-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Gestor RPV">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e1117" media="(prefers-color-scheme: dark)">
   <link rel="stylesheet" href="estilo.css">
 </head>
 <body>
@@ -29,6 +39,8 @@
       <div class="barra"><div id="andamento-barra"></div></div>
     </div>
     <p id="erro" class="erro" role="alert" hidden></p>
+    <p id="instalar" class="aviso pequeno" hidden>Para usar como app: no Safari, toque em <strong>Compartilhar</strong>
+      e depois em <strong>Adicionar à Tela de Início</strong>.</p>
   </main>
 
   <!-- Aplicativo: as telas são montadas por app.js conforme o endereço (#inicio, #operacoes...). -->
