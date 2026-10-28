@@ -19,25 +19,29 @@ class MotorCalculadora:
         self.novo = True
         self.erro = False
         self.repetir = None
+        self.exato = None  # Resultado com todas as casas; o visor mostra só 12 dígitos.
 
     def valor(self):
-        return Decimal(self.texto.replace(',', '.'))
+        # O próximo cálculo usa o resultado exato, e não o arredondado do visor: 1 ÷ 3 × 3 dá 1.
+        return self.exato if self.exato is not None else Decimal(self.texto.replace(',', '.'))
 
     def mostrar(self, valor):
         if not valor.is_finite():
             raise ArithmeticError
+        exato = valor
         with localcontext() as contexto:
             contexto.prec = 12
             valor = +valor
-        if valor == 0:
-            texto = '0'
-        elif valor.adjusted() >= 12 or valor.adjusted() <= -8:
-            texto = str(valor.normalize())
+        if valor.adjusted() >= 12:
+            raise OverflowError  # Mais de 12 dígitos inteiros não cabem no visor.
+        if valor == 0 or valor.adjusted() <= -8:
+            texto, exato = '0', Decimal(0)
         else:
             texto = format(valor, 'f')
             if '.' in texto:
                 texto = texto.rstrip('0').rstrip('.')
         self.texto = texto.replace('.', ',')
+        self.exato = exato
 
     @staticmethod
     def calcular(a, b, operacao):
@@ -64,6 +68,8 @@ class MotorCalculadora:
                 self.limpar()
             else:
                 return
+        if tecla in '0123456789,⌫±':
+            self.exato = None  # Ao editar o visor, vale o número digitado.
         try:
             if tecla in '0123456789':
                 if self.novo:
@@ -89,7 +95,8 @@ class MotorCalculadora:
             elif tecla == '±':
                 if self.novo and self.operacao is not None:
                     self.texto = '0'
-                self.texto = self.texto[1:] if self.texto.startswith('-') else '-' + self.texto
+                if self.texto != '0':  # Zero não tem sinal; o visor nunca mostra "-0".
+                    self.texto = self.texto[1:] if self.texto.startswith('-') else '-' + self.texto
                 self.novo = False
             elif tecla == '%':
                 valor = self.valor() / Decimal(100)
@@ -105,8 +112,9 @@ class MotorCalculadora:
                 self.novo = True
                 self.repetir = None
             elif tecla == '=':
-                if self.operacao and not self.novo:
-                    segundo = self.valor()
+                if self.operacao:
+                    # "5 + =" repete o primeiro número (dá 10), como nas calculadoras comuns.
+                    segundo = self.acumulado if self.novo else self.valor()
                     self.mostrar(self.calcular(self.acumulado, segundo, self.operacao))
                     self.repetir = (self.operacao, segundo)
                     self.operacao = None
@@ -119,6 +127,10 @@ class MotorCalculadora:
         except ZeroDivisionError:
             self.limpar()
             self.texto = 'Não divide por zero'
+            self.erro = True
+        except OverflowError:
+            self.limpar()
+            self.texto = 'Número grande demais'
             self.erro = True
         except (DecimalException, ArithmeticError, ValueError):
             self.limpar()
