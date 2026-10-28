@@ -35,7 +35,8 @@ class TestExportacao(unittest.TestCase):
 
     def test_planilha_tem_cabecalho_valores_datas_e_situacao(self):
         recebida = self.banco.salvar(dados_rpv(nome='Pessoa <&> "aspas"', comissao=15050, observacoes='Linha\x01 extra'))
-        self.banco.salvar(dados_rpv(nome='Pendente', aquisicao='2026-10-23'))
+        self.banco.salvar(dados_rpv(nome='Pendente', aquisicao='2026-10-23', previsao='2099-12-31'))
+        self.banco.salvar(dados_rpv(nome='Atrasada', aquisicao='2020-01-01', previsao='2020-02-01'))
         self.banco.registrar_recebimento(recebida, '2026-10-22')
         lixo = self.banco.salvar(dados_rpv(nome='Na lixeira'))
         self.banco.excluir(lixo)
@@ -43,8 +44,9 @@ class TestExportacao(unittest.TestCase):
         self.assertEqual(destino.name, 'operacoes.xlsx')
         linhas = ler_planilha(destino)
         self.assertEqual(linhas[0], [titulo for titulo, _tipo, _largura in COLUNAS])
-        self.assertEqual(len(linhas), 3)
-        pendente, recebida = linhas[1], linhas[2]
+        self.assertEqual(len(linhas), 4)
+        pendente, recebida, atrasada = linhas[1], linhas[2], linhas[3]
+        self.assertEqual(atrasada[9], 'Atrasada')
         self.assertEqual(pendente[0], 'Pendente')
         self.assertEqual(pendente[9], 'Pendente')
         self.assertIsNone(pendente[10])

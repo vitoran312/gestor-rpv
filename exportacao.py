@@ -7,6 +7,8 @@ from pathlib import Path
 from xml.sax.saxutils import escape
 from zipfile import ZipFile, ZIP_DEFLATED
 
+from dados import situacao
+
 
 COLUNAS = (
     ('Titular original', 'texto', 34),
@@ -81,12 +83,15 @@ def serial_excel(iso):
     return (date.fromisoformat(iso) - date(1899, 12, 30)).days
 
 
+SITUACOES = {'recebida': 'Recebido', 'atrasada': 'Atrasada', 'pendente': 'Pendente'}
+
+
 def linha_registro(registro):
-    recebido = registro['recebimento']
+    # A mesma situação da tela: atrasada quando a previsão atual passou sem recebimento.
     return (registro['nome'], registro['aquisicao'], registro['custo'], registro['comissao'] or 0,
             registro['previsto'], registro['previsto'] - registro['custo'], registro['conta'],
-            registro['previsao'], registro['previsao_atual'], 'Recebido' if recebido else 'Pendente',
-            recebido, registro['observacoes'])
+            registro['previsao'], registro['previsao_atual'], SITUACOES[situacao(registro)],
+            registro['recebimento'], registro['observacoes'])
 
 
 def celula(referencia, valor, tipo, estilo=None):
