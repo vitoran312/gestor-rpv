@@ -57,6 +57,10 @@ def centavos(texto):
         if 1 <= len(partes[0]) <= 3 and all(len(p) == 3 and p.isdigit() for p in partes[1:]):
             texto = ''.join(partes)
     try:
+        # Só dígitos 0-9 e um separador decimal: Decimal aceitaria também "1e3", "1_000" e dígitos de
+        # outros alfabetos, que não são formas de escrever dinheiro.
+        if not re.fullmatch(r'[0-9]+(\.[0-9]+)?', texto):
+            raise ValueError
         valor = Decimal(texto)
         if not valor.is_finite() or valor < 0 or valor > Decimal('999999999999.99'):
             raise ValueError

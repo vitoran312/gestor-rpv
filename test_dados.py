@@ -25,7 +25,10 @@ class TestDados(unittest.TestCase):
         self.assertEqual(centavos('12000,50'), 1200050)
         self.assertEqual(moeda(-800050), '-8.000,50')
         self.assertEqual(data_iso('22/10/2026'), '2026-10-22')
-        for invalido in ('NaN', 'Infinity', '-1', '12,345', ''):
+        self.assertEqual(centavos('R$ 1.000,00'), 100000)
+        self.assertEqual(centavos('1500.5'), 150050)
+        for invalido in ('NaN', 'Infinity', '-1', '12,345', '', '1e3', '1E2', '2e-2', '1_000', '١٢٣', '１２３',
+                         '+5', '.5', '5.', '1,2,3', 'abc'):
             with self.assertRaises(ValueError):
                 centavos(invalido)
         with self.assertRaises(ValueError):
