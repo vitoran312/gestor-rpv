@@ -101,6 +101,7 @@ class TestOperacoesInterrompidas(unittest.TestCase):
         import instancia
         dados_app = self.pasta / 'trava'
         self.assertTrue(instancia.travar(dados_app))
+        self.addCleanup(instancia.soltar, dados_app)  # No Windows, a pasta só sai depois de fechado o arquivo.
         self.assertTrue(instancia.travar(dados_app))  # A própria execução pode pedir de novo.
         outra = subprocess.run([sys.executable, '-c', 'import sys, instancia; sys.exit(0 if instancia.travar(sys.argv[1]) '
                                 'else 3)', str(dados_app)], cwd=Path(__file__).parent)

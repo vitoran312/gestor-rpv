@@ -215,9 +215,9 @@ if __name__ == '__main__':
     preparar_windows()
     diario.ativar(pasta_dados())
     janela = tk.Tk()
+    janela.withdraw()  # A segunda execução não pisca uma janela vazia antes do aviso.
     janela.report_callback_exception = diario.erro_na_interface
     if not instancia.travar(pasta_dados()):
-        janela.withdraw()
         messagebox.showinfo('Gestor de RPV', 'O Gestor de RPV já está aberto neste computador. Use a janela que '
                             'já está aberta (veja a barra de tarefas).')
         raise SystemExit(0)

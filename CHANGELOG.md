@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## 0.34.1
+
+- Se o Windows segurar a pasta dos anexos antigos logo depois de uma importação que deu certo, a tela não
+  mostra mais "Não foi possível importar"; a próxima abertura termina a arrumação.
+- Abrir o programa uma segunda vez não pisca uma janela vazia antes do aviso.
+- Teste da trava de execução única solta o arquivo no fim (no Windows, a pasta temporária não saía).
+
 ## 0.34.0
 
 Correções do segundo veredito do chefe da banca, sobre a 0.33.0.

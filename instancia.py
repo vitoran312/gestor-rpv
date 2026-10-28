@@ -31,3 +31,10 @@ def travar(pasta):
         return False
     _travas[caminho] = arquivo
     return True
+
+
+def soltar(pasta):
+    """Solta a trava desta execução (o sistema também a solta sozinho quando o programa fecha)."""
+    arquivo = _travas.pop(Path(pasta) / NOME, None)
+    if arquivo is not None:
+        arquivo.close()

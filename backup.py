@@ -564,8 +564,13 @@ class BackupPreparado:
                     os.replace(antigos, destino)
                 raise
             if tinha_documentos:
-                # A troca terminou: a partir daqui, recuperar_interrompidas nunca devolve estes anexos.
-                os.replace(antigos, trabalho / DESCARTAR)
+                # A troca terminou: a partir daqui, recuperar_interrompidas nunca devolve estes anexos. Se o
+                # Windows segurar a pasta, a marca no banco faz a próxima abertura completar a renomeação; a
+                # importação deu certo e não pode ser mostrada como falha.
+                try:
+                    os.replace(antigos, trabalho / DESCARTAR)
+                except OSError:
+                    log.warning('Anexos anteriores não marcados para descarte; a próxima abertura completa.')
         # A marca da restauração fica no banco até a próxima abertura (recuperar_interrompidas a apaga): nada é
         # gravado depois da troca. Ela nunca vai para um backup, por estar em CONFIGURACOES_LOCAIS.
         return seguranca
