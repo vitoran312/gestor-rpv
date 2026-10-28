@@ -76,7 +76,7 @@ class TestBackupHistorico(unittest.TestCase):
         destino_docs = self.destino.caminho.parent / 'documentos'
         arquivo = criar_backup(self.origem, self.pasta / 'backups')
         with BackupPreparado(arquivo, SENHA_TESTE) as preparado:
-            self.assertEqual(preparado.resumo, {'registros':1, 'lixeira':1, 'contas':3, 'documentos':2})
+            self.assertEqual(preparado.resumo, {'registros': 1, 'lixeira': 1, 'contas': 3, 'documentos': 2})
             seguranca = preparado.restaurar(self.destino)
         restaurado = Banco(self.destino.caminho)
         self.assertEqual(restaurado.obter(rpv)['previsao_atual'], '2027-01-20')
@@ -112,13 +112,13 @@ class TestBackupHistorico(unittest.TestCase):
         arquivo = self.backup_sem_senha()
         alterado = self.pasta / 'alterado.rpvbackup'
         no_zip = 'documentos/' + contrato.relative_to(contrato.parents[1]).as_posix()
-        with ZipFile(arquivo) as origem, ZipFile(alterado,'w',ZIP_DEFLATED) as alvo:
+        with ZipFile(arquivo) as origem, ZipFile(alterado, 'w', ZIP_DEFLATED) as alvo:
             for nome in origem.namelist():
                 alvo.writestr(nome, b'alterado' if nome == no_zip else origem.read(nome))
         with self.assertRaises(ValueError), BackupPreparado(alterado, SENHA_TESTE):
             pass
         inseguro = self.pasta / 'inseguro.rpvbackup'
-        with ZipFile(inseguro,'w') as pacote:
+        with ZipFile(inseguro, 'w') as pacote:
             pacote.writestr('../fora.txt', 'invalido')
         with self.assertRaises(ValueError), BackupPreparado(inseguro, SENHA_TESTE):
             pass
@@ -205,8 +205,8 @@ class TestBackupHistorico(unittest.TestCase):
     def test_lixeira_restauracao_e_prorrogacao_somente_na_lista_ativa(self):
         identificador = self.origem.salvar(dados_rpv())
         self.origem.salvar(dados_rpv(observacoes='Alteração'), identificador)
-        self.origem.atualizar_previsao(identificador,'2027-01-20')
-        self.origem.registrar_recebimento(identificador,'2026-10-22')
+        self.origem.atualizar_previsao(identificador, '2027-01-20')
+        self.origem.registrar_recebimento(identificador, '2026-10-22')
         with self.assertRaises(ValueError):
             self.origem.salvar(dados_rpv(custo=0), identificador)
         self.assertEqual(self.origem.obter(identificador)['observacoes'], 'Alteração')
@@ -219,7 +219,7 @@ class TestBackupHistorico(unittest.TestCase):
     def test_migracao_080_remove_unicidade_cpf_preserva_vinculos(self):
         conta = self.origem.salvar_conta(dados_conta())
         identificador = self.origem.salvar(dados_rpv(conta_id=conta))
-        self.origem.registrar_recebimento(identificador,'2026-10-22')
+        self.origem.registrar_recebimento(identificador, '2026-10-22')
         snapshot = self.origem.obter(identificador)['conta_snapshot']
         with self.origem.conectar() as con:
             con.execute('ALTER TABLE rpvs DROP COLUMN lixeira_em')
@@ -233,16 +233,16 @@ class TestBackupHistorico(unittest.TestCase):
             con.execute('ALTER TABLE contas_legado RENAME TO contas')
             con.execute('PRAGMA user_version=3')
         migrado = Banco(self.origem.caminho)
-        nova = migrado.salvar_conta(dados_conta(identificacao='Outro banco',numero='999',pix='outro@example.com'))
-        self.assertNotEqual(conta,nova)
-        self.assertEqual(migrado.obter(identificador)['conta_snapshot'],snapshot)
-        self.assertEqual(migrado.obter(identificador)['recebimento'],'2026-10-22')
+        nova = migrado.salvar_conta(dados_conta(identificacao='Outro banco', numero='999', pix='outro@example.com'))
+        self.assertNotEqual(conta, nova)
+        self.assertEqual(migrado.obter(identificador)['conta_snapshot'], snapshot)
+        self.assertEqual(migrado.obter(identificador)['recebimento'], '2026-10-22')
         with migrado.conectar() as con:
-            self.assertEqual(con.execute('PRAGMA foreign_key_check').fetchall(),[])
+            self.assertEqual(con.execute('PRAGMA foreign_key_check').fetchall(), [])
             self.assertFalse(Banco.cpf_unico(con))
         with migrado.conectar() as con:
             self.assertIsNone(con.execute("SELECT 1 FROM sqlite_master WHERE name='historico_alteracoes'").fetchone())
-        self.assertEqual(len(list(migrado.caminho.parent.glob('backup-antes-0.9.0-*.sqlite3'))),1)
+        self.assertEqual(len(list(migrado.caminho.parent.glob('backup-antes-0.9.0-*.sqlite3'))), 1)
 
     def test_backup_dentro_da_pasta_documentos_nao_inclui_a_si_mesmo(self):
         self.anexar(self.origem, self.origem.salvar(dados_rpv()), 'contrato.pdf', b'%PDF-contrato')
@@ -250,7 +250,7 @@ class TestBackupHistorico(unittest.TestCase):
         primeiro = criar_backup(self.origem, docs)
         segundo = criar_backup(self.origem, docs)
         with BackupPreparado(segundo, SENHA_TESTE) as preparado:
-            self.assertEqual(preparado.resumo['documentos'],1)
+            self.assertEqual(preparado.resumo['documentos'], 1)
         self.assertTrue(primeiro.exists())
 
     def test_backups_automaticos_mantem_somente_os_dez_mais_recentes(self):
@@ -288,7 +288,6 @@ class TestBackupHistorico(unittest.TestCase):
         self.assertEqual(len(restantes), 10)
         self.assertEqual(len(list(pasta.glob('backup-antes-0.16.0-*.sqlite3'))), 1)
         self.assertFalse((pasta / 'backup-antes-0.9.0-20200100.sqlite3').exists())
-
 
     def test_backup_automatico_semanal_preserva_backups_manuais(self):
         self.assertIsNone(executar_backup_automatico(self.origem))
@@ -342,6 +341,7 @@ class TestBackupHistorico(unittest.TestCase):
         finally:
             copia.close()
         self.assertEqual(migrado.obter(identificador)['nome'], 'Pessoa De Teste')
+
 
 if __name__ == '__main__':
     unittest.main()

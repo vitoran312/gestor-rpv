@@ -99,10 +99,10 @@ class CampoMoeda(ttk.Frame):
         if selecionado:
             digitos = digitos[:antes] + digitos[depois:]
         elif acao == 'BackSpace' and antes:
-            digitos = digitos[:antes-1] + digitos[antes:]
+            digitos = digitos[:antes - 1] + digitos[antes:]
             antes -= 1
         elif acao == 'Delete':
-            digitos = digitos[:antes] + digitos[antes+1:]
+            digitos = digitos[:antes] + digitos[antes + 1:]
         digitos = digitos[:antes] + inserir + digitos[antes:]
         posicao = antes + len(inserir)
         direita = len(digitos) - posicao
@@ -116,7 +116,7 @@ class CampoMoeda(ttk.Frame):
         cursor = len(novo)
         if direita:
             vistos = 0
-            for indice in range(len(novo)-1, -1, -1):
+            for indice in range(len(novo) - 1, -1, -1):
                 if novo[indice].isdigit():
                     vistos += 1
                 if vistos == direita:
@@ -180,14 +180,14 @@ class CampoData(ttk.Frame):
         self.botao.pack(side='left', padx=(5, 0))
 
     def atualizar_tema(self):
-        self.imagem_calendario = tk.PhotoImage(master=self,width=20,height=20)
+        self.imagem_calendario = tk.PhotoImage(master=self, width=20, height=20)
         imagem = self.imagem_calendario
         cor = cores()['texto']
-        for retangulo in ((2,4,18,6),(2,16,18,18),(2,5,4,17),(16,5,18,17),(6,2,8,7),(12,2,14,7),(3,8,17,9)):
-            imagem.put(cor,to=retangulo)
-        for x in (6,10,14):
-            for y in (11,14): imagem.put(cor,to=(x,y,x+1,y+1))
-        self.botao.configure(image=imagem,compound='image')
+        for retangulo in ((2, 4, 18, 6), (2, 16, 18, 18), (2, 5, 4, 17), (16, 5, 18, 17), (6, 2, 8, 7), (12, 2, 14, 7), (3, 8, 17, 9)):
+            imagem.put(cor, to=retangulo)
+        for x in (6, 10, 14):
+            for y in (11, 14): imagem.put(cor, to=(x, y, x + 1, y + 1))
+        self.botao.configure(image=imagem, compound='image')
 
     def habilitar(self, ativo):
         estado = '!disabled' if ativo else 'disabled'
@@ -282,37 +282,38 @@ class CampoData(ttk.Frame):
 
 class AreaRolavel(ttk.Frame):
     """Formulários com conteúdo rolável e ações fixas fora da área de rolagem."""
-    def __init__(self,pai):
+
+    def __init__(self, pai):
         super().__init__(pai)
         import weakref
-        self.canvas = tk.Canvas(self,bg=cores()['fundo'],highlightthickness=0,bd=0)
-        self.scroll = ttk.Scrollbar(self,orient='vertical',command=self.canvas.yview)
+        self.canvas = tk.Canvas(self, bg=cores()['fundo'], highlightthickness=0, bd=0)
+        self.scroll = ttk.Scrollbar(self, orient='vertical', command=self.canvas.yview)
         self.canvas.configure(yscrollcommand=self.scroll.set)
-        self.canvas.grid(row=0,column=0,sticky='nsew')
-        self.scroll.grid(row=0,column=1,sticky='ns')
-        self.rowconfigure(0,weight=1)
-        self.columnconfigure(0,weight=1)
-        self.conteudo = ttk.Frame(self.canvas,padding=(24,16))
-        self.janela_interna = self.canvas.create_window(0,0,window=self.conteudo,anchor='nw')
-        self.conteudo.bind('<Configure>',self.ajustar_conteudo)
-        self.canvas.bind('<Configure>',self.ajustar_canvas)
+        self.canvas.grid(row=0, column=0, sticky='nsew')
+        self.scroll.grid(row=0, column=1, sticky='ns')
+        self.rowconfigure(0, weight=1)
+        self.columnconfigure(0, weight=1)
+        self.conteudo = ttk.Frame(self.canvas, padding=(24, 16))
+        self.janela_interna = self.canvas.create_window(0, 0, window=self.conteudo, anchor='nw')
+        self.conteudo.bind('<Configure>', self.ajustar_conteudo)
+        self.canvas.bind('<Configure>', self.ajustar_canvas)
         raiz = self._root()
-        if not hasattr(raiz,'_formularios_rolaveis'):
+        if not hasattr(raiz, '_formularios_rolaveis'):
             raiz._formularios_rolaveis = weakref.WeakSet()
             def rolar(evento):
-                alvo = raiz.winfo_containing(evento.x_root,evento.y_root)
-                if isinstance(alvo,(tk.Text,ttk.Treeview)):
+                alvo = raiz.winfo_containing(evento.x_root, evento.y_root)
+                if isinstance(alvo, (tk.Text, ttk.Treeview)):
                     return
                 while alvo is not None:
                     if alvo in raiz._formularios_rolaveis:
-                        delta = getattr(evento,'delta',0)
-                        numero = getattr(evento,'num',None)
-                        unidades = -max(1,abs(delta)//120) if delta>0 or numero==4 else max(1,abs(delta)//120)
-                        alvo.canvas.yview_scroll(unidades,'units')
+                        delta = getattr(evento, 'delta', 0)
+                        numero = getattr(evento, 'num', None)
+                        unidades = -max(1, abs(delta) // 120) if delta > 0 or numero == 4 else max(1, abs(delta) // 120)
+                        alvo.canvas.yview_scroll(unidades, 'units')
                         return 'break'
-                    alvo = getattr(alvo,'master',None)
-            for evento in ('<MouseWheel>','<Button-4>','<Button-5>'):
-                raiz.bind_all(evento,rolar,add='+')
+                    alvo = getattr(alvo, 'master', None)
+            for evento in ('<MouseWheel>', '<Button-4>', '<Button-5>'):
+                raiz.bind_all(evento, rolar, add='+')
             def revelar(evento):
                 widget = evento.widget
                 alvo = widget
@@ -320,81 +321,82 @@ class AreaRolavel(ttk.Frame):
                     if alvo in raiz._formularios_rolaveis:
                         if not alvo.winfo_ismapped():
                             return
-                        altura_total = max(1,alvo.conteudo.winfo_height())
-                        inicio = widget.winfo_rooty()-alvo.conteudo.winfo_rooty()
-                        fim = inicio+widget.winfo_height()
-                        primeiro,ultimo = alvo.canvas.yview()
-                        if inicio < primeiro*altura_total:
-                            alvo.canvas.yview_moveto(max(0,inicio-12)/altura_total)
-                        elif fim > ultimo*altura_total:
-                            alvo.canvas.yview_moveto(max(0,fim-alvo.canvas.winfo_height()+12)/altura_total)
+                        altura_total = max(1, alvo.conteudo.winfo_height())
+                        inicio = widget.winfo_rooty() - alvo.conteudo.winfo_rooty()
+                        fim = inicio + widget.winfo_height()
+                        primeiro, ultimo = alvo.canvas.yview()
+                        if inicio < primeiro * altura_total:
+                            alvo.canvas.yview_moveto(max(0, inicio - 12) / altura_total)
+                        elif fim > ultimo * altura_total:
+                            alvo.canvas.yview_moveto(max(0, fim - alvo.canvas.winfo_height() + 12) / altura_total)
                         return
-                    alvo = getattr(alvo,'master',None)
-            raiz.bind_all('<FocusIn>',revelar,add='+')
+                    alvo = getattr(alvo, 'master', None)
+            raiz.bind_all('<FocusIn>', revelar, add='+')
         raiz._formularios_rolaveis.add(self)
 
     def atualizar_tema(self):
         self.canvas.configure(bg=cores()['fundo'])
 
-    def ajustar_conteudo(self,_evento=None):
+    def ajustar_conteudo(self, _evento=None):
         self.canvas.configure(scrollregion=self.canvas.bbox('all'),
                               width=self.conteudo.winfo_reqwidth(),
-                              height=min(self.conteudo.winfo_reqheight(),max(240,self.winfo_screenheight()-270)))
+                              height=min(self.conteudo.winfo_reqheight(), max(240, self.winfo_screenheight() - 270)))
 
-    def ajustar_canvas(self,evento):
-        self.canvas.itemconfigure(self.janela_interna,width=max(evento.width,self.conteudo.winfo_reqwidth()))
+    def ajustar_canvas(self, evento):
+        self.canvas.itemconfigure(self.janela_interna, width=max(evento.width, self.conteudo.winfo_reqwidth()))
 
 
 class BalaoAjuda:
     """Ajuda ao passar o mouse: não muda o foco nem o controle de janelas modais."""
-    def __init__(self,widget,texto,atraso=600):
-        self.widget=widget
-        self.texto=texto
-        self.atraso=atraso
-        self.agendado=None
-        self.janela=None
-        widget.balao=self
-        widget.bind('<Enter>',self.agendar,add='+')
-        widget.bind('<Leave>',self.ocultar,add='+')
-        widget.bind('<ButtonPress>',self.ocultar,add='+')
-        widget.bind('<Destroy>',self.ocultar,add='+')
-        widget.winfo_toplevel().bind('<Unmap>',self.ocultar,add='+')
-        widget.winfo_toplevel().bind('<FocusOut>',self.ocultar,add='+')
 
-    def agendar(self,_evento=None):
+    def __init__(self, widget, texto, atraso=600):
+        self.widget = widget
+        self.texto = texto
+        self.atraso = atraso
+        self.agendado = None
+        self.janela = None
+        widget.balao = self
+        widget.bind('<Enter>', self.agendar, add='+')
+        widget.bind('<Leave>', self.ocultar, add='+')
+        widget.bind('<ButtonPress>', self.ocultar, add='+')
+        widget.bind('<Destroy>', self.ocultar, add='+')
+        widget.winfo_toplevel().bind('<Unmap>', self.ocultar, add='+')
+        widget.winfo_toplevel().bind('<FocusOut>', self.ocultar, add='+')
+
+    def agendar(self, _evento=None):
         self.ocultar()
         if self.widget.winfo_exists():
-            self.agendado=self.widget.after(self.atraso,self.mostrar)
+            self.agendado = self.widget.after(self.atraso, self.mostrar)
 
     def mostrar(self):
         if self.agendado is not None:
             self.widget.after_cancel(self.agendado)
-            self.agendado=None
+            self.agendado = None
         if self.janela is not None or not self.widget.winfo_exists() or not self.widget.winfo_ismapped():
             return
-        if hasattr(self.widget,'instate') and self.widget.instate(['disabled']):
+        if hasattr(self.widget, 'instate') and self.widget.instate(['disabled']):
             return
-        tela=tk.Toplevel(self.widget)
-        self.janela=tela
+        tela = tk.Toplevel(self.widget)
+        self.janela = tela
         tela.withdraw()
         tela.overrideredirect(True)
         tela.transient(self.widget.winfo_toplevel())
         tela.configure(bg=cores()['campo'])
-        ttk.Label(tela,text=self.texto,style='Ajuda.TLabel',justify='left').pack()
+        ttk.Label(tela, text=self.texto, style='Ajuda.TLabel', justify='left').pack()
         tela.update_idletasks()
-        largura,altura=tela.winfo_reqwidth(),tela.winfo_reqheight()
-        x=min(self.widget.winfo_rootx()+12,self.widget.winfo_screenwidth()-largura-8)
-        y=self.widget.winfo_rooty()+self.widget.winfo_height()+6
-        if y+altura>self.widget.winfo_screenheight()-8:
-            y=self.widget.winfo_rooty()-altura-6
-        tela.geometry(f'+{max(8,x)}+{max(8,y)}')
+        largura, altura = tela.winfo_reqwidth(), tela.winfo_reqheight()
+        x = min(self.widget.winfo_rootx() + 12, self.widget.winfo_screenwidth() - largura - 8)
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 6
+        if y + altura > self.widget.winfo_screenheight() - 8:
+            y = self.widget.winfo_rooty() - altura - 6
+        tela.geometry(f'+{max(8, x)}+{max(8, y)}')
         tela.deiconify()
         tela.lift()
 
-    def ocultar(self,_evento=None):
+    def ocultar(self, _evento=None):
         if self.agendado is not None:
             self.widget.after_cancel(self.agendado)
-            self.agendado=None
+            self.agendado = None
         if self.janela is not None:
-            tela,self.janela=self.janela,None
+            tela, self.janela = self.janela, None
             if tela.winfo_exists(): tela.destroy()

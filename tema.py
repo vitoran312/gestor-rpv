@@ -41,7 +41,7 @@ def atualizar_widgets(widget):
     c = cores()
     if isinstance(widget, (tk.Tk, tk.Toplevel)):
         widget.configure(bg=c['fundo'])
-    elif callable(getattr(widget,'atualizar_tema',None)):
+    elif callable(getattr(widget, 'atualizar_tema', None)):
         widget.atualizar_tema()
     elif isinstance(widget, tk.Text):
         widget.configure(bg=c['campo'], fg=c['texto'], insertbackground=c['texto'],
@@ -50,7 +50,7 @@ def atualizar_widgets(widget):
         widget.configure(bg=c['campo'], fg=c['texto'], activebackground=c['selecao'],
                          activeforeground=c['texto_selecao'], disabledforeground=c['desabilitado'])
     elif isinstance(widget, ttk.Combobox):
-        popup = str(widget)+'.popdown'
+        popup = str(widget) + '.popdown'
         lista = str(popup) + '.f.l'
         if widget.tk.call('winfo', 'exists', lista):
             widget.tk.call(lista, 'configure', '-background', c['campo'], '-foreground', c['texto'],

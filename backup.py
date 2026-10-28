@@ -334,6 +334,7 @@ def conferir_hash(pacote, nome, esperado, destino=None):
 
 class BackupPreparado:
     """Confere o backup numa pasta temporária; os anexos só são gravados em restaurar(), após a confirmação."""
+
     def __init__(self, arquivo, senha=None, pasta_trabalho=None):
         self.arquivo = Path(arquivo)
         self.senha = senha

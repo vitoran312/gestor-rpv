@@ -158,7 +158,7 @@ class JanelaCalculadora:
         for linha, grupo in enumerate(teclas):
             painel.rowconfigure(linha, weight=1)
             for coluna, tecla in enumerate(grupo):
-                ttk.Button(painel, text=tecla, style='Resultado.Calculadora.TButton' if tecla=='=' else 'Calculadora.TButton', width=4,
+                ttk.Button(painel, text=tecla, style='Resultado.Calculadora.TButton' if tecla == '=' else 'Calculadora.TButton', width=4,
                            command=lambda t=tecla: self.clicar(t)).grid(row=linha, column=coluna,
                                     sticky='nsew', padx=3, pady=3)
         for coluna in range(4):

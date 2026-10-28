@@ -26,41 +26,41 @@ def verificar(exe):
     kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
     with tempfile.TemporaryDirectory(prefix='gestor-exe-teste-') as pasta:
         ambiente = dict(os.environ, LOCALAPPDATA=pasta)
-        ambiente['PATH'] = str(Path(os.environ['SystemRoot'])/'System32')
+        ambiente['PATH'] = str(Path(os.environ['SystemRoot']) / 'System32')
         processo = subprocess.Popen([str(exe)], env=ambiente)
         try:
             encontrada = []
             @callback
             def janela(hwnd, _):
                 titulo = ctypes.create_unicode_buffer(256)
-                user32.GetWindowTextW(hwnd,titulo,len(titulo))
+                user32.GetWindowTextW(hwnd, titulo, len(titulo))
                 if titulo.value != 'Gestor de RPV' or not user32.IsWindowVisible(hwnd):
                     return True
                 pid = wintypes.DWORD()
-                user32.GetWindowThreadProcessId(hwnd,ctypes.byref(pid))
-                handle = kernel32.OpenProcess(0x1000,False,pid.value)
+                user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+                handle = kernel32.OpenProcess(0x1000, False, pid.value)
                 if handle:
                     try:
                         caminho = ctypes.create_unicode_buffer(32768)
                         tamanho = wintypes.DWORD(len(caminho))
-                        if kernel32.QueryFullProcessImageNameW(handle,0,caminho,ctypes.byref(tamanho)) and Path(caminho.value).resolve() == exe:
+                        if kernel32.QueryFullProcessImageNameW(handle, 0, caminho, ctypes.byref(tamanho)) and Path(caminho.value).resolve() == exe:
                             encontrada.append(hwnd)
                     finally:
                         kernel32.CloseHandle(handle)
                 return True
-            limite = time.monotonic()+45
-            while not encontrada and time.monotonic()<limite:
+            limite = time.monotonic() + 45
+            while not encontrada and time.monotonic() < limite:
                 if processo.poll() is not None:
                     raise RuntimeError(f'O executável fechou antes de abrir a janela: {processo.returncode}')
-                user32.EnumWindows(janela,0)
+                user32.EnumWindows(janela, 0)
                 time.sleep(.2)
             if not encontrada:
                 raise RuntimeError('A janela do executável não abriu em 45 segundos.')
-            user32.PostMessageW(encontrada[0],0x0010,0,0)  # WM_CLOSE
+            user32.PostMessageW(encontrada[0], 0x0010, 0, 0)  # WM_CLOSE
             if processo.wait(timeout=20) != 0:
                 raise RuntimeError('O executável terminou com erro.')
             # closing fecha o arquivo; no Windows, um banco aberto impede apagar a pasta temporária.
-            with closing(sqlite3.connect(Path(pasta)/'GestorRPV'/'gestor.sqlite3')) as con:
+            with closing(sqlite3.connect(Path(pasta) / 'GestorRPV' / 'gestor.sqlite3')) as con:
                 assert con.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
                 assert con.execute('PRAGMA user_version').fetchone()[0] == 8
                 # Instalação nova abre com os dados fictícios de demonstração.
@@ -70,7 +70,7 @@ def verificar(exe):
             print('Executável abriu, criou o banco temporário e fechou sem Python no PATH.')
         finally:
             if processo.poll() is None:
-                subprocess.run(['taskkill','/PID',str(processo.pid),'/T','/F'],check=False)
+                subprocess.run(['taskkill', '/PID', str(processo.pid), '/T', '/F'], check=False)
                 processo.wait(timeout=20)
 
 

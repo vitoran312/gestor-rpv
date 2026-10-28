@@ -45,7 +45,6 @@ def pad(valor):
     return round(valor * AMPLIACAO) if isinstance(valor, int) else tuple(round(v * AMPLIACAO) for v in valor)
 
 
-
 def criar_campos_principais(quadro, registro, conta_inicial, mapa_contas, modo_previsao):
     """Nome, datas, valores e conta, uma linha cada; a previsão pode vir do calendário ou do prazo."""
     campos = {}
@@ -59,9 +58,9 @@ def criar_campos_principais(quadro, registro, conta_inicial, mapa_contas, modo_p
     ]
     for linha, (chave, titulo, padrao) in enumerate(definicoes):
         if chave == 'previsao':
-            ttk.Radiobutton(quadro,text='Previsão inicial por calendário',variable=modo_previsao,value='calendario').grid(row=linha,column=0,sticky='w',pady=pad(6),padx=pad((0,16)))
+            ttk.Radiobutton(quadro, text='Previsão inicial por calendário', variable=modo_previsao, value='calendario').grid(row=linha, column=0, sticky='w', pady=pad(6), padx=pad((0, 16)))
         else:
-            ttk.Label(quadro, text=titulo).grid(row=linha, column=0, sticky='w', pady=pad(6), padx=pad((0,16)))
+            ttk.Label(quadro, text=titulo).grid(row=linha, column=0, sticky='w', pady=pad(6), padx=pad((0, 16)))
         valor = conta_inicial if chave == 'conta' else (registro[chave] if registro else padrao)
         if registro and chave in ('aquisicao', 'previsao'):
             valor = data_br(valor)
@@ -87,15 +86,15 @@ def criar_campos_principais(quadro, registro, conta_inicial, mapa_contas, modo_p
 
 def criar_linha_prazo(quadro, linha, campos, modo_previsao, campo_previsao):
     """Previsão por prazo em dias, sincronizada nos dois sentidos com a data escolhida no calendário."""
-    ttk.Radiobutton(quadro,text='Previsão inicial de recebimento em',variable=modo_previsao,value='dias').grid(row=linha,column=0,sticky='w',pady=pad(6),padx=pad((0,16)))
+    ttk.Radiobutton(quadro, text='Previsão inicial de recebimento em', variable=modo_previsao, value='dias').grid(row=linha, column=0, sticky='w', pady=pad(6), padx=pad((0, 16)))
     linha_prazo = ttk.Frame(quadro)
-    linha_prazo.grid(row=linha,column=1,sticky='ew',pady=pad(6))
+    linha_prazo.grid(row=linha, column=1, sticky='ew', pady=pad(6))
     prazo = tk.StringVar()
-    entrada_prazo = ttk.Entry(linha_prazo,textvariable=prazo,width=6,justify='center',name='prazo_dias')
+    entrada_prazo = ttk.Entry(linha_prazo, textvariable=prazo, width=6, justify='center', name='prazo_dias')
     entrada_prazo.pack(side='left')
-    ttk.Label(linha_prazo,text='dias.').pack(side='left',padx=pad((8,12)))
+    ttk.Label(linha_prazo, text='dias.').pack(side='left', padx=pad((8, 12)))
     data_calculada = tk.StringVar(value='dd/mm/aaaa')
-    resultado_prazo = ttk.Label(linha_prazo,textvariable=data_calculada,style='DataCalculada.TLabel',name='data_calculada')
+    resultado_prazo = ttk.Label(linha_prazo, textvariable=data_calculada, style='DataCalculada.TLabel', name='data_calculada')
     resultado_prazo.pack(side='left')
     sincronizando_prazo = False
 
@@ -104,7 +103,7 @@ def criar_linha_prazo(quadro, linha, campos, modo_previsao, campo_previsao):
         if sincronizando_prazo or modo_previsao.get() != 'dias':
             return
         try:
-            prevista = previsao_por_prazo(campos['aquisicao'].get(),prazo.get())
+            prevista = previsao_por_prazo(campos['aquisicao'].get(), prazo.get())
         except ValueError:
             data_calculada.set('dd/mm/aaaa')
             return
@@ -138,10 +137,10 @@ def criar_linha_prazo(quadro, linha, campos, modo_previsao, campo_previsao):
         resultado_prazo.state(['!disabled' if por_dias else 'disabled'])
         calcular_data() if por_dias else calcular_dias()
 
-    prazo.trace_add('write',calcular_data)
-    campos['aquisicao'].trace_add('write',lambda *_: calcular_data() if modo_previsao.get()=='dias' else calcular_dias())
-    campos['previsao'].trace_add('write',calcular_dias)
-    modo_previsao.trace_add('write',escolher_modo)
+    prazo.trace_add('write', calcular_data)
+    campos['aquisicao'].trace_add('write', lambda *_: calcular_data() if modo_previsao.get() == 'dias' else calcular_dias())
+    campos['previsao'].trace_add('write', calcular_dias)
+    modo_previsao.trace_add('write', escolher_modo)
     escolher_modo()
     return prazo
 
@@ -193,7 +192,7 @@ def criar_observacoes(quadro, linha, registro, fonte):
                           bg=cores()['campo'], fg=cores()['texto'], insertbackground=cores()['texto'],
                           selectbackground=cores()['selecao'], selectforeground=cores()['texto_selecao'],
                           relief='flat', padx=pad(6), pady=pad(6))
-    observacoes.grid(row=linha, column=1, sticky='ew',pady=pad(10))
+    observacoes.grid(row=linha, column=1, sticky='ew', pady=pad(10))
 
     def capitalizar_observacoes(_evento=None):
         texto = observacoes.get('1.0', 'end-1c')
@@ -209,6 +208,7 @@ def criar_observacoes(quadro, linha, registro, fonte):
         observacoes.insert('1.0', registro['observacoes'])
     return observacoes
 
+
 class RegistroMixin:
     def formulario(self, identificador=None):
         # Um formulário por vez: Ctrl+N repetido (ou a tecla presa) traz o que já está aberto,
@@ -216,31 +216,31 @@ class RegistroMixin:
         if self.trazer_se_aberta(self.janela_formulario):
             return
         registro = self.banco.obter(identificador) if identificador else None
-        contas=list(self.banco.contas(somente_ativas=True))
-        conta_original=self.banco.obter_conta(registro['conta_id']) if registro and registro['conta_id'] is not None else None
-        if conta_original is not None and all(c['id']!=conta_original['id'] for c in contas):
+        contas = list(self.banco.contas(somente_ativas=True))
+        conta_original = self.banco.obter_conta(registro['conta_id']) if registro and registro['conta_id'] is not None else None
+        if conta_original is not None and all(c['id'] != conta_original['id'] for c in contas):
             contas.append(conta_original)
         if not contas and registro is None:
-            messagebox.showinfo('Contas de recebimento','Cadastre ou reative uma conta antes de criar uma entrada.',parent=self.janela)
+            messagebox.showinfo('Contas de recebimento', 'Cadastre ou reative uma conta antes de criar uma entrada.', parent=self.janela)
             return
-        mapa_contas={c['identificacao']:c['id'] for c in contas}
+        mapa_contas = {c['identificacao']: c['id'] for c in contas}
         if registro:
-            conta_inicial=conta_original['identificacao'] if conta_original else registro['conta']+' (conta removida)'
+            conta_inicial = conta_original['identificacao'] if conta_original else registro['conta'] + ' (conta removida)'
             if conta_original is None:
-                mapa_contas[conta_inicial]=None
+                mapa_contas[conta_inicial] = None
         else:
-            conta_inicial=contas[0]['identificacao']
+            conta_inicial = contas[0]['identificacao']
         tela = self.janela_formulario = tk.Toplevel(self.janela)
         tela.withdraw()
         tela.title('Editar registro' if registro else 'Nova entrada')
         tela.configure(bg=cores()['fundo'])
         tela.resizable(False, False)
         tela.transient(self.janela_ativa())
-        cabecalho = ttk.Frame(tela,padding=pad((24,16,24,0)))
+        cabecalho = ttk.Frame(tela, padding=pad((24, 16, 24, 0)))
         cabecalho.pack(fill='x')
-        ttk.Label(cabecalho,text='Editar registro' if registro else 'Nova entrada',style='Titulo.TLabel').pack(anchor='w')
+        ttk.Label(cabecalho, text='Editar registro' if registro else 'Nova entrada', style='Titulo.TLabel').pack(anchor='w')
         area = AreaRolavel(tela)
-        area.pack(fill='both',expand=True)
+        area.pack(fill='both', expand=True)
         quadro = area.conteudo
         modo_previsao = tk.StringVar(value='calendario')
         campos, campo_previsao = criar_campos_principais(quadro, registro, conta_inicial, mapa_contas, modo_previsao)
@@ -250,7 +250,7 @@ class RegistroMixin:
         tem_comissao, valor_comissao = criar_comissao(quadro, linha + 2, registro, tela)
         observacoes = criar_observacoes(quadro, linha + 4, registro, self.fonte)
         painel_documentos = ttk.Frame(quadro)
-        painel_documentos.grid(row=linha + 5,column=0,columnspan=2,sticky='ew',pady=pad((8,0)))
+        painel_documentos.grid(row=linha + 5, column=0, columnspan=2, sticky='ew', pady=pad((8, 0)))
         anexos_pendentes = self.criar_painel_documentos(painel_documentos, tela, identificador)
 
         def salvar():
@@ -285,24 +285,24 @@ class RegistroMixin:
             except ValueError as erro:
                 messagebox.showerror('Confira o cadastro', descrever_erro(erro), parent=tela)
                 return
-            except (sqlite3.Error,OSError) as erro:
+            except (sqlite3.Error, OSError) as erro:
                 messagebox.showerror('Não foi possível salvar', descrever_erro(erro), parent=tela)
                 return
             self.atualizar()
             tela.destroy()
 
-        ttk.Separator(tela).pack(fill='x',padx=pad(24))
-        botoes = ttk.Frame(tela,padding=pad((20,8,20,12)))
+        ttk.Separator(tela).pack(fill='x', padx=pad(24))
+        botoes = ttk.Frame(tela, padding=pad((20, 8, 20, 12)))
         botoes.pack(fill='x')
         for coluna in range(3):
-            botoes.columnconfigure(coluna,weight=1,uniform='acoes')
-        ttk.Button(botoes,text='Dados de recebimento',width=20,
-                   command=lambda: self.ver_dados_recebimento(tela,registro,mapa_contas.get(campos['conta'].get()))).grid(row=0,column=0,sticky='ew',padx=pad((0,8)))
+            botoes.columnconfigure(coluna, weight=1, uniform='acoes')
+        ttk.Button(botoes, text='Dados de recebimento', width=20,
+                   command=lambda: self.ver_dados_recebimento(tela, registro, mapa_contas.get(campos['conta'].get()))).grid(row=0, column=0, sticky='ew', padx=pad((0, 8)))
         fechar = fechar_com_confirmacao(tela, lambda: (
             tuple(variavel.get() for variavel in campos.values()), modo_previsao.get(), prazo.get(), tem_comissao.get(),
             valor_comissao.get(), observacoes.get('1.0', 'end-1c'), len(anexos_pendentes)))
-        ttk.Button(botoes,text='Cancelar',width=20,command=fechar).grid(row=0,column=1,sticky='ew',padx=pad((4,4)))
-        ttk.Button(botoes,text='Salvar registro',width=20,style='Salvar.TButton',command=salvar).grid(row=0,column=2,sticky='ew',padx=pad((8,0)))
+        ttk.Button(botoes, text='Cancelar', width=20, command=fechar).grid(row=0, column=1, sticky='ew', padx=pad((4, 4)))
+        ttk.Button(botoes, text='Salvar registro', width=20, style='Salvar.TButton', command=salvar).grid(row=0, column=2, sticky='ew', padx=pad((8, 0)))
         ampliar_formulario(tela, self.fonte)
         centralizar(tela)
         tela.deiconify()
@@ -317,25 +317,25 @@ class RegistroMixin:
             texto_documentos.set(f'Documentos ({total})')
 
         def anexar():
-            arquivos = filedialog.askopenfilenames(parent=tela,title='Anexar documentos',
-                filetypes=[('PDFs e imagens','*.pdf *.png *.jpg *.jpeg *.webp *.bmp *.gif *.tif *.tiff')])
+            arquivos = filedialog.askopenfilenames(parent=tela, title='Anexar documentos',
+                filetypes=[('PDFs e imagens', '*.pdf *.png *.jpg *.jpeg *.webp *.bmp *.gif *.tif *.tiff')])
             try:
                 novos = [validar_anexo(arquivo) for arquivo in arquivos]
-            except (OSError,ValueError) as erro:
-                messagebox.showerror('Anexar documentos',descrever_erro(erro),parent=tela)
+            except (OSError, ValueError) as erro:
+                messagebox.showerror('Anexar documentos', descrever_erro(erro), parent=tela)
                 return
             for arquivo in novos:
                 if arquivo not in anexos_pendentes:
                     anexos_pendentes.append(arquivo)
             atualizar_contagem()
 
-        botao_anexar=ttk.Button(painel_documentos,text='Anexar documentos',command=anexar)
+        botao_anexar = ttk.Button(painel_documentos, text='Anexar documentos', command=anexar)
         botao_anexar.pack(side='left')
-        explicacao=('Anexe comprovantes do recebimento, como confirmações de transferência e extratos bancários.'
-                    if tipo=='recebimento' else 'Anexe PDFs e imagens desta entrada, como contratos e protocolos.')
-        BalaoAjuda(botao_anexar,explicacao)
-        ttk.Button(painel_documentos,textvariable=texto_documentos,
-                   command=lambda: self.ver_documentos(tela, identificador, tipo, anexos_pendentes, atualizar_contagem)).pack(side='left',padx=8)
+        explicacao = ('Anexe comprovantes do recebimento, como confirmações de transferência e extratos bancários.'
+                    if tipo == 'recebimento' else 'Anexe PDFs e imagens desta entrada, como contratos e protocolos.')
+        BalaoAjuda(botao_anexar, explicacao)
+        ttk.Button(painel_documentos, textvariable=texto_documentos,
+                   command=lambda: self.ver_documentos(tela, identificador, tipo, anexos_pendentes, atualizar_contagem)).pack(side='left', padx=8)
         atualizar_contagem()
 
         return anexos_pendentes
@@ -347,14 +347,14 @@ class RegistroMixin:
         janela.title('Comprovantes de recebimento' if tipo == 'recebimento' else 'Documentos da entrada')
         janela.configure(bg=cores()['fundo'])
         janela.transient(tela)
-        corpo = ttk.Frame(janela,padding=15)
-        corpo.pack(fill='both',expand=True)
-        lista = ttk.Treeview(corpo,columns=('nome','situacao'),show='headings',selectmode='browse')
-        lista.heading('nome',text='Documento')
-        lista.heading('situacao',text='Situação')
-        lista.column('nome',width=px(lista,370))
-        lista.column('situacao',width=px(lista,160))
-        lista.pack(fill='both',expand=True)
+        corpo = ttk.Frame(janela, padding=15)
+        corpo.pack(fill='both', expand=True)
+        lista = ttk.Treeview(corpo, columns=('nome', 'situacao'), show='headings', selectmode='browse')
+        lista.heading('nome', text='Documento')
+        lista.heading('situacao', text='Situação')
+        lista.column('nome', width=px(lista, 370))
+        lista.column('situacao', width=px(lista, 160))
+        lista.pack(fill='both', expand=True)
         caminhos = {}
 
         def atualizar_lista():
@@ -363,39 +363,39 @@ class RegistroMixin:
             if identificador:
                 for documento in self.banco.documentos(identificador, tipo=tipo):
                     iid = 'salvo:' + str(documento['id'])
-                    lista.insert('','end',iid=iid,values=(documento['nome'],'Salvo'))
-                    caminhos[iid] = ('salvo',documento['id'])
-            for indice,arquivo in enumerate(anexos_pendentes):
+                    lista.insert('', 'end', iid=iid, values=(documento['nome'], 'Salvo'))
+                    caminhos[iid] = ('salvo', documento['id'])
+            for indice, arquivo in enumerate(anexos_pendentes):
                 iid = 'novo:' + str(indice)
-                lista.insert('','end',iid=iid,values=(arquivo.name,'Salvar com o recebimento' if tipo == 'recebimento' else 'Salvar com a entrada'))
-                caminhos[iid] = ('novo',arquivo)
+                lista.insert('', 'end', iid=iid, values=(arquivo.name, 'Salvar com o recebimento' if tipo == 'recebimento' else 'Salvar com a entrada'))
+                caminhos[iid] = ('novo', arquivo)
 
         def abrir_documento():
             selecao = lista.selection()
             if len(selecao) != 1:
                 return
-            origem,valor = caminhos[selecao[0]]
+            origem, valor = caminhos[selecao[0]]
             try:
                 caminho = self.banco.caminho_documento(valor) if origem == 'salvo' else valor
                 abrir_arquivo(caminho)
-            except (OSError,ValueError) as erro:
-                messagebox.showerror('Abrir documento',descrever_erro(erro),parent=janela)
+            except (OSError, ValueError) as erro:
+                messagebox.showerror('Abrir documento', descrever_erro(erro), parent=janela)
 
         def retirar():
             selecao = lista.selection()
             if not selecao:
                 return
-            origem,valor = caminhos[selecao[0]]
-            if origem=='salvo':
+            origem, valor = caminhos[selecao[0]]
+            if origem == 'salvo':
                 if not messagebox.askyesno('Excluir anexo',
                     'Excluir definitivamente a cópia deste documento guardada no programa?\n\n'
                     'A exclusão será aplicada agora. O arquivo original fora do programa será preservado.',
-                    parent=janela,icon='warning',default='no'):
+                    parent=janela, icon='warning', default='no'):
                     return
                 try:
                     self.banco.remover_documento(valor)
-                except (OSError,sqlite3.Error,ValueError) as erro:
-                    messagebox.showerror('Excluir anexo',descrever_erro(erro),parent=janela)
+                except (OSError, sqlite3.Error, ValueError) as erro:
+                    messagebox.showerror('Excluir anexo', descrever_erro(erro), parent=janela)
                     return
             else:
                 anexos_pendentes.remove(valor)
@@ -407,16 +407,16 @@ class RegistroMixin:
             tela.grab_set()
 
         rodape = ttk.Frame(corpo)
-        rodape.pack(fill='x',pady=(12,0))
-        ttk.Button(rodape,text='Abrir documento',command=abrir_documento).pack(side='left')
-        ttk.Button(rodape,text='Remover documento',command=retirar).pack(side='left',padx=8)
-        ttk.Button(rodape,text='Fechar',command=fechar).pack(side='right')
-        lista.bind('<Double-1>',lambda _: abrir_documento())
-        lista.bind('<Return>',lambda _: abrir_documento())
-        janela.protocol('WM_DELETE_WINDOW',fechar)
-        janela.bind('<Escape>',lambda _: fechar())
+        rodape.pack(fill='x', pady=(12, 0))
+        ttk.Button(rodape, text='Abrir documento', command=abrir_documento).pack(side='left')
+        ttk.Button(rodape, text='Remover documento', command=retirar).pack(side='left', padx=8)
+        ttk.Button(rodape, text='Fechar', command=fechar).pack(side='right')
+        lista.bind('<Double-1>', lambda _: abrir_documento())
+        lista.bind('<Return>', lambda _: abrir_documento())
+        janela.protocol('WM_DELETE_WINDOW', fechar)
+        janela.bind('<Escape>', lambda _: fechar())
         atualizar_lista()
-        centralizar(janela,650,400)
+        centralizar(janela, 650, 400)
         janela.deiconify()
         janela.grab_set()
 
@@ -476,7 +476,7 @@ class RegistroMixin:
         ttk.Label(corpo, text='Data do recebimento', style='Recebido.TLabel').pack(anchor='w', pady=(15, 6))
         valor = tk.StringVar(value=data_br(registro['recebimento']) if registro['recebimento'] else date.today().strftime('%d/%m/%Y'))
         CampoData(corpo, valor).pack(fill='x')
-        ttk.Label(corpo, text='Comprovantes de recebimento').pack(anchor='w', pady=(15,6))
+        ttk.Label(corpo, text='Comprovantes de recebimento').pack(anchor='w', pady=(15, 6))
         painel_documentos = ttk.Frame(corpo)
         painel_documentos.pack(fill='x')
         anexos_pendentes = self.criar_painel_documentos(painel_documentos, tela, identificador, tipo='recebimento')
@@ -487,7 +487,7 @@ class RegistroMixin:
             except ValueError as erro:
                 messagebox.showerror('Confira o recebimento', descrever_erro(erro), parent=tela)
                 return
-            except (sqlite3.Error,OSError):
+            except (sqlite3.Error, OSError):
                 messagebox.showerror('Recebimento', 'Não foi possível salvar.', parent=tela)
                 return
             self.atualizar()
@@ -537,20 +537,20 @@ class RegistroMixin:
         valor = tk.StringVar(value=data_br(registro['previsao_atual']))
         CampoData(corpo, valor).pack(fill='x')
 
-        ttk.Label(corpo,text='Alterações de previsão').pack(anchor='w',pady=(16,6))
-        quadro_historico=ttk.Frame(corpo)
-        quadro_historico.pack(fill='both',expand=True)
-        historico=ttk.Treeview(quadro_historico,columns=('anterior','nova','quando'),show='headings',height=4)
-        for coluna,titulo in (('anterior','Previsão anterior'),('nova','Nova previsão'),('quando','Alterada em')):
-            historico.heading(coluna,text=titulo)
-            historico.column(coluna,width=px(historico,180),anchor='center')
-        historico.pack(side='left',fill='both',expand=True)
+        ttk.Label(corpo, text='Alterações de previsão').pack(anchor='w', pady=(16, 6))
+        quadro_historico = ttk.Frame(corpo)
+        quadro_historico.pack(fill='both', expand=True)
+        historico = ttk.Treeview(quadro_historico, columns=('anterior', 'nova', 'quando'), show='headings', height=4)
+        for coluna, titulo in (('anterior', 'Previsão anterior'), ('nova', 'Nova previsão'), ('quando', 'Alterada em')):
+            historico.heading(coluna, text=titulo)
+            historico.column(coluna, width=px(historico, 180), anchor='center')
+        historico.pack(side='left', fill='both', expand=True)
         for item in self.banco.historico_previsoes(identificador):
-            historico.insert('','end',values=(data_br(item['anterior']),data_br(item['nova']),
+            historico.insert('', 'end', values=(data_br(item['anterior']), data_br(item['nova']),
                 datetime.fromisoformat(item['alterada_em']).strftime('%d/%m/%Y %H:%M')))
-        barra=ttk.Scrollbar(quadro_historico,orient='vertical',command=historico.yview)
+        barra = ttk.Scrollbar(quadro_historico, orient='vertical', command=historico.yview)
         historico.configure(yscrollcommand=barra.set)
-        barra.pack(side='right',fill='y')
+        barra.pack(side='right', fill='y')
         def salvar():
             try:
                 self.banco.atualizar_previsao(identificador, data_iso(valor.get()))

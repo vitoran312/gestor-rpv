@@ -71,23 +71,23 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
         self.atualizar_alternador_tema()
         self.atualizar_ultimo_backup()
         self.atualizar_aviso_atrasadas()
-        janela.bind('<FocusIn>',self.atualizar_backup_ao_ativar,add='+')
-        janela.bind('<Alt-Left>',self.voltar)
+        janela.bind('<FocusIn>', self.atualizar_backup_ao_ativar, add='+')
+        janela.bind('<Alt-Left>', self.voltar)
         self.data_exibida = date.today()
-        self.agendamento_data = janela.after(60 * 1000,self.vigiar_data)
-        self.agendamento_tema = janela.after(1200,self.preparar_outro_tema)
-        self.agendamento_backup = janela.after(1500,self.verificar_backup_automatico)
-        janela.bind('<Destroy>',self.cancelar_agendamento_backup,add='+')
+        self.agendamento_data = janela.after(60 * 1000, self.vigiar_data)
+        self.agendamento_tema = janela.after(1200, self.preparar_outro_tema)
+        self.agendamento_backup = janela.after(1500, self.verificar_backup_automatico)
+        janela.bind('<Destroy>', self.cancelar_agendamento_backup, add='+')
         centralizar(janela, 1480, 980)
         janela.deiconify()
         # As placas de vidro entram logo depois que a janela aparece e ficam paradas ao fim da entrada.
-        self.agendamento_arte = janela.after(250,self.arte_inicio.animar)
+        self.agendamento_arte = janela.after(250, self.arte_inicio.animar)
         self.relogio_inicio.iniciar()
         # As páginas (operações, contas, gráfico) usam a mesma janela; maximizada, a tabela tem espaço para todas as colunas.
         maximizar(janela)
 
     def alternar_tema(self):
-        self.modo_tema.set('escuro' if self.modo_tema.get()=='claro' else 'claro')
+        self.modo_tema.set('escuro' if self.modo_tema.get() == 'claro' else 'claro')
         self.configurar_tema()
 
     def preparar_outro_tema(self):
@@ -123,8 +123,8 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
 
     def atualizar_alternador_tema(self):
         if self.texto_alternar_tema is not None:
-            self.texto_alternar_tema.set('Modo escuro' if self.modo_tema.get()=='claro' else 'Modo claro')
-            self.botao_alternar_tema.configure(image=icone_tema(self.janela,self.modo_tema.get()))
+            self.texto_alternar_tema.set('Modo escuro' if self.modo_tema.get() == 'claro' else 'Modo claro')
+            self.botao_alternar_tema.configure(image=icone_tema(self.janela, self.modo_tema.get()))
 
     def mostrar_atrasadas(self):
         self.mostrar_historico()
@@ -149,25 +149,25 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
         tela = self.sobre = tk.Toplevel(self.janela)
         tela.withdraw()
         tela.title('Sobre o Gestor de RPV')
-        tela.resizable(False,False)
+        tela.resizable(False, False)
         tela.transient(self.janela_ativa())
-        corpo = ttk.Frame(tela,padding=30)
-        corpo.pack(fill='both',expand=True)
-        ttk.Label(corpo,image=self.janela._marca_vitoran).pack(pady=(0,12))
-        ttk.Label(corpo,text='Gestor de RPV',style='Titulo.TLabel').pack()
-        ttk.Label(corpo,text='Organização de operações e recebimentos de RPV.',wraplength=px(tela,430),
-                  justify='center',style='Subtitulo.TLabel').pack(pady=(8,20))
-        ttk.Label(corpo,text='Vitoran Tech',font=(self.fonte,13,'bold')).pack()
-        ttk.Label(corpo,text='Desenvolvido por Vitor Alves Nascimento').pack(pady=(6,0))
-        ttk.Label(corpo,text=f'Versão {VERSAO}',style='Discreto.TLabel').pack(pady=(8,16))
-        ttk.Label(corpo,text='Sugestões ou dúvidas:',style='Discreto.TLabel').pack()
-        contato = ttk.Label(corpo,text=CONTATO,style='Contato.TLabel',cursor='hand2')
-        contato.pack(pady=(2,20))
-        contato.bind('<Button-1>',lambda _: webbrowser.open(f'mailto:{CONTATO}'))
-        ttk.Button(corpo,text='Fechar',command=tela.destroy).pack()
-        tela.bind('<Escape>',lambda _: tela.destroy())
-        tela.bind('<Return>',lambda _: tela.destroy())
-        centralizar(tela,550)
+        corpo = ttk.Frame(tela, padding=30)
+        corpo.pack(fill='both', expand=True)
+        ttk.Label(corpo, image=self.janela._marca_vitoran).pack(pady=(0, 12))
+        ttk.Label(corpo, text='Gestor de RPV', style='Titulo.TLabel').pack()
+        ttk.Label(corpo, text='Organização de operações e recebimentos de RPV.', wraplength=px(tela, 430),
+                  justify='center', style='Subtitulo.TLabel').pack(pady=(8, 20))
+        ttk.Label(corpo, text='Vitoran Tech', font=(self.fonte, 13, 'bold')).pack()
+        ttk.Label(corpo, text='Desenvolvido por Vitor Alves Nascimento').pack(pady=(6, 0))
+        ttk.Label(corpo, text=f'Versão {VERSAO}', style='Discreto.TLabel').pack(pady=(8, 16))
+        ttk.Label(corpo, text='Sugestões ou dúvidas:', style='Discreto.TLabel').pack()
+        contato = ttk.Label(corpo, text=CONTATO, style='Contato.TLabel', cursor='hand2')
+        contato.pack(pady=(2, 20))
+        contato.bind('<Button-1>', lambda _: webbrowser.open(f'mailto:{CONTATO}'))
+        ttk.Button(corpo, text='Fechar', command=tela.destroy).pack()
+        tela.bind('<Escape>', lambda _: tela.destroy())
+        tela.bind('<Return>', lambda _: tela.destroy())
+        centralizar(tela, 550)
         tela.deiconify()
         tela.focus_set()
 
@@ -176,27 +176,27 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
             atualizar_widgets(evento.widget)
 
     def configurar_tema(self):
-        estilo=ttk.Style(self.janela)
-        modo=self.modo_tema.get()
+        estilo = ttk.Style(self.janela)
+        modo = self.modo_tema.get()
         definir_modo(modo)
         # A preferência é gravada depois que a tela se redesenha: no Windows, gravar no disco atrasaria a troca.
         self.janela.after_idle(lambda m=modo: self.salvar_tema(m))
-        self.fonte=familia_fonte(self.janela)
-        fonte=self.fonte
-        nome_tema='VitoranPro'+modo.title()
+        self.fonte = familia_fonte(self.janela)
+        fonte = self.fonte
+        nome_tema = 'VitoranPro' + modo.title()
         if nome_tema not in estilo.theme_names():
-            estilo.theme_create(nome_tema,parent='clam')
+            estilo.theme_create(nome_tema, parent='clam')
             estilo.theme_use(nome_tema)
-            criar_estilos(self.janela,estilo,fonte)
-        elif estilo.theme_use()!=nome_tema:
+            criar_estilos(self.janela, estilo, fonte)
+        elif estilo.theme_use() != nome_tema:
             estilo.theme_use(nome_tema)
-        c=cores()
-        campo,texto=c['campo'],c['texto']
-        self.janela.option_add('*Menu.font',(fonte,10))
-        self.janela.option_add('*TCombobox*Listbox.background',campo)
-        self.janela.option_add('*TCombobox*Listbox.foreground',texto)
-        self.janela.option_add('*TCombobox*Listbox.selectBackground',c['selecao'])
-        self.janela.option_add('*TCombobox*Listbox.selectForeground',c['texto_selecao'])
+        c = cores()
+        campo, texto = c['campo'], c['texto']
+        self.janela.option_add('*Menu.font', (fonte, 10))
+        self.janela.option_add('*TCombobox*Listbox.background', campo)
+        self.janela.option_add('*TCombobox*Listbox.foreground', texto)
+        self.janela.option_add('*TCombobox*Listbox.selectBackground', c['selecao'])
+        self.janela.option_add('*TCombobox*Listbox.selectForeground', c['texto_selecao'])
         atualizar_widgets(self.janela)
         self.atualizar_alternador_tema()
         if self.icone_lixeira is not None:

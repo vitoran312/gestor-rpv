@@ -4,7 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-EXTENSOES = {'.pdf','.png','.jpg','.jpeg','.webp','.bmp','.gif','.tif','.tiff'}
+EXTENSOES = {'.pdf', '.png', '.jpg', '.jpeg', '.webp', '.bmp', '.gif', '.tif', '.tiff'}
 
 
 def validar_anexo(caminho):
@@ -30,6 +30,6 @@ def _abrir_no_sistema(caminho):
     if os.name == 'nt':
         os.startfile(str(caminho))
     elif sys.platform == 'darwin':
-        subprocess.Popen(['open',str(caminho)])
+        subprocess.Popen(['open', str(caminho)])
     else:
-        subprocess.Popen(['xdg-open',str(caminho)])
+        subprocess.Popen(['xdg-open', str(caminho)])

@@ -51,14 +51,14 @@ class JanelaContas:
             alinhamento = 'center' if chave == 'status' else 'w'
             self.tabela.heading(chave, text=titulo, anchor=alinhamento)
             self.tabela.column(chave, width=largura, minwidth=110, anchor=alinhamento)
-        self.situacoes_labels={}
-        self.incompletas=set()
-        self.situacoes_pendentes=False
-        self.tabela.bind('<Configure>',lambda _:self.agendar_situacoes())
-        self.tabela.bind('<<TreeviewSelect>>',lambda _:self.agendar_situacoes())
-        self.tabela.configure(yscrollcommand=lambda *_:self.agendar_situacoes(),xscrollcommand=lambda *_:self.agendar_situacoes())
+        self.situacoes_labels = {}
+        self.incompletas = set()
+        self.situacoes_pendentes = False
+        self.tabela.bind('<Configure>', lambda _: self.agendar_situacoes())
+        self.tabela.bind('<<TreeviewSelect>>', lambda _: self.agendar_situacoes())
+        self.tabela.configure(yscrollcommand=lambda *_: self.agendar_situacoes(), xscrollcommand=lambda *_: self.agendar_situacoes())
         self.tabela.pack(fill='both', expand=True)
-        habilitar_selecao(self.tabela,abrir=self.editar,excluir=self.remover)
+        habilitar_selecao(self.tabela, abrir=self.editar, excluir=self.remover)
         self.tabela.bind('<Button-3>', self.menu_contexto)
         self.tabela.bind('<Double-1>', lambda _: self.editar())
         ttk.Label(self.cartao, text='Contas desativadas permanecem no histórico e podem ser reativadas.',
@@ -73,7 +73,7 @@ class JanelaContas:
         self.cartao.place(relx=0.5, rely=0.45, anchor='center', width=largura, height=altura)
 
     def atualizar(self):
-        for w in self.situacoes_labels.values():w.destroy()
+        for w in self.situacoes_labels.values(): w.destroy()
         self.situacoes_labels.clear()
         self.incompletas.clear()
         self.tabela.delete(*self.tabela.get_children())
@@ -95,33 +95,33 @@ class JanelaContas:
 
     def agendar_situacoes(self):
         if not self.situacoes_pendentes:
-            self.situacoes_pendentes=True
+            self.situacoes_pendentes = True
             self.tela.after_idle(self.atualizar_situacoes)
 
     def atualizar_situacoes(self):
-        self.situacoes_pendentes=False
-        if not self.tabela.winfo_exists():return
-        c=cores()
+        self.situacoes_pendentes = False
+        if not self.tabela.winfo_exists(): return
+        c = cores()
         for linha in self.tabela.get_children():
-            caixa=self.tabela.bbox(linha,'status')
+            caixa = self.tabela.bbox(linha, 'status')
             if not caixa:
-                if linha in self.situacoes_labels:self.situacoes_labels[linha].place_forget()
+                if linha in self.situacoes_labels: self.situacoes_labels[linha].place_forget()
                 continue
             if linha not in self.situacoes_labels:
-                rotulo=ttk.Label(self.tabela,text=self.tabela.set(linha,'status'),anchor='center',
+                rotulo = ttk.Label(self.tabela, text=self.tabela.set(linha, 'status'), anchor='center',
                     style='ContaIncompleta.TLabel' if linha in self.incompletas else 'ContaSituacao.TLabel')
-                rotulo.bind('<Button-1>',lambda e,i=linha:self.pressionar_situacao(e,i))
-                rotulo.bind('<B1-Motion>',lambda e:arrastar(self.tabela,e.y_root-self.tabela.winfo_rooty()))
-                rotulo.bind('<Double-1>',lambda _:self.editar())
-                rotulo.bind('<Button-3>',lambda e,i=linha:self.menu_contexto(e,i))
-                self.situacoes_labels[linha]=rotulo
-            rotulo=self.situacoes_labels[linha]
+                rotulo.bind('<Button-1>', lambda e, i=linha: self.pressionar_situacao(e, i))
+                rotulo.bind('<B1-Motion>', lambda e: arrastar(self.tabela, e.y_root - self.tabela.winfo_rooty()))
+                rotulo.bind('<Double-1>', lambda _: self.editar())
+                rotulo.bind('<Button-3>', lambda e, i=linha: self.menu_contexto(e, i))
+                self.situacoes_labels[linha] = rotulo
+            rotulo = self.situacoes_labels[linha]
             rotulo.configure(background=c['selecao'] if linha in self.tabela.selection() else c['campo'])
-            x,y,largura,altura=caixa
-            rotulo.place(x=x+1,y=y+1,width=max(1,largura-2),height=max(1,altura-2))
+            x, y, largura, altura = caixa
+            rotulo.place(x=x + 1, y=y + 1, width=max(1, largura - 2), height=max(1, altura - 2))
 
-    def pressionar_situacao(self,evento,linha):
-        pressionar_linha(self.tabela,linha,evento.state)
+    def pressionar_situacao(self, evento, linha):
+        pressionar_linha(self.tabela, linha, evento.state)
         return 'break'
 
     def menu_contexto(self, evento, linha=None):
@@ -132,8 +132,8 @@ class JanelaContas:
                 self.tabela.selection_set(linha)
             unica = len(self.tabela.selection()) == 1
             conta = self.banco.obter_conta(int(linha))
-            menu.add_command(label='Editar', command=self.editar,state='normal' if unica else 'disabled')
-            menu.add_command(label='Desativar' if conta['ativa'] else 'Reativar', command=self.alterar_status,state='normal' if unica else 'disabled')
+            menu.add_command(label='Editar', command=self.editar, state='normal' if unica else 'disabled')
+            menu.add_command(label='Desativar' if conta['ativa'] else 'Reativar', command=self.alterar_status, state='normal' if unica else 'disabled')
             menu.add_command(label='Remover', command=self.remover)
             menu.add_command(label='Copiar', command=lambda: copiar_texto(self.tabela, '\n\n'.join(dados_para_copiar(dict(self.banco.obter_conta(int(i)))) for i in self.tabela.selection())))
             menu.add_separator()
@@ -146,7 +146,7 @@ class JanelaContas:
             messagebox.showinfo('Contas de recebimento', 'Selecione uma conta na lista.', parent=self.tela)
             return None
         if len(itens) != 1:
-            messagebox.showinfo('Contas de recebimento','Selecione apenas uma conta para esta ação.',parent=self.tela)
+            messagebox.showinfo('Contas de recebimento', 'Selecione apenas uma conta para esta ação.', parent=self.tela)
             return None
         return self.banco.obter_conta(int(itens[0]))
 
@@ -173,7 +173,7 @@ class JanelaContas:
     def remover(self):
         selecao = self.tabela.selection()
         if not selecao:
-            messagebox.showinfo('Remover contas','Selecione uma ou mais contas.',parent=self.tela)
+            messagebox.showinfo('Remover contas', 'Selecione uma ou mais contas.', parent=self.tela)
             return
         try:
             em_uso = self.banco.operacoes_da_conta(selecao)
@@ -182,16 +182,16 @@ class JanelaContas:
         aviso = ('As entradas das operações e os dados bancários já guardados nelas continuarão existentes.' if not em_uso else
                  f'{em_uso} operação(ões) usam esta(s) conta(s). Elas guardam os dados bancários, mas a conta não '
                  'poderá ser escolhida de novo nem reativada. Se for só parar de usar, prefira Desativar.')
-        if not messagebox.askyesno('Remover contas',f'Remover permanentemente {len(selecao)} conta(s)?\n\n'+aviso,
-                                   parent=self.tela,icon='warning',default='no'):
+        if not messagebox.askyesno('Remover contas', f'Remover permanentemente {len(selecao)} conta(s)?\n\n' + aviso,
+                                   parent=self.tela, icon='warning', default='no'):
             return
         try:
             self.banco.remover_contas(selecao)
         except ValueError as erro:
-            messagebox.showinfo('Preservar histórico',descrever_erro(erro),parent=self.tela)
+            messagebox.showinfo('Preservar histórico', descrever_erro(erro), parent=self.tela)
             return
         except sqlite3.Error:
-            messagebox.showerror('Remover contas','Não foi possível remover as contas.',parent=self.tela)
+            messagebox.showerror('Remover contas', 'Não foi possível remover as contas.', parent=self.tela)
             return
         self.atualizar()
 
@@ -203,11 +203,11 @@ class JanelaContas:
         tela.configure(bg=cores()['fundo'])
         tela.resizable(False, False)
         tela.transient(self.tela)
-        cabecalho = ttk.Frame(tela,padding=(24,16,24,0))
+        cabecalho = ttk.Frame(tela, padding=(24, 16, 24, 0))
         cabecalho.pack(fill='x')
-        ttk.Label(cabecalho,text='Editar conta' if conta else 'Nova conta',style='Titulo.TLabel').pack(anchor='w')
+        ttk.Label(cabecalho, text='Editar conta' if conta else 'Nova conta', style='Titulo.TLabel').pack(anchor='w')
         area = AreaRolavel(tela)
-        area.pack(fill='both',expand=True)
+        area.pack(fill='both', expand=True)
         quadro = area.conteudo
         campos = {}
         for linha, (chave, titulo) in enumerate(TITULOS_CONTA.items()):
@@ -243,12 +243,12 @@ class JanelaContas:
             self.atualizar()
             tela.destroy()
 
-        ttk.Separator(tela).pack(fill='x',padx=24)
-        botoes = ttk.Frame(tela,padding=(24,8,24,12))
+        ttk.Separator(tela).pack(fill='x', padx=24)
+        botoes = ttk.Frame(tela, padding=(24, 8, 24, 12))
         botoes.pack(fill='x')
         fechar = fechar_com_confirmacao(tela, lambda: tuple(variavel.get() for variavel in campos.values()))
-        ttk.Button(botoes, text='Cancelar', command=fechar).pack(side='left',expand=True,fill='x',padx=(0,8))
-        ttk.Button(botoes, text='Salvar conta', style='Salvar.TButton', command=salvar).pack(side='left',expand=True,fill='x')
+        ttk.Button(botoes, text='Cancelar', command=fechar).pack(side='left', expand=True, fill='x', padx=(0, 8))
+        ttk.Button(botoes, text='Salvar conta', style='Salvar.TButton', command=salvar).pack(side='left', expand=True, fill='x')
         centralizar(tela)
         tela.deiconify()
         tela.grab_set()

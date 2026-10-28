@@ -18,12 +18,12 @@ from diario import log
 
 
 class ArquivosMixin:
-    def atualizar_backup_ao_ativar(self,evento):
+    def atualizar_backup_ao_ativar(self, evento):
         if evento.widget is self.janela or evento.widget is self.historico:
             self.atualizar_ultimo_backup()
 
     def atualizar_ultimo_backup(self):
-        quando=self.banco.ultimo_backup()
+        quando = self.banco.ultimo_backup()
         aviso = aviso_backup(quando)
         if aviso and self.falha_backup_automatico:
             aviso = ('Defina a senha dos backups em Arquivo → Backup automático. ' if self.falha_backup_automatico == 'senha'
@@ -31,14 +31,14 @@ class ArquivosMixin:
         self.texto_aviso_backup.set(aviso)
         try:
             data = datetime.fromisoformat(quando).astimezone().strftime('%d/%m/%Y') if quando else 'ainda não realizado'
-        except (ValueError,TypeError):
+        except (ValueError, TypeError):
             data = 'não disponível'
         if self.texto_ultimo_backup is not None:
             automatico = ''
             if self.banco.configuracao(PASTA_AUTOMATICA):
                 automatico = (' · Backup automático semanal ativo' if senha_salva(self.banco) else
                               ' · Backup automático parado: falta criar a senha dos backups')
-            self.texto_ultimo_backup.set('Último backup: '+data+automatico)
+            self.texto_ultimo_backup.set('Último backup: ' + data + automatico)
 
     def verificar_backup_automatico(self, forcar=False):
         """Roda ao abrir e a cada seis horas; uma falha vira aviso discreto, sem janelas modais."""
@@ -303,8 +303,8 @@ class ArquivosMixin:
         pai = self.janela_ativa()
         try:
             pasta = self.banco.pasta_documentos
-            pasta.mkdir(parents=True,exist_ok=True)
+            pasta.mkdir(parents=True, exist_ok=True)
             abrir_pasta(pasta)
-        except (OSError,ValueError) as erro:
+        except (OSError, ValueError) as erro:
             messagebox.showerror('Abrir pasta dos documentos',
-                'Não foi possível abrir a pasta dos documentos. ' + descrever_erro(erro),parent=pai)
+                'Não foi possível abrir a pasta dos documentos. ' + descrever_erro(erro), parent=pai)

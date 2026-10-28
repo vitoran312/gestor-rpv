@@ -317,7 +317,7 @@ class Banco:
                 con.execute('''INSERT INTO rpvs_nova
                     (id,nome,aquisicao,previsto,custo,conta,previsao,comissao,observacoes,conta_id,conta_snapshot)
                     VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
-                    tuple(r[k] for k in ('id','nome','aquisicao','previsto','custo','conta','previsao','comissao','observacoes')) +
+                    tuple(r[k] for k in ('id', 'nome', 'aquisicao', 'previsto', 'custo', 'conta', 'previsao', 'comissao', 'observacoes')) +
                     (conta['id'], self.snapshot(conta)))
             con.execute('DROP TABLE rpvs')
             con.execute('ALTER TABLE rpvs_nova RENAME TO rpvs')
@@ -461,8 +461,8 @@ class Banco:
         ids = list(dict.fromkeys(int(i) for i in identificadores))
         with self.conectar() as con:
             con.execute('BEGIN IMMEDIATE')
-            con.executemany('UPDATE rpvs SET conta_id=NULL WHERE conta_id=?',[(i,) for i in ids])
-            con.executemany('DELETE FROM contas WHERE id=?',[(i,) for i in ids])
+            con.executemany('UPDATE rpvs SET conta_id=NULL WHERE conta_id=?', [(i,) for i in ids])
+            con.executemany('DELETE FROM contas WHERE id=?', [(i,) for i in ids])
 
     def salvar(self, dados, identificador=None, anexos=()):
         criados = []
@@ -525,17 +525,17 @@ class Banco:
                 conta = con.execute('SELECT * FROM contas WHERE id=?', (dados['conta_id'],)).fetchone()
             else:
                 conta = con.execute('SELECT * FROM contas WHERE identificacao=?', (dados['conta'],)).fetchone()
-            removida_preservada=(anterior is not None and anterior['conta_id'] is None and conta is None and
-                                (dados.get('conta_id','ausente') is None or dados.get('conta')==anterior['conta']))
+            removida_preservada = (anterior is not None and anterior['conta_id'] is None and conta is None and
+                                (dados.get('conta_id', 'ausente') is None or dados.get('conta') == anterior['conta']))
             if conta is None and not removida_preservada:
                 raise ValueError('Selecione uma conta cadastrada.')
-            mesma_conta=removida_preservada or (anterior is not None and anterior['conta_id']==conta['id'])
+            mesma_conta = removida_preservada or (anterior is not None and anterior['conta_id'] == conta['id'])
             if conta is not None and not conta['ativa'] and not mesma_conta:
                 raise ValueError('A conta foi desativada. Selecione uma conta ativa.')
-            dados['conta_id']=None if removida_preservada else conta['id']
-            dados['conta']=anterior['conta'] if mesma_conta else conta['identificacao']
-            dados['conta_snapshot']=anterior['conta_snapshot'] if mesma_conta else self.snapshot(conta)
-            campos = ('nome','aquisicao','previsto','custo','conta','previsao','comissao','observacoes','conta_id','conta_snapshot')
+            dados['conta_id'] = None if removida_preservada else conta['id']
+            dados['conta'] = anterior['conta'] if mesma_conta else conta['identificacao']
+            dados['conta_snapshot'] = anterior['conta_snapshot'] if mesma_conta else self.snapshot(conta)
+            campos = ('nome', 'aquisicao', 'previsto', 'custo', 'conta', 'previsao', 'comissao', 'observacoes', 'conta_id', 'conta_snapshot')
             if anterior:
                 if anterior['recebimento'] and dados['aquisicao'] > anterior['recebimento']:
                     raise ValueError('A aquisição não pode ser posterior à data do recebimento.')
@@ -557,10 +557,11 @@ class Banco:
             registros = con.execute(CONSULTA_RPVS + ' WHERE r.lixeira_em IS NULL ORDER BY aquisicao DESC, id DESC').fetchall()
         # Sem acentos, maiúsculas nem pontuação: "jose" acha "José" e "davila" acha "D'Ávila".
         # A busca também procura na conta; buscas só de símbolos comparam o texto como foi digitado.
-        termo = normalizar(busca)
+        # Espaços contam ("lva j" não acha "Silva José"), como na ordenação.
+        termo = chave_texto(busca)
         if not termo:
             return [r for r in registros if busca.casefold() in r['nome'].casefold() or busca in data_br(r['aquisicao'])]
-        return [r for r in registros if termo in normalizar(r['nome']) or termo in normalizar(r['conta'])
+        return [r for r in registros if termo in chave_texto(r['nome']) or termo in chave_texto(r['conta'])
                 or busca.strip() in data_br(r['aquisicao'])]
 
     def obter(self, identificador):
@@ -576,7 +577,7 @@ class Banco:
             con.execute('BEGIN IMMEDIATE')
             self.conferir_lixeira(con, ids, False, 'Uma entrada não está mais na lista ativa. Atualize a lista e tente novamente.')
             agora = datetime.now().astimezone().isoformat(timespec='seconds')
-            con.executemany('UPDATE rpvs SET lixeira_em=? WHERE id=?',[(agora,i) for i in ids])
+            con.executemany('UPDATE rpvs SET lixeira_em=? WHERE id=?', [(agora, i) for i in ids])
 
     @staticmethod
     def conferir_lixeira(con, ids, na_lixeira, mensagem):
@@ -598,7 +599,7 @@ class Banco:
         with self.conectar() as con:
             con.execute('BEGIN IMMEDIATE')
             self.conferir_lixeira(con, ids, True, 'Uma entrada não está mais na lixeira. Reabra a lista e tente novamente.')
-            con.executemany('UPDATE rpvs SET lixeira_em=NULL WHERE id=?',[(i,) for i in ids])
+            con.executemany('UPDATE rpvs SET lixeira_em=NULL WHERE id=?', [(i,) for i in ids])
 
     def registrar_recebimento(self, identificador, data, anexos=()):
         criados = []
@@ -636,14 +637,14 @@ class Banco:
                 raise ValueError('Registro não encontrado na lista ativa.')
             if nova_data < registro['aquisicao']:
                 raise ValueError('A previsão atual não pode ser anterior à aquisição.')
-            atual=con.execute(CONSULTA_RPVS+' WHERE r.id=?',(identificador,)).fetchone()['previsao_atual']
+            atual = con.execute(CONSULTA_RPVS + ' WHERE r.id=?', (identificador,)).fetchone()['previsao_atual']
             if atual != nova_data:
                 con.execute('INSERT INTO previsoes_historico (rpv_id,anterior,nova,alterada_em) VALUES (?,?,?,?)',
-                            (identificador,atual,nova_data,datetime.now().astimezone().isoformat(timespec='seconds')))
+                            (identificador, atual, nova_data, datetime.now().astimezone().isoformat(timespec='seconds')))
             con.execute('UPDATE rpvs SET previsao_atual_definida=? WHERE id=?', (nova_data, identificador))
 
     def copiar_anexos(self, con, identificador, anexos, criados, tipo='entrada'):
-        if tipo not in ('entrada','recebimento'):
+        if tipo not in ('entrada', 'recebimento'):
             raise ValueError('Tipo de documento inválido.')
         for origem in anexos:
             origem = validar_anexo(origem)
@@ -655,15 +656,15 @@ class Banco:
             criados.append(destino)
             shutil.copyfile(origem, destino)
             con.execute('INSERT INTO documentos (rpv_id,nome,caminho,tipo) VALUES (?,?,?,?)',
-                        (identificador,origem.name,relativo,tipo))
+                        (identificador, origem.name, relativo, tipo))
 
     def documentos(self, identificador, tipo='entrada'):
         with self.conectar() as con:
-            return con.execute('SELECT * FROM documentos WHERE rpv_id=? AND tipo=? ORDER BY id',(identificador,tipo)).fetchall()
+            return con.execute('SELECT * FROM documentos WHERE rpv_id=? AND tipo=? ORDER BY id', (identificador, tipo)).fetchall()
 
     def caminho_documento(self, identificador):
         with self.conectar() as con:
-            documento = con.execute('SELECT * FROM documentos WHERE id=?',(identificador,)).fetchone()
+            documento = con.execute('SELECT * FROM documentos WHERE id=?', (identificador,)).fetchone()
         if documento is None:
             raise ValueError('Documento não encontrado.')
         raiz = self.pasta_documentos.resolve()
@@ -672,10 +673,9 @@ class Banco:
             raise ValueError('O arquivo deste documento não está disponível.')
         return caminho
 
-
-    def historico_previsoes(self,identificador):
+    def historico_previsoes(self, identificador):
         with self.conectar() as con:
-            return con.execute('SELECT * FROM previsoes_historico WHERE rpv_id=? ORDER BY id DESC',(identificador,)).fetchall()
+            return con.execute('SELECT * FROM previsoes_historico WHERE rpv_id=? ORDER BY id DESC', (identificador,)).fetchall()
 
     def configuracao(self, chave, padrao=None):
         with self.conectar() as con:
@@ -698,41 +698,41 @@ class Banco:
 
     @contextmanager
     def arquivos_para_excluir(self):
-        movidos=[]
-        with tempfile.TemporaryDirectory(prefix=PREFIXO_EXCLUSAO,dir=self.caminho.parent) as pasta:
+        movidos = []
+        with tempfile.TemporaryDirectory(prefix=PREFIXO_EXCLUSAO, dir=self.caminho.parent) as pasta:
             def preparar(documentos):
-                raiz=self.pasta_documentos.resolve()
+                raiz = self.pasta_documentos.resolve()
                 for documento in documentos:
-                    arquivo=(raiz/documento['caminho']).resolve()
+                    arquivo = (raiz / documento['caminho']).resolve()
                     if not arquivo.is_relative_to(raiz):
                         raise ValueError('Caminho de documento inválido.')
                     if arquivo.is_file():
-                        destino=Path(pasta)/str(len(movidos))
-                        os.replace(arquivo,destino)
-                        movidos.append((arquivo,destino))
+                        destino = Path(pasta) / str(len(movidos))
+                        os.replace(arquivo, destino)
+                        movidos.append((arquivo, destino))
             try:
                 yield preparar
             except Exception:
-                for arquivo,destino in reversed(movidos):
-                    os.replace(destino,arquivo)
+                for arquivo, destino in reversed(movidos):
+                    os.replace(destino, arquivo)
                 raise
 
-    def remover_documento(self,identificador):
+    def remover_documento(self, identificador):
         with self.arquivos_para_excluir() as preparar:
             with self.conectar() as con:
                 con.execute('BEGIN IMMEDIATE')
-                documento=con.execute('SELECT * FROM documentos WHERE id=?',(identificador,)).fetchone()
+                documento = con.execute('SELECT * FROM documentos WHERE id=?', (identificador,)).fetchone()
                 if documento is None:
                     raise ValueError('Documento não encontrado.')
                 preparar([documento])
-                con.execute('DELETE FROM documentos WHERE id=?',(identificador,))
+                con.execute('DELETE FROM documentos WHERE id=?', (identificador,))
 
-    def excluir_permanentemente(self,identificadores):
-        ids=list(dict.fromkeys(int(i) for i in identificadores))
+    def excluir_permanentemente(self, identificadores):
+        ids = list(dict.fromkeys(int(i) for i in identificadores))
         with self.arquivos_para_excluir() as preparar:
             with self.conectar() as con:
                 con.execute('BEGIN IMMEDIATE')
                 self.conferir_lixeira(con, ids, True, 'Somente entradas na lixeira podem ser excluídas permanentemente.')
                 for identificador in ids:
-                    preparar(con.execute('SELECT * FROM documentos WHERE rpv_id=?',(identificador,)).fetchall())
-                con.executemany('DELETE FROM rpvs WHERE id=?',[(i,) for i in ids])
+                    preparar(con.execute('SELECT * FROM documentos WHERE rpv_id=?', (identificador,)).fetchall())
+                con.executemany('DELETE FROM rpvs WHERE id=?', [(i,) for i in ids])
