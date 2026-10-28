@@ -2,6 +2,7 @@
 import hashlib
 import json
 import os
+import re
 from pathlib import Path, PurePosixPath
 import shutil
 import sqlite3
@@ -11,6 +12,7 @@ import time
 from datetime import date, datetime
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED, BadZipFile
 
+from documentos import EXTENSOES
 from versao import VERSAO
 from dados import VERSAO_BANCO, Banco, limitar_backups
 
@@ -50,6 +52,11 @@ TABELAS_CONHECIDAS = {'rpvs', 'contas', 'prorrogacoes', 'documentos', 'previsoes
                       'historico_alteracoes', 'sqlite_sequence', 'sqlite_stat1', 'sqlite_stat4'}
 # Ordem de cópia na importação: tabelas referenciadas antes das que apontam para elas.
 TABELAS_IMPORTADAS = ('contas', 'rpvs', 'prorrogacoes', 'documentos', 'previsoes_historico', 'configuracoes')
+
+
+# Nome que o aplicativo dá a cada anexo: pasta da operação, identificador aleatório e extensão permitida.
+CAMINHO_DOCUMENTO = re.compile(r'(recebimentos/)?[0-9]+/[0-9a-f]{32}(' +
+                               '|'.join(re.escape(e) for e in sorted(EXTENSOES)) + ')')
 
 
 def verificar_estruturas(con):
@@ -130,14 +137,21 @@ def criar_backup(banco, pasta, prefixo='GestorRPV-'):
             documentos = banco.caminho.parent / 'documentos'
             if documentos.is_symlink():
                 raise ValueError('A pasta de documentos não pode ser um atalho simbólico.')
+            # Só entram os anexos cadastrados; arquivos soltos na pasta não fazem parte dos dados.
+            # A lista sai da cópia gravada no backup, que pode ser de um banco antigo, ainda sem anexos.
+            con = sqlite3.connect(copia)
+            try:
+                tem_tabela = con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='documentos'").fetchone()
+                vinculados = sorted(r[0] for r in con.execute('SELECT caminho FROM documentos')) if tem_tabela else []
+            finally:
+                con.close()
             if documentos.exists():
-                for arquivo in sorted(documentos.rglob('*')):
-                    if arquivo == trabalho or trabalho in arquivo.parents or arquivo.suffix.casefold() == '.rpvbackup':
-                        continue
+                for caminho in vinculados:
+                    arquivo = documentos / caminho
                     if arquivo.is_symlink():
                         raise ValueError('Há um atalho simbólico na pasta de documentos.')
                     if arquivo.is_file():
-                        relativo = 'documentos/' + arquivo.relative_to(documentos).as_posix()
+                        relativo = 'documentos/' + caminho
                         # O hash é calculado sobre os mesmos bytes gravados no ZIP, inclusive se a origem mudar
                         # durante a cópia. O nome é montado com barras, sem depender da normalização do Windows.
                         info = ZipInfo(relativo, max(time.localtime(arquivo.stat().st_mtime)[:6], (1980, 1, 1, 0, 0, 0)))
@@ -264,14 +278,16 @@ class BackupPreparado:
                 validar_banco(self.pasta / 'banco.sqlite3')
                 banco_preparado = Banco(self.pasta / 'banco.sqlite3')
                 with banco_preparado.conectar() as con:
-                    for documento in con.execute('SELECT caminho FROM documentos'):
-                        relativo = PurePosixPath(documento['caminho'])
-                        if (relativo.is_absolute() or '..' in relativo.parts or '\\' in documento['caminho'] or
-                            ':' in documento['caminho'] or relativo.as_posix() != documento['caminho']):
-                            raise ValueError('Um documento contém um caminho inválido.')
-                        caminho_documento = self.pasta / 'documentos' / documento['caminho']
-                        if not caminho_documento.is_file():
-                            raise ValueError('Um documento vinculado está ausente no backup.')
+                    caminhos = [r['caminho'] for r in con.execute('SELECT caminho FROM documentos')]
+                for caminho in caminhos:
+                    if not CAMINHO_DOCUMENTO.fullmatch(caminho):
+                        raise ValueError('Um documento contém um caminho inválido.')
+                    if not (self.pasta / 'documentos' / caminho).is_file():
+                        raise ValueError('Um documento vinculado está ausente no backup.')
+                # Cada arquivo de documentos/ precisa ser um anexo cadastrado: nada de executáveis, atalhos
+                # ou outros arquivos soltos chegando à pasta de documentos da pessoa.
+                if {n for n in hashes if n.startswith('documentos/')} != {'documentos/' + c for c in caminhos}:
+                    raise ValueError('O backup contém arquivos que não são documentos cadastrados.')
                 self.resumo = validar_banco(self.pasta / 'banco.sqlite3')
                 self.resumo['documentos'] = sum(n.startswith('documentos/') for n in hashes)
                 self.criado_em = manifesto.get('criado_em', '')

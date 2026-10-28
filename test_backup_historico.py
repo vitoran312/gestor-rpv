@@ -47,6 +47,15 @@ class TestBackupHistorico(unittest.TestCase):
         self.origem = banco_com_contas(self.pasta / 'origem' / 'gestor.sqlite3')
         self.destino = banco_com_contas(self.pasta / 'destino' / 'gestor.sqlite3')
 
+    def anexar(self, banco, rpv, nome, conteudo):
+        """Anexa um arquivo pela rotina normal do aplicativo e devolve onde ele foi guardado."""
+        origem = self.pasta / 'anexos' / nome
+        origem.parent.mkdir(exist_ok=True)
+        origem.write_bytes(conteudo)
+        banco.salvar(dict(banco.obter(rpv)), rpv, anexos=[origem])
+        documento = [d for d in banco.documentos(rpv) if d['nome'] == nome][0]
+        return banco.caminho_documento(documento['id'])
+
     def test_backup_portatil_tudo_inclusive_documentos_lixeira_auditoria(self):
         conta = self.origem.salvar_conta(dados_conta())
         rpv = self.origem.salvar(dados_rpv(conta_id=conta))
@@ -54,14 +63,12 @@ class TestBackupHistorico(unittest.TestCase):
         self.origem.registrar_recebimento(rpv, '2026-10-22')
         outra = self.origem.salvar(dados_rpv(nome='Lixeira'))
         self.origem.excluir(outra)
-        docs = self.origem.caminho.parent / 'documentos' / str(rpv)
-        docs.mkdir(parents=True)
-        (docs / 'contrato.pdf').write_bytes(b'%PDF-teste-do-contrato')
-        (docs / 'protocolo.png').write_bytes(b'PNG-teste-do-protocolo')
-        self.destino.salvar(dados_rpv(nome='Anterior'))
+        contrato = self.anexar(self.origem, rpv, 'contrato.pdf', b'%PDF-teste-do-contrato')
+        self.anexar(self.origem, rpv, 'protocolo.png', b'PNG-teste-do-protocolo')
+        (contrato.parent / 'solto.exe').write_bytes(b'MZ')  # Arquivo sem cadastro: fica fora do backup.
+        anterior = self.destino.salvar(dados_rpv(nome='Anterior'))
+        antigo = self.anexar(self.destino, anterior, 'antigo.pdf', b'antigo')
         destino_docs = self.destino.caminho.parent / 'documentos'
-        destino_docs.mkdir()
-        (destino_docs / 'antigo.pdf').write_bytes(b'antigo')
         arquivo = criar_backup(self.origem, self.pasta / 'backups')
         with BackupPreparado(arquivo) as preparado:
             self.assertEqual(preparado.resumo, {'registros':1, 'lixeira':1, 'contas':3, 'documentos':2})
@@ -70,15 +77,16 @@ class TestBackupHistorico(unittest.TestCase):
         self.assertEqual(restaurado.obter(rpv)['previsao_atual'], '2027-01-20')
         self.assertEqual(restaurado.obter(rpv)['recebimento'], '2026-10-22')
         self.assertEqual(len(restaurado.listar_lixeira()), 1)
-        self.assertEqual((destino_docs / str(rpv) / 'contrato.pdf').read_bytes(), b'%PDF-teste-do-contrato')
-        self.assertFalse((destino_docs / 'antigo.pdf').exists())
+        self.assertEqual((destino_docs / contrato.relative_to(contrato.parents[1])).read_bytes(), b'%PDF-teste-do-contrato')
+        self.assertFalse((destino_docs / contrato.parent.name / 'solto.exe').exists())
+        self.assertFalse(antigo.exists())
         with BackupPreparado(seguranca) as anterior:
             con = sqlite3.connect(anterior.pasta / 'banco.sqlite3')
             try:
                 self.assertEqual(con.execute('SELECT nome FROM rpvs').fetchone()[0], 'Anterior')
             finally:
                 con.close()
-            self.assertEqual((anterior.pasta / 'documentos' / 'antigo.pdf').read_bytes(), b'antigo')
+            self.assertEqual((anterior.pasta / 'documentos' / antigo.relative_to(antigo.parents[1])).read_bytes(), b'antigo')
 
     def test_backup_vazio_documentos_e_falha_importacao_preserva_destino(self):
         self.origem.salvar(dados_rpv(nome='Origem'))
@@ -96,15 +104,13 @@ class TestBackupHistorico(unittest.TestCase):
         self.assertEqual(len(list((self.destino.caminho.parent / 'backups_automaticos').glob('*.rpvbackup'))), 1)
 
     def test_backup_alterado_invalido_ou_caminho_inseguro_nao_importa(self):
-        self.origem.salvar(dados_rpv())
-        docs = self.origem.caminho.parent / 'documentos'
-        docs.mkdir()
-        (docs / 'contrato.pdf').write_bytes(b'original')
+        contrato = self.anexar(self.origem, self.origem.salvar(dados_rpv()), 'contrato.pdf', b'original')
         arquivo = criar_backup(self.origem, self.pasta / 'backups')
         alterado = self.pasta / 'alterado.rpvbackup'
+        no_zip = 'documentos/' + contrato.relative_to(contrato.parents[1]).as_posix()
         with ZipFile(arquivo) as origem, ZipFile(alterado,'w',ZIP_DEFLATED) as alvo:
             for nome in origem.namelist():
-                alvo.writestr(nome, b'alterado' if nome == 'documentos/contrato.pdf' else origem.read(nome))
+                alvo.writestr(nome, b'alterado' if nome == no_zip else origem.read(nome))
         with self.assertRaises(ValueError), BackupPreparado(alterado):
             pass
         inseguro = self.pasta / 'inseguro.rpvbackup'
@@ -125,6 +131,22 @@ class TestBackupHistorico(unittest.TestCase):
             with self.subTest(nome):
                 adulterado = adulterar_banco(arquivo, self.pasta / f'{nome}.rpvbackup', sql)
                 with self.assertRaisesRegex(ValueError, 'segurança'), BackupPreparado(adulterado):
+                    pass
+
+    def test_backup_com_arquivo_que_nao_e_documento_cadastrado_e_recusado(self):
+        contrato = self.anexar(self.origem, self.origem.salvar(dados_rpv()), 'contrato.pdf', b'%PDF')
+        arquivo = criar_backup(self.origem, self.pasta / 'backups')
+        manifesto = json.loads(ZipFile(arquivo).read('manifesto.json'))
+        for nome in ('documentos/LEIA-ME URGENTE.exe', 'documentos/desktop.ini',
+                     'documentos/' + contrato.parent.name + '/Comprovante.pdf.url'):
+            with self.subTest(nome):
+                extra = self.pasta / 'extra.rpvbackup'
+                manifesto_extra = dict(manifesto, arquivos=dict(manifesto['arquivos'], **{nome: hashlib.sha256(b'x').hexdigest()}))
+                with ZipFile(arquivo) as origem, ZipFile(extra, 'w', ZIP_DEFLATED) as alvo:
+                    for item in origem.namelist():
+                        alvo.writestr(item, json.dumps(manifesto_extra) if item == 'manifesto.json' else origem.read(item))
+                    alvo.writestr(nome, b'x')
+                with self.assertRaisesRegex(ValueError, 'não são documentos cadastrados'), BackupPreparado(extra):
                     pass
 
     def test_importacao_recria_o_esquema_e_copia_so_os_dados(self):
@@ -196,10 +218,8 @@ class TestBackupHistorico(unittest.TestCase):
         self.assertEqual(len(list(migrado.caminho.parent.glob('backup-antes-0.9.0-*.sqlite3'))),1)
 
     def test_backup_dentro_da_pasta_documentos_nao_inclui_a_si_mesmo(self):
-        self.origem.salvar(dados_rpv())
+        self.anexar(self.origem, self.origem.salvar(dados_rpv()), 'contrato.pdf', b'%PDF-contrato')
         docs = self.origem.caminho.parent / 'documentos'
-        docs.mkdir()
-        (docs / 'contrato.pdf').write_bytes(b'%PDF-contrato')
         primeiro = criar_backup(self.origem, docs)
         segundo = criar_backup(self.origem, docs)
         with BackupPreparado(segundo) as preparado:
