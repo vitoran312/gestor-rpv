@@ -4,7 +4,7 @@ import tkinter as tk
 from datetime import datetime
 from tkinter import messagebox, ttk, font as tkfont
 
-from dados import moeda, data_iso, data_br, situacao
+from dados import moeda, data_br, situacao
 from grafico import JanelaGrafico
 import demonstracao
 from componentes import centralizar
@@ -219,6 +219,8 @@ class OperacoesMixin:
             registros = [r for r in registros if situacoes[str(r['id'])] == self.filtro.get()]
         self.atrasadas = {i for i, s in situacoes.items() if s == 'atrasada'}
         self.recebimentos = {str(r['id']): r['recebimento'] for r in registros}
+        # Comparação em ISO, direto do banco: o texto exibido não precisa ser relido como data.
+        self.adiadas = {str(r['id']) for r in registros if r['previsao_atual'] > r['previsao']}
         for widgets in self.acoes_linhas.values():
             for widget in widgets:
                 widget.destroy()
@@ -284,7 +286,7 @@ class OperacoesMixin:
             if linha not in self.acoes_linhas:
                 valores = self.tabela.item(linha, 'values')
                 atrasada = linha in self.atrasadas
-                adiada = data_iso(valores[-2]) > data_iso(valores[-3])
+                adiada = linha in self.adiadas
                 botao = ttk.Label(self.tabela, text=valores[-2], anchor='center', cursor='hand2',
                                   style='PrevisaoAtrasada.TLabel' if atrasada else
                                   'PrevisaoRecebida.TLabel' if self.recebimentos[linha] else

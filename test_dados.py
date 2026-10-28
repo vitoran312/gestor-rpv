@@ -1,7 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
-from dados import Banco, centavos, moeda, data_iso, previsao_por_prazo
+from dados import Banco, centavos, data_br, moeda, data_iso, previsao_por_prazo
 from test_contas import banco_com_contas
 
 
@@ -33,6 +33,13 @@ class TestDados(unittest.TestCase):
                 centavos(invalido)
         with self.assertRaises(ValueError):
             data_iso('31/02/2026')
+        for fora in ('01/01/0001', '01/01/0026', '31/12/1899', '01/01/2101', '01/01/9999'):
+            with self.subTest(fora), self.assertRaisesRegex(ValueError, '1900 e 2100'):
+                data_iso(fora)
+        self.assertEqual(data_iso('01/01/1900'), '1900-01-01')
+        self.assertEqual(data_br('0026-01-01'), '01/01/0026')
+        with self.assertRaisesRegex(ValueError, 'depois de 2100'):
+            previsao_por_prazo('01/01/2026', '99999')
 
     def test_persistencia_edicao_comissao_e_registros_distintos(self):
         with tempfile.TemporaryDirectory() as pasta:

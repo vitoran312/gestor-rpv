@@ -86,18 +86,28 @@ def previsao_por_prazo(aquisicao, prazo):
         resultado = inicio + timedelta(days=int(prazo))
     except (OverflowError, ValueError):
         raise ValueError('Confira a data de aquisição e o prazo informado.') from None
-    return resultado.strftime('%d/%m/%Y')
+    if not ANO_MINIMO <= resultado.year <= ANO_MAXIMO:
+        raise ValueError(f'O prazo leva a previsão para depois de {ANO_MAXIMO}. Confira o número de dias.')
+    return data_br(resultado.isoformat())
+
+
+ANO_MINIMO, ANO_MAXIMO = 1900, 2100  # Fora disso é erro de digitação; datas fora da faixa quebram o Excel.
 
 
 def data_iso(texto):
     try:
-        return datetime.strptime(texto.strip(), '%d/%m/%Y').date().isoformat()
+        valor = datetime.strptime(texto.strip(), '%d/%m/%Y').date()
     except ValueError:
         raise ValueError('Informe uma data válida no formato DD/MM/AAAA.') from None
+    if not ANO_MINIMO <= valor.year <= ANO_MAXIMO:
+        raise ValueError(f'Informe uma data entre {ANO_MINIMO} e {ANO_MAXIMO}.')
+    return valor.isoformat()
 
 
 def data_br(texto):
-    return datetime.strptime(texto, '%Y-%m-%d').strftime('%d/%m/%Y')
+    # Sem strftime: no Linux, '%Y' não completa anos com zeros à esquerda.
+    valor = date.fromisoformat(texto)
+    return f'{valor.day:02d}/{valor.month:02d}/{valor.year:04d}'
 
 
 def situacao(registro, hoje=None):
