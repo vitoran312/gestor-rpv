@@ -212,15 +212,10 @@ class TestBackupHistorico(unittest.TestCase):
             self.origem.salvar(dados_rpv(custo=0), identificador)
         self.assertEqual(self.origem.obter(identificador)['observacoes'], 'Alteração')
         self.origem.excluir(identificador)
-        with self.assertRaises(ValueError):
-            self.origem.prorrogar(identificador, '2027-03-01')
-        self.assertEqual(self.origem.prorrogacoes(identificador), [])
         self.assertEqual(self.origem.listar(), [])
         self.assertEqual(len(self.origem.listar_lixeira()), 1)
         self.origem.restaurar(identificador)
         self.assertEqual(self.origem.obter(identificador)['recebimento'], '2026-10-22')
-        self.origem.prorrogar(identificador, '2027-03-01')
-        self.assertEqual(len(self.origem.prorrogacoes(identificador)), 1)
 
     def test_migracao_080_remove_unicidade_cpf_preserva_vinculos(self):
         conta = self.origem.salvar_conta(dados_conta())

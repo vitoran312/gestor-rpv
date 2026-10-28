@@ -16,6 +16,7 @@ import cifra
 from documentos import EXTENSOES
 from versao import VERSAO
 from dados import ESQUEMA, VERSAO_BANCO, Banco, limitar_backups
+from diario import log
 
 
 FORMATO = 'gestor-rpv-backup'
@@ -40,7 +41,7 @@ def limpar_temporarios(pasta, idade_segundos=24 * 60 * 60):
                 if sobra.is_dir() and not sobra.is_symlink() and sobra.stat().st_mtime < limite:
                     shutil.rmtree(sobra, ignore_errors=True)
             except OSError:
-                pass
+                log.warning('Sobra de importação não removida: %s', sobra, exc_info=True)
 
 
 def conferir_espaco(pasta, necessario):

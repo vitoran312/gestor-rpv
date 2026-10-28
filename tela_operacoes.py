@@ -8,7 +8,7 @@ from dados import data_br, reais, situacao
 from grafico import JanelaGrafico
 import demonstracao
 from componentes import centralizar
-from visual import px
+from visual import LARGURA_LAYOUT_LARGO, MODIFICADORES_SELECAO, px
 from tema import cores
 from ordenacao import ordenar
 from selecao import habilitar_selecao, pressionar_linha, arrastar
@@ -195,7 +195,7 @@ class OperacoesMixin:
         aviso.bind('<Button-1>',lambda _: self.exportar_backup())
 
     def organizar_resumo(self, evento):
-        colunas = 4 if evento.width >= 1100 else 2
+        colunas = 4 if evento.width >= LARGURA_LAYOUT_LARGO else 2
         if colunas != self.colunas_resumo:
             self.colunas_resumo = colunas
             for coluna in range(4):
@@ -381,7 +381,7 @@ class OperacoesMixin:
             copiar_texto(self.tabela,'\n'.join(linhas))
 
     def clicar_historico(self, evento):
-        if getattr(self.tabela,'_arrastando',False) or evento.state & 5 or len(self.tabela.selection()) > 1:
+        if getattr(self.tabela,'_arrastando',False) or evento.state & MODIFICADORES_SELECAO or len(self.tabela.selection()) > 1:
             return
         if self.tabela.identify_region(evento.x, evento.y) != 'cell':
             return

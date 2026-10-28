@@ -16,7 +16,7 @@ import tela_arquivos
 import tela_registro
 from componentes import CampoData, CampoMoeda, AreaRolavel
 from dados import Banco
-from test_contas import banco_com_contas, dados_rpv
+from test_contas import banco_com_contas, dados_rpv, prorrogacao_antiga
 from tema import cores, PALETAS
 
 
@@ -164,8 +164,8 @@ class TestInterface(unittest.TestCase):
     def test_previsao_atual_edicao_cor_e_preservacao_historico(self):
         identificador = self.banco.salvar(dict(nome='Teste', aquisicao='2026-10-22', previsto=2000000,
             custo=1200000, conta='Vitor', previsao='2026-12-20', comissao=None, observacoes=''))
-        self.banco.prorrogar(identificador, '2027-01-20')
-        self.banco.prorrogar(identificador, '2027-02-20')
+        prorrogacao_antiga(self.banco, identificador, '2027-01-20')
+        prorrogacao_antiga(self.banco, identificador, '2027-02-20')
         self.programa.mostrar_historico()
         self.root.update()
         tabela = self.programa.tabela
@@ -193,7 +193,7 @@ class TestInterface(unittest.TestCase):
         registro = self.banco.obter(identificador)
         self.assertEqual(registro['previsao_atual'], '2027-03-20')
         self.assertEqual(registro['previsao'], '2026-12-20')
-        self.assertEqual(len(self.banco.prorrogacoes(identificador)), 2)
+        self.assertEqual(self.banco.obter(identificador)['total_prorrogacoes'], 2)
         self.programa.acoes_linhas[str(identificador)][0].event_generate('<Button-1>')
         self.programa.acoes_linhas[str(identificador)][0].event_generate('<ButtonRelease-1>')
         self.root.update()
@@ -745,7 +745,8 @@ class TestInterface(unittest.TestCase):
 
     def test_selecao_mouse_teclado_exclusao_e_restauracao_em_lote(self):
         from test_contas import dados_rpv
-        ids = [str(self.banco.salvar(dados_rpv(nome=f'Pessoa {n}'))) for n in range(4)]
+        for n in range(4):
+            self.banco.salvar(dados_rpv(nome=f'Pessoa {n}'))
         self.programa.mostrar_historico()
         self.root.geometry('1100x900')
         self.root.update()

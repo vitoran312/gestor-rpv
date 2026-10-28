@@ -12,6 +12,7 @@ import sqlite3
 from datetime import datetime, date, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from diario import log
 
 
 ESTADOS = ('AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS',
@@ -77,7 +78,7 @@ def limitar_backups(pasta, padrao, manter=MANTER_BACKUPS):
         try:
             antigo.unlink()
         except OSError:
-            pass
+            log.warning('Backup antigo não removido: %s', antigo, exc_info=True)
 
 
 def centavos(texto):
@@ -427,9 +428,6 @@ class Banco:
         with self.conectar() as con:
             con.execute('UPDATE contas SET ativa=? WHERE id=?', (int(ativa), identificador))
 
-    def remover_conta(self, identificador):
-        self.remover_contas([identificador])
-
     def operacoes_da_conta(self, identificadores):
         """Quantas operações (inclusive na lixeira) usam alguma das contas."""
         ids = [int(i) for i in identificadores]
@@ -558,23 +556,6 @@ class Banco:
             con.execute('BEGIN IMMEDIATE')
             self.conferir_lixeira(con, ids, True, 'Uma entrada não está mais na lixeira. Reabra a lista e tente novamente.')
             con.executemany('UPDATE rpvs SET lixeira_em=NULL WHERE id=?',[(i,) for i in ids])
-
-    def prorrogacoes(self, identificador):
-        with self.conectar() as con:
-            return con.execute('SELECT * FROM prorrogacoes WHERE rpv_id=? ORDER BY data, id', (identificador,)).fetchall()
-
-    def prorrogar(self, identificador, nova_data):
-        # Validação também na persistência, independente da interface.
-        nova_data = data_iso(data_br(nova_data))
-        with self.conectar() as con:
-            con.execute('BEGIN IMMEDIATE')
-            rpv = con.execute('SELECT * FROM rpvs WHERE id=?', (identificador,)).fetchone()
-            if rpv is None or rpv['lixeira_em']:
-                raise ValueError('Registro não encontrado na lista ativa.')
-            ultima = con.execute('SELECT MAX(data) FROM prorrogacoes WHERE rpv_id=?', (identificador,)).fetchone()[0]
-            if nova_data <= max(ultima or rpv['previsao'], rpv['aquisicao'], rpv['previsao']):
-                raise ValueError('A nova previsão deve ser posterior à previsão atual e à aquisição.')
-            con.execute('INSERT INTO prorrogacoes (rpv_id, data) VALUES (?,?)', (identificador, nova_data))
 
     def registrar_recebimento(self, identificador, data, anexos=()):
         criados = []

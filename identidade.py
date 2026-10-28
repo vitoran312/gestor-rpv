@@ -2,6 +2,7 @@
 import sys
 from pathlib import Path
 import tkinter as tk
+from diario import log
 
 
 RECURSOS = Path(__file__).resolve().parent / 'recursos'
@@ -22,7 +23,7 @@ def preparar_windows():
             try:
                 ctypes.windll.user32.SetProcessDPIAware()  # Windows mais antigo.
             except (AttributeError, OSError):
-                pass
+                log.info('Ajuste de escala do Windows indisponível.', exc_info=True)
 
 
 def aplicar_icone(raiz):

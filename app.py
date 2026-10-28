@@ -22,6 +22,9 @@ from navegacao import NavegacaoMixin
 from tela_operacoes import OperacoesMixin
 from tela_registro import RegistroMixin
 from tela_arquivos import ArquivosMixin
+import diario
+from dados import pasta_dados
+from diario import log
 
 
 class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, ArquivosMixin):
@@ -34,7 +37,7 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
             try:
                 demonstracao.carregar(self.banco)
             except (sqlite3.Error, ValueError):
-                pass  # Sem a demonstração, o programa abre vazio, como antes.
+                log.warning('Dados de demonstração não carregados; o programa abre vazio.', exc_info=True)
         janela.withdraw()
         janela.title('Gestor de RPV')
         aplicar_icone(janela)
@@ -78,7 +81,7 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
         # As placas de vidro entram logo depois que a janela aparece e ficam paradas ao fim da entrada.
         self.agendamento_arte = janela.after(250,self.arte_inicio.animar)
         self.relogio_inicio.iniciar()
-        # As páginas (operações, contas, gráfico) usam a mesma janela; maximizada, a tabela tem o espaço de antes.
+        # As páginas (operações, contas, gráfico) usam a mesma janela; maximizada, a tabela tem espaço para todas as colunas.
         maximizar(janela)
 
     def alternar_tema(self):
@@ -113,7 +116,8 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
             if self.banco.configuracao('tema') != modo:
                 self.banco.salvar_configuracao('tema', modo)
         except sqlite3.Error:
-            pass  # Sem gravar a preferência, o tema escolhido continua valendo nesta execução.
+            # Sem gravar a preferência, o tema escolhido continua valendo nesta execução.
+            log.warning('Preferência de tema não gravada.', exc_info=True)
 
     def atualizar_alternador_tema(self):
         if self.texto_alternar_tema is not None:
@@ -209,6 +213,8 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
 
 if __name__ == '__main__':
     preparar_windows()
+    diario.ativar(pasta_dados())
     janela = tk.Tk()
+    janela.report_callback_exception = diario.erro_na_interface
     Aplicativo(janela)
     janela.mainloop()

@@ -22,7 +22,9 @@ jobs:
           cache: pip
           cache-dependency-path: requirements-build.txt
       - name: Instalar dependencias
-        run: python -m pip install -r requirements-build.txt
+        run: python -m pip install -r requirements-build.txt pyflakes==3.2.0
+      - name: Conferir o codigo (imports e nomes sem uso, nomes indefinidos)
+        run: python -m pyflakes .
       - name: Ajustar resolucao da tela
         shell: pwsh
         run: |

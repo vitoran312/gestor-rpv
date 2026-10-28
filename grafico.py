@@ -100,7 +100,7 @@ class GraficoMensal(tk.Canvas):
         piso = topo + area
         # Parede do fundo e piso em perspectiva, com a grade em linhas finas.
         self.create_polygon(esquerda, piso, esquerda + dx, piso - dy, largura - direita + dx * 0.4, piso - dy,
-                            largura - direita - dx * 0.6, piso, fill=misturar(c['superficie'], c['sage'], 0.9), outline='')
+                            largura - direita - dx * 0.6, piso, fill=misturar(c['superficie'], c['cabecalho'], 0.9), outline='')
         for passo in range(5):
             y = topo + area * passo / 4
             cor = c['borda'] if passo == 4 else c['borda_suave']

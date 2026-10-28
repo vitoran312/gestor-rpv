@@ -62,7 +62,7 @@ class TestOperacoes016(unittest.TestCase):
         conta=self.banco.salvar_conta(dados_conta())
         rpv=self.banco.salvar(dados_rpv(conta_id=conta))
         copia=self.banco.obter(rpv)['conta_snapshot']
-        self.banco.remover_conta(conta)
+        self.banco.remover_contas([conta])
         self.assertIsNone(self.banco.obter_conta(conta))
         self.banco.salvar(dados_rpv(conta_id=None,observacoes='Corrigido'),rpv)
         self.assertEqual(self.banco.obter(rpv)['conta_snapshot'],copia)
@@ -124,7 +124,7 @@ class TestOperacoes016(unittest.TestCase):
         self.assertTrue(list(migrado.caminho.parent.glob('backup-antes-0.16.0-*.sqlite3')))
         destino=Banco(self.pasta/'novo'/'banco.sqlite3')
         with BackupPreparado(legado, SENHA_TESTE) as preparado:preparado.restaurar(destino)
-        destino.remover_conta(conta)
+        destino.remover_contas([conta])
         self.assertIsNone(destino.obter(rpv)['conta_id'])
         self.assertTrue(destino.caminho_documento(documento['id']).exists())
         with destino.conectar() as con:self.assertEqual(con.execute('PRAGMA foreign_key_check').fetchall(),[])

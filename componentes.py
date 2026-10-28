@@ -142,7 +142,7 @@ class CampoMoeda(ttk.Frame):
         try:
             self.variavel.set(moeda(centavos(self.variavel.get())))
         except ValueError:
-            pass
+            return  # O texto fica como está; ao salvar, o formulário aponta o campo com problema.
 
 
 class CampoData(ttk.Frame):

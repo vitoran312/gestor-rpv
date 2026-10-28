@@ -8,6 +8,12 @@ from tkinter import ttk, font as tkfont
 from tema import cores
 
 
+# Abaixo desta largura (em pixels a 100% de escala), telas com cartões lado a lado passam a empilhá-los.
+LARGURA_LAYOUT_LARGO = 1100
+# Bits de evento.state das teclas que mudam o clique (Shift e Ctrl): com elas, o clique só seleciona.
+MODIFICADORES_SELECAO = 0x0001 | 0x0004
+
+
 def familia_fonte(raiz):
     raiz = raiz._root()
     if hasattr(raiz,'_familia_pro'):
@@ -173,7 +179,7 @@ def aplicar_superficies(raiz):
     if chave not in cache:
         imagens = {}
         for nome,cor,contorno in (('botao',c['botao'],c['borda']),('ativo',c['ativo'],c['borda']),
-                                  ('pressionado',c['selecao'],c['floresta']),
+                                  ('pressionado',c['selecao'],c['marca']),
                                   ('primario',c['primario'],None),('primario_ativo',c['primario_ativo'],None),
                                   ('primario_pressionado',c['primario_pressionado'],None),
                                   ('inativo',c['fundo'],c['borda_suave'])):
@@ -183,7 +189,7 @@ def aplicar_superficies(raiz):
         # com um ou dois azulejos; os tamanhos mínimos das superfícies continuam os mesmos.
         imagens['filtro'] = tk.PhotoImage(master=raiz,data=_png_arredondado(c['fundo'],c['borda_suave'],16,240,32))
         imagens['filtro_ativo'] = tk.PhotoImage(master=raiz,data=_png_arredondado(c['ativo'],c['borda'],16,240,32))
-        imagens['filtro_selecionado'] = tk.PhotoImage(master=raiz,data=_png_arredondado(c['realce'],c['floresta'],16,240,32))
+        imagens['filtro_selecionado'] = tk.PhotoImage(master=raiz,data=_png_arredondado(c['realce'],c['marca'],16,240,32))
         imagens['cartao'] = tk.PhotoImage(master=raiz,data=_png_arredondado(c['superficie'],c['borda_suave'],12,1200,800))
         prefixo = 'Pro'+chave[1:]
         for nome,normal,hover,pressionado in (('secundario','botao','ativo','pressionado'),
@@ -241,7 +247,7 @@ class Icone(tk.Canvas):
         self.configure(bg=c['superficie'])
         self.delete('all')
         self.create_oval(5,5,49,49,fill=c['realce'],outline='')
-        linha = dict(fill=c['floresta'],width=1.8,capstyle='round',joinstyle='round')
+        linha = dict(fill=c['marca'],width=1.8,capstyle='round',joinstyle='round')
         if self.nome == 'entrada':
             self.create_line(17,14,32,14,38,20,38,40,17,40,17,14,**linha)
             self.create_line(31,14,31,21,38,21,**linha)

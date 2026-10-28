@@ -12,7 +12,7 @@ from arte_inicio import ArteVidro, LuzesFundo, Relogio
 from dados import situacao
 from tema import cores, modo_atual, PALETAS
 from versao import VERSAO
-from visual import Icone, _png_arredondado, misturar, px
+from visual import Icone, LARGURA_LAYOUT_LARGO, _png_arredondado, misturar, px
 
 # Tamanho máximo da composição da tela inicial (em pixels a 100% de escala), nas proporções de referência.
 COMPOSICAO = (1420, 900)
@@ -27,7 +27,7 @@ ATALHOS = (
 def cores_superficie(paleta, tipo):
     """Preenchimento, contorno e raio de cada tipo de superfície da tela inicial."""
     if tipo == 'destaque':
-        return paleta['superficie'], misturar(paleta['borda_suave'], paleta['floresta'], 0.55), 18
+        return paleta['superficie'], misturar(paleta['borda_suave'], paleta['marca'], 0.55), 18
     if tipo == 'aviso':
         return paleta['superficie'], misturar(paleta['borda_suave'], paleta['vermelho'], 0.45), 14
     return paleta['superficie'], paleta['borda_suave'], 16
@@ -210,7 +210,7 @@ class InicioMixin:
         altura_aviso = p(84)
         retangulos = {}
         conteudo = largura - 2 * margem
-        if largura >= p(1100):
+        if largura >= p(LARGURA_LAYOUT_LARGO):
             # Cartão em destaque à esquerda; à direita, os dois atalhos empilhados e os avisos.
             esquerda = round(conteudo * 0.56)
             direita_x = margem + esquerda + espaco
@@ -239,7 +239,7 @@ class InicioMixin:
             for chave in avisos:
                 retangulos[chave] = (margem, y, conteudo, altura_aviso)
                 y += altura_aviso + espaco
-        self.layout_largo_inicio = largura >= p(1100)
+        self.layout_largo_inicio = largura >= p(LARGURA_LAYOUT_LARGO)
         self.medidas_inicio = {}
         for chave, (peca, tipo) in self.pecas_inicio.items():
             desenho, janela_peca = self.desenhos_inicio[chave], self.janelas_inicio[chave]

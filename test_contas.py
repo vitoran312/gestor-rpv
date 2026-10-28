@@ -18,6 +18,12 @@ def dados_rpv(**valores):
 SENHA_TESTE = 'senha-de-teste'
 
 
+def prorrogacao_antiga(banco, rpv, data):
+    """Prorrogação no formato das versões até a 0.6, que ainda pode existir em bancos antigos."""
+    with banco.conectar() as con:
+        con.execute('INSERT INTO prorrogacoes (rpv_id, data) VALUES (?, ?)', (rpv, data))
+
+
 def banco_com_contas(caminho):
     """Banco novo com as contas usadas nos dados de exemplo dos testes e a senha dos backups definida."""
     banco = Banco(caminho)
@@ -104,18 +110,15 @@ class TestContas(unittest.TestCase):
                 self.banco.salvar(dados_rpv(custo=custo))
         rpv = self.banco.salvar(dados_rpv(custo=2000000))
         outra = self.banco.salvar(dados_rpv())
-        self.banco.prorrogar(rpv, '2027-01-20')
-        self.banco.prorrogar(rpv, '2027-02-20')
-        for data in ('2027-02-20', '2026-12-10'):
-            with self.subTest(data=data), self.assertRaises(ValueError):
-                self.banco.prorrogar(rpv, data)
+        prorrogacao_antiga(self.banco, rpv, '2027-01-20')
+        prorrogacao_antiga(self.banco, rpv, '2027-02-20')
         lista = {r['id']: r for r in self.banco.listar()}
         self.assertEqual(lista[rpv]['total_prorrogacoes'], 2)
         self.assertEqual(lista[rpv]['previsao_atual'], '2027-02-20')
         self.assertEqual(lista[rpv]['previsao'], '2026-12-20')
         self.assertEqual(lista[outra]['total_prorrogacoes'], 0)
         self.banco.excluir(rpv)
-        self.assertEqual(len(self.banco.prorrogacoes(rpv)), 2)
+        self.assertEqual(self.banco.obter(rpv)['total_prorrogacoes'], 2)
         self.assertIsNotNone(self.banco.obter(rpv)['lixeira_em'])
         self.assertIsNotNone(self.banco.obter(outra))
 
@@ -154,12 +157,12 @@ class TestContas(unittest.TestCase):
         self.assertEqual(self.banco.obter_conta(conta)['endereco'], 'Rua Das Flores')
         rpv = self.banco.salvar(dados_rpv(conta_id=conta))
         snapshot = self.banco.obter(rpv)['conta_snapshot']
-        self.banco.remover_conta(conta)
+        self.banco.remover_contas([conta])
         self.assertEqual(self.banco.obter(rpv)['conta_snapshot'], snapshot)
         self.assertIsNone(self.banco.obter(rpv)['conta_id'])
         self.assertIsNone(self.banco.obter_conta(conta))
         outra = self.banco.salvar_conta(dados_conta(identificacao='Outra', cpf='11144477735', numero='999', pix='outra@example.com'))
-        self.banco.remover_conta(outra)
+        self.banco.remover_contas([outra])
         self.assertIsNone(self.banco.obter_conta(outra))
 
     def test_recebimento_persistencia_limites_e_correcao(self):
@@ -178,7 +181,7 @@ class TestContas(unittest.TestCase):
 
     def test_migracao_050_preserva_contas_snapshots_e_prorrogacoes(self):
         identificador = self.banco.salvar(dados_rpv())
-        self.banco.prorrogar(identificador, '2027-01-20')
+        prorrogacao_antiga(self.banco, identificador, '2027-01-20')
         snapshot = self.banco.obter(identificador)['conta_snapshot']
         with self.banco.conectar() as con:
             con.execute('ALTER TABLE rpvs DROP COLUMN recebimento')
@@ -186,7 +189,7 @@ class TestContas(unittest.TestCase):
         migrado = Banco(self.caminho)
         self.assertEqual(migrado.obter(identificador)['conta_snapshot'], snapshot)
         self.assertIsNone(migrado.obter(identificador)['recebimento'])
-        self.assertEqual(len(migrado.prorrogacoes(identificador)), 1)
+        self.assertEqual(migrado.obter(identificador)['total_prorrogacoes'], 1)
         backups = list(Path(self.pasta.name).glob('backup-antes-0.6.0-*.sqlite3'))
         self.assertEqual(len(backups), 1)
         with closing(sqlite3.connect(backups[0])) as con:
@@ -213,7 +216,7 @@ class TestContas(unittest.TestCase):
 
     def test_migracao_060_e_edicao_previsao(self):
         identificador = self.banco.salvar(dados_rpv())
-        self.banco.prorrogar(identificador, '2027-01-20')
+        prorrogacao_antiga(self.banco, identificador, '2027-01-20')
         self.banco.registrar_recebimento(identificador, '2026-10-22')
         snapshot = self.banco.obter(identificador)['conta_snapshot']
         with self.banco.conectar() as con:
@@ -230,7 +233,7 @@ class TestContas(unittest.TestCase):
         migrado.atualizar_previsao(identificador, '2027-02-20')
         migrado.atualizar_previsao(identificador, '2026-12-20')
         self.assertEqual(migrado.obter(identificador)['previsao_atual'], '2026-12-20')
-        self.assertEqual(len(migrado.prorrogacoes(identificador)), 1)
+        self.assertEqual(migrado.obter(identificador)['total_prorrogacoes'], 1)
         migrado.atualizar_previsao(identificador, '2026-12-01')
         with self.assertRaises(ValueError):
             migrado.atualizar_previsao(identificador, '2026-10-01')

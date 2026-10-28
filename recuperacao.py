@@ -14,6 +14,7 @@ import cifra
 from backup import SENHA_BACKUP, BackupPreparado
 from dados import Banco, VersaoMaisNova, pasta_dados
 from mensagens import descrever_erro
+from diario import log
 
 
 def abrir_pasta(pasta):
@@ -23,7 +24,7 @@ def abrir_pasta(pasta):
         else:
             subprocess.Popen(['xdg-open', str(pasta)])
     except OSError:
-        pass  # A mensagem já mostra o caminho da pasta.
+        log.warning('Pasta dos dados não aberta; a mensagem já mostra o caminho.', exc_info=True)
 
 
 def restaurar_em_banco_novo(caminho, arquivo, senha=None):

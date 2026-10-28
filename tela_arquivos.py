@@ -14,6 +14,7 @@ from documentos import abrir_pasta
 from exportacao import exportar_excel, nome_sugerido
 from ordenacao import ordenar
 from mensagens import descrever_erro
+from diario import log
 
 
 class ArquivosMixin:
@@ -110,7 +111,7 @@ class ArquivosMixin:
                     else:
                         self.banco.remover_configuracao(PASTA_AUTOMATICA)
                 except sqlite3.Error:
-                    pass
+                    log.warning('Pasta anterior do backup automático não restaurada.', exc_info=True)
                 self.atualizar_ultimo_backup()
                 messagebox.showerror('Backup automático', 'Não foi possível usar esta pasta. ' + descrever_erro(erro), parent=tela)
                 atualizar()

@@ -11,7 +11,7 @@ def criar_estilos(janela, estilo, fonte):
     primario_texto = c['primario_texto']
     estilo.configure('.',font=(fonte,10),background=fundo,foreground=texto,
                      bordercolor=c['borda'],lightcolor=campo,darkcolor=campo,troughcolor=fundo,
-                     focuscolor=c['floresta'],selectbackground=c['selecao'],selectforeground=c['texto_selecao'])
+                     focuscolor=c['marca'],selectbackground=c['selecao'],selectforeground=c['texto_selecao'])
     aplicar_superficies(janela)
 
     # Botões planos: secundário com contorno fino, principal preenchido com a cor da marca.
@@ -41,7 +41,7 @@ def criar_estilos(janela, estilo, fonte):
     # Filtros em pílulas: o selecionado ganha o tom suave e o contorno da marca.
     for nome,cor in (('Filtro.TRadiobutton',texto),('FiltroAlerta.TRadiobutton',c['vermelho'])):
         estilo.configure(nome,padding=(14,6),background=fundo,foreground=cor,anchor='center')
-        estilo.map(nome,background=[('!disabled',fundo)],foreground=[('selected',c['floresta'] if cor==texto else cor),('!disabled',cor)],
+        estilo.map(nome,background=[('!disabled',fundo)],foreground=[('selected',c['marca'] if cor==texto else cor),('!disabled',cor)],
                    font=[('selected',(fonte,10,'bold')),('!selected',(fonte,10))])
 
     # Aviso de dados de demonstração: faixa suave da cor da marca.
@@ -87,7 +87,7 @@ def criar_estilos(janela, estilo, fonte):
     estilo.configure('AtrasadasAviso.TLabel',background=fundo,foreground=c['vermelho'],font=(fonte,10,'bold'))
     estilo.configure('Voltar.TButton',padding=(12,5),font=(fonte,10))
     estilo.configure('BackupAviso.TLabel',background=fundo,foreground=c['vermelho'],font=(fonte,9))
-    estilo.configure('Contato.TLabel',foreground=c['floresta'],font=(fonte,11,'underline'))
+    estilo.configure('Contato.TLabel',foreground=c['marca'],font=(fonte,11,'underline'))
     estilo.configure('LegendaInvestido.TLabel',foreground=c['secundario'],font=(fonte,12))
     estilo.configure('LegendaRecebido.TLabel',foreground=c['verde'],font=(fonte,12))
     estilo.configure('Recebido.TLabel',foreground=c['verde'],font=(fonte,10,'bold'))
@@ -102,8 +102,8 @@ def criar_estilos(janela, estilo, fonte):
                          bordercolor=c['borda'],lightcolor=campo,darkcolor=campo)
         estilo.map(tipo,fieldbackground=[('disabled',fundo),('readonly',campo)],
                    foreground=[('disabled',c['desabilitado']),('readonly',texto)],
-                   bordercolor=[('focus',c['floresta']),('!focus',c['borda'])],
-                   lightcolor=[('focus',c['floresta']),('!focus',campo)],
+                   bordercolor=[('focus',c['marca']),('!focus',c['borda'])],
+                   lightcolor=[('focus',c['marca']),('!focus',campo)],
                    background=[('active',campo),('!disabled',campo)],
                    arrowcolor=[('disabled',c['desabilitado']),('!disabled',c['secundario'])],
                    selectbackground=[('!disabled',c['selecao'])],selectforeground=[('!disabled',c['texto_selecao'])])
@@ -115,9 +115,9 @@ def criar_estilos(janela, estilo, fonte):
                      borderwidth=1,bordercolor=c['borda_suave'],lightcolor=campo,darkcolor=campo)
     estilo.map('Treeview',background=[('selected',c['selecao'])],foreground=[('selected',c['texto_selecao'])])
     estilo.configure('Treeview.Cell',padding=(14,0))
-    estilo.configure('Treeview.Heading',background=c['sage'],foreground=c['secundario'],font=(fonte,10,'bold'),
+    estilo.configure('Treeview.Heading',background=c['cabecalho'],foreground=c['secundario'],font=(fonte,10,'bold'),
                      padding=(14,10),relief='flat',borderwidth=0,bordercolor=c['borda_suave'],
-                     lightcolor=c['sage'],darkcolor=c['borda_suave'])
+                     lightcolor=c['cabecalho'],darkcolor=c['borda_suave'])
     estilo.map('Treeview.Heading',background=[('active',c['ativo'])],foreground=[('active',texto)])
     estilo.configure('Operacoes.Treeview',font=(fonte,12),rowheight=max(px(janela,52),tkfont.Font(font=(fonte,12)).metrics('linespace')+px(janela,18)))
     # No claro, o cabeçalho cinza-claro precisa do negrito para se destacar das linhas.
