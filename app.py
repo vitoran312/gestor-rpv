@@ -6,7 +6,7 @@ from datetime import date
 from tkinter import ttk
 
 import demonstracao
-from dados import Banco
+from recuperacao import abrir_banco
 from componentes import centralizar, maximizar
 from contas import JanelaContas
 from versao import CONTATO, VERSAO
@@ -26,7 +26,8 @@ from tela_arquivos import ArquivosMixin
 class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, ArquivosMixin):
     def __init__(self, janela):
         self.janela = janela
-        self.banco = Banco()
+        janela.withdraw()
+        self.banco = abrir_banco(janela)
         if demonstracao.deve_carregar(self.banco):
             try:
                 demonstracao.carregar(self.banco)

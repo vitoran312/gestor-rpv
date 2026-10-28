@@ -52,7 +52,7 @@ class TestInterface(unittest.TestCase):
         self.root = tk.Tk()
         self.erros = []
         self.root.report_callback_exception = lambda *args: self.erros.append(args)
-        with patch.object(app, 'Banco', return_value=self.banco):
+        with patch.object(app, 'abrir_banco', return_value=self.banco):
             self.programa = app.Aplicativo(self.root)
         if sys.platform == 'win32':
             self.root.state('normal')  # Maximizada, a janela ignoraria os tamanhos pedidos pelos testes de layout.
@@ -1292,7 +1292,7 @@ class TestInterface(unittest.TestCase):
         self.root.destroy()
         self.root = tk.Tk()
         self.root.report_callback_exception = lambda *args: self.erros.append(args)
-        with patch.object(app, 'Banco', return_value=self.banco):
+        with patch.object(app, 'abrir_banco', return_value=self.banco):
             self.programa = app.Aplicativo(self.root)
         self.root.update()
         self.assertEqual(self.programa.modo_tema.get(), 'escuro')
@@ -1446,7 +1446,7 @@ class TestInterface(unittest.TestCase):
         self.root = tk.Tk()
         self.root.report_callback_exception = lambda *args: self.erros.append(args)
         novo = Banco(Path(self.pasta.name) / 'novo' / 'gestor.sqlite3')
-        with patch.object(app, 'Banco', return_value=novo):
+        with patch.object(app, 'abrir_banco', return_value=novo):
             self.programa = app.Aplicativo(self.root)
         self.programa.mostrar_historico()
         self.root.update()
