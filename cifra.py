@@ -37,7 +37,9 @@ def _aesgcm(chave):
     try:
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     except ImportError as erro:  # Só acontece rodando o código-fonte sem as dependências instaladas.
-        log.error('Biblioteca de criptografia não carregou.', exc_info=True)
+        # Só o nome do módulo e se faltou uma DLL: a mensagem completa pode trazer a pasta do usuário.
+        log.error('Biblioteca de criptografia não carregou: módulo %s%s.', getattr(erro, 'name', None),
+                  ', falta uma DLL do Windows' if 'DLL' in str(erro) else '', exc_info=True)
         raise ValueError('Instale o pacote "cryptography" para criar ou abrir backups com senha.') from erro
     return AESGCM(chave)
 

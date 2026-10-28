@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## 0.35.1
+
+- O executável gerado passa a ser testado criando e abrindo um backup com senha antes de ser entregue; se a
+  biblioteca de criptografia não carregar no computador da pessoa, o diário (`gestor.log`) anota qual módulo
+  faltou e se foi uma DLL do Windows.
+
 ## 0.35.0
 
 - Início do app do celular (pasta `celular/`): prova técnica que abre no próprio aparelho um backup do
