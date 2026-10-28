@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## 0.35.0
+
+- Início do app do celular (pasta `celular/`): prova técnica que abre no próprio aparelho um backup do
+  programa, com a senha dos backups, e mostra quantos registros ele tem e quanto tempo levou. Nada é enviado
+  para a internet. Publicação automática no GitHub Pages. O programa no computador não muda.
+
 ## 0.34.1
 
 - Se o Windows segurar a pasta dos anexos antigos logo depois de uma importação que deu certo, a tela não

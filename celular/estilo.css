@@ -1,0 +1,87 @@
+:root {
+  --fundo: #f4f5f7;
+  --superficie: #ffffff;
+  --texto: #1b1d21;
+  --secundario: #5b6270;
+  --borda: #d9dce2;
+  --marca: #8c1d32;
+  --erro: #b4232f;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fundo: #15171b;
+    --superficie: #1f2228;
+    --texto: #eceef2;
+    --secundario: #a2a8b4;
+    --borda: #343842;
+    --marca: #d0546b;
+    --erro: #ff6b75;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--fundo);
+  color: var(--texto);
+}
+
+main {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+}
+
+h1 { font-size: 1.6rem; margin: 8px 0 4px; }
+h2 { font-size: 1.1rem; margin: 24px 0 8px; }
+.discreto { color: var(--secundario); }
+.erro { color: var(--erro); font-weight: 600; }
+
+form {
+  display: grid;
+  gap: 8px;
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+label { font-weight: 600; margin-top: 4px; }
+
+input, button {
+  font: inherit;
+  font-size: 16px; /* Abaixo de 16px, o Safari dá zoom ao tocar no campo. */
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--borda);
+  background: var(--fundo);
+  color: var(--texto);
+  width: 100%;
+}
+
+button {
+  margin-top: 8px;
+  background: var(--marca);
+  border-color: var(--marca);
+  color: #fff;
+  font-weight: 600;
+}
+
+button:disabled { opacity: 0.6; }
+
+dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: 12px;
+  padding: 16px;
+  margin: 0;
+}
+
+dt { color: var(--secundario); }
+dd { margin: 0; text-align: right; overflow-wrap: anywhere; }

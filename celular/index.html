@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- Nada sai do aparelho: a página só carrega arquivos dela mesma e não se conecta a nenhum outro endereço. -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; style-src 'self'; img-src 'self' data:; connect-src 'self'; form-action 'none'; base-uri 'none'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="light dark">
+  <title>Gestor de RPV</title>
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+  <main>
+    <h1>Gestor de RPV</h1>
+    <p class="discreto">Prova técnica: abre um backup do programa neste aparelho. Nada é enviado para a internet.</p>
+
+    <form id="formulario" autocomplete="off">
+      <label for="arquivo">Backup (.rpvbackup)</label>
+      <input id="arquivo" type="file" required>
+      <label for="senha">Senha dos backups</label>
+      <input id="senha" type="password" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button id="abrir" type="submit">Abrir backup</button>
+    </form>
+
+    <p id="andamento" class="discreto" aria-live="polite"></p>
+    <p id="erro" class="erro" role="alert" hidden></p>
+    <section id="resultado" hidden>
+      <h2>Backup aberto</h2>
+      <dl id="resumo"></dl>
+      <h2>Tempo de cada etapa</h2>
+      <dl id="tempos"></dl>
+    </section>
+  </main>
+  <script src="vendor/scrypt.js"></script>
+  <script src="vendor/fflate.js"></script>
+  <script src="vendor/sql-wasm.js"></script>
+  <script src="leitor.js"></script>
+  <script src="prova.js"></script>
+</body>
+</html>

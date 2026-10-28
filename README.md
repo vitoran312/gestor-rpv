@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.32.0
+# Gestor de RPV — 0.35.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -443,6 +443,18 @@ teste também em outro computador sem Python ou no Windows Sandbox, se disponív
 Cadastre uma entrada de exemplo, abra a janela Sobre, anexe um documento e teste
 backup/importação usando dados de teste. Em um computador novo, somente o `.exe`
 começa com um banco próprio; transfira os registros usando o backup do aplicativo.
+
+## App do celular (piloto, só consulta)
+
+A pasta `celular/` é o começo de um app para o iPhone (PWA), publicado pelo GitHub Pages. Ele abre no próprio
+aparelho um backup `.rpvbackup` gravado pelo programa (por exemplo, na pasta do Google Drive escolhida para o
+backup automático), com a senha dos backups, e mostra os dados. Nada é enviado para a internet: o site só
+contém o código das telas, e os dados ficam na memória do app enquanto ele está aberto. O programa no
+computador não muda.
+
+Etapa atual: prova técnica que conta os registros do backup e mede o tempo de abertura no aparelho. O leitor
+(`celular/leitor.js`) é conferido por `test_celular.py`, que grava backups com o Python e os abre num navegador
+(requer Node.js com Playwright: `GESTOR_RPV_TESTE_CELULAR=1 python -m unittest test_celular`).
 
 ## Versões
 
