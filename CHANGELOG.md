@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## 0.36.0
+
+- App do celular, primeiras telas (só consulta): Início com indicadores e situação das operações, Operações em
+  cartões com busca e filtros, detalhe completo de cada operação, Contas de recebimento, Lixeira, Gráfico
+  mensal e dados do backup aberto, nos temas claro e escuro do iPhone. As contas são as mesmas do programa no
+  computador, conferidas por testes que comparam os dois. O programa no computador não muda.
+
 ## 0.35.1
 
 - O executável gerado passa a ser testado criando e abrindo um backup com senha antes de ser entregue; se a

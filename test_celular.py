@@ -1,4 +1,4 @@
-"""O leitor de backups do app do celular (celular/leitor.js) abre os mesmos arquivos que o programa grava.
+"""O app do celular (pasta celular/) abre os mesmos backups que o programa grava e mostra as mesmas contas.
 
 Roda um navegador de verdade (Playwright + Chromium); fica de fora quando não há Node.js com Playwright,
 como no Windows do CI. Exemplo: GESTOR_RPV_TESTE_CELULAR=1 python -m unittest test_celular -v
@@ -11,13 +11,22 @@ import subprocess
 import tempfile
 import threading
 import unittest
+from datetime import date
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from backup import criar_backup
-from apoio_testes import SENHA_TESTE, banco_com_contas, dados_rpv
+from dados import chave_texto, moeda, situacao
+from grafico import resumo_mensal
+from apoio_testes import SENHA_TESTE, banco_com_contas, dados_rpv, prorrogacao_antiga
 
 RAIZ = Path(__file__).resolve().parent
+HOJE = date(2026, 10, 28)
+TERMOS = ['', 'ana', 'jose', 'maria jose', 'ria jo', 'lva', 'silva c', 'lva c', 'davila', 'lilian', '10/2026', '---', 'ÁVILA',
+          'x y z', '  bruno  ']
+VALORES = [0, 5, 99, 100, 123456, 100000000, -800050, 99999999999999]
+TEXTOS = ["Ana Júlia D'Ávila", 'Maria-José  Souza', 'João_da Silva', '  ', 'ÇÃO ção', 'O’Neill', 'x1 y2']
+TELAS = ['#inicio', '#operacoes', '#contas', '#mais', '#grafico', '#lixeira', '#backup']
 
 
 class Silencioso(SimpleHTTPRequestHandler):
@@ -27,20 +36,20 @@ class Silencioso(SimpleHTTPRequestHandler):
 
 @unittest.skipUnless(os.environ.get('GESTOR_RPV_TESTE_CELULAR') == '1', 'Requer Node.js com Playwright e '
                      'GESTOR_RPV_TESTE_CELULAR=1')
-class TestLeitorDoCelular(unittest.TestCase):
+class TestAppDoCelular(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.temp = tempfile.TemporaryDirectory()
         cls.pasta = Path(cls.temp.name)
         cls.site = cls.pasta / 'site'
         shutil.copytree(RAIZ / 'celular', cls.site, ignore=shutil.ignore_patterns('testes'))
-        cls.casos, cls.esperado = cls.montar_backups()
+        entrada = cls.montar_backups()
         servidor = ThreadingHTTPServer(('127.0.0.1', 0), functools.partial(Silencioso, directory=str(cls.site)))
         threading.Thread(target=servidor.serve_forever, daemon=True).start()
         try:
             saida = subprocess.run(
                 ['node', str(RAIZ / 'celular' / 'testes' / 'navegador.cjs'),
-                 f'http://127.0.0.1:{servidor.server_address[1]}', json.dumps(cls.casos)],
+                 f'http://127.0.0.1:{servidor.server_address[1]}', json.dumps(entrada)],
                 capture_output=True, text=True, timeout=300, check=True).stdout
         finally:
             servidor.shutdown()
@@ -53,12 +62,22 @@ class TestLeitorDoCelular(unittest.TestCase):
 
     @classmethod
     def montar_backups(cls):
-        banco = banco_com_contas(cls.pasta / 'dados' / 'gestor.sqlite3')
+        banco = cls.banco = banco_com_contas(cls.pasta / 'dados' / 'gestor.sqlite3')
         # Um anexo de 2,5 MB faz o backup passar de um bloco da cifra (1 MiB): confere a costura dos blocos.
-        anexo = cls.pasta / 'grande.pdf'
+        anexo = cls.pasta / 'contrato.pdf'
         anexo.write_bytes(b'%PDF' + os.urandom(2_500_000))
-        banco.salvar(dados_rpv(nome='Ana Júlia D\'Ávila'), anexos=[anexo])
-        banco.salvar(dados_rpv(nome='Bruno Lima'))
+        cls.ana = banco.salvar(dados_rpv(nome='Ana Júlia D\'Ávila', aquisicao='2026-09-10', previsao='2026-10-01'),
+                               anexos=[anexo])
+        cls.bruno = banco.salvar(dados_rpv(nome='Bruno Lima', conta='Lilian', aquisicao='2026-10-01',
+                                           previsao='2026-12-01', comissao=50000))
+        cls.maria = banco.salvar(dados_rpv(nome='Maria-José Souza', aquisicao='2026-08-05', previsao='2026-09-01',
+                                           custo=700000, previsto=1000000))
+        banco.registrar_recebimento(cls.maria, '2026-09-15')
+        cls.carlos = banco.salvar(dados_rpv(nome='Carlos Silva', aquisicao='2026-10-20', previsao='2026-11-10'))
+        banco.atualizar_previsao(cls.carlos, '2026-12-20')
+        cls.antiga = banco.salvar(dados_rpv(nome='Operação Antiga', aquisicao='2025-11-02', previsao='2026-01-10',
+                                            observacoes='Linha 1\nLinha 2 <b>sem HTML</b>'))
+        prorrogacao_antiga(banco, cls.antiga, '2026-11-30')
         banco.excluir(banco.salvar(dados_rpv(nome='Na Lixeira')))
         cifrado = criar_backup(banco, cls.site / 'backups')
         banco.remover_configuracao('senha_backup')
@@ -78,31 +97,94 @@ class TestLeitorDoCelular(unittest.TestCase):
             {'nome': 'adulterado', 'arquivo': endereco(adulterado), 'senha': SENHA_TESTE},
             {'nome': 'cortado', 'arquivo': endereco(cortado), 'senha': SENHA_TESTE},
         ]
-        esperado = {'operacoes': 2, 'lixeira': 1, 'contas': len(banco.contas()), 'documentos': 1,
-                    'nomes': ['Ana Júlia D\'Ávila', 'Bruno Lima']}
-        return casos, esperado
+        regras = {'arquivo': endereco(cifrado), 'senha': SENHA_TESTE, 'hoje': HOJE.isoformat(), 'termos': TERMOS,
+                  'valores': VALORES, 'textos': TEXTOS}
+        telas = {'arquivo': str(cifrado), 'senha': SENHA_TESTE, 'enderecos': TELAS + [f'#operacao/{cls.antiga}']}
+        return {'casos': casos, 'regras': regras, 'telas': telas}
 
+    # ---- Leitura do backup ------------------------------------------------------------------------------
     def test_backup_com_senha_abre_igual_ao_programa(self):
-        resultado = self.resultados['cifrado']
+        resultado = dict(self.resultados['leituras']['cifrado'])
         self.assertTrue(resultado.pop('cifrado'))
         resultado.pop('versao_app')
-        self.assertEqual(resultado, self.esperado)
+        self.assertEqual(resultado, {'operacoes': 5, 'lixeira': 1, 'contas': len(self.banco.contas()), 'documentos': 1,
+                                     'nomes': [r['nome'] for r in sorted(self.banco.listar(), key=lambda r: r['id'])]})
 
     def test_backup_antigo_sem_senha_tambem_abre(self):
-        resultado = self.resultados['sem_senha']
+        resultado = self.resultados['leituras']['sem_senha']
         self.assertFalse(resultado['cifrado'])
-        self.assertEqual(resultado['nomes'], self.esperado['nomes'])
+        self.assertEqual(resultado['operacoes'], 5)
 
     def test_senha_errada_ou_ausente_e_recusada(self):
         for caso in ('senha_errada', 'senha_vazia'):
             with self.subTest(caso):
-                self.assertEqual(self.resultados[caso]['erro'], 'SenhaIncorreta')
+                self.assertEqual(self.resultados['leituras'][caso]['erro'], 'SenhaIncorreta')
 
     def test_arquivo_alterado_ou_cortado_e_recusado(self):
         for caso in ('adulterado', 'cortado'):
             with self.subTest(caso):
-                self.assertEqual(self.resultados[caso]['erro'], 'SenhaIncorreta')
-                self.assertIn('alterado ou está incompleto', self.resultados[caso]['mensagem'])
+                self.assertEqual(self.resultados['leituras'][caso]['erro'], 'SenhaIncorreta')
+                self.assertIn('alterado ou está incompleto', self.resultados['leituras'][caso]['mensagem'])
+
+    # ---- As mesmas contas do programa ---------------------------------------------------------------------
+    def test_ordem_previsao_atual_e_situacao(self):
+        regras = self.resultados['regras']
+        registros = self.banco.listar()
+        self.assertEqual(regras['ordem'], [r['id'] for r in registros])
+        self.assertEqual(regras['lixeira'], [r['id'] for r in self.banco.listar_lixeira()])
+        self.assertEqual(regras['previsao_atual'], {str(r['id']): r['previsao_atual'] for r in registros})
+        self.assertEqual(regras['situacoes'], {str(r['id']): situacao(r, HOJE) for r in registros})
+        situacoes = [situacao(r, HOJE) for r in registros]
+        self.assertEqual(regras['totais'], {'todas': len(registros), **{s: situacoes.count(s) for s in
+                                                                         ('pendente', 'atrasada', 'recebida')}})
+        self.assertEqual(set(situacoes), {'pendente', 'atrasada', 'recebida'})  # Os dados cobrem os três casos.
+
+    def test_indicadores_iguais_aos_de_minhas_operacoes(self):
+        registros = self.banco.listar()
+        self.assertEqual(self.resultados['regras']['indicadores'], {
+            'registros': len(registros),
+            'previsto': sum(r['previsto'] - r['custo'] for r in registros),
+            'realizado': sum(r['previsto'] - r['custo'] for r in registros if r['recebimento']),
+            'aberto': sum(r['custo'] for r in registros if not r['recebimento']),
+        })
+
+    def test_busca_encontra_o_mesmo_que_no_computador(self):
+        for termo in TERMOS:
+            with self.subTest(termo=termo):
+                self.assertEqual(self.resultados['regras']['buscas'][termo], [r['id'] for r in self.banco.listar(termo)])
+
+    def test_grafico_mensal(self):
+        esperado = [list(linha) for linha in resumo_mensal(self.banco.listar(), hoje=HOJE)]
+        self.assertEqual(self.resultados['regras']['resumo'], esperado)
+
+    def test_valores_e_textos(self):
+        self.assertEqual(self.resultados['regras']['moedas'], [moeda(v) for v in VALORES])
+        self.assertEqual(self.resultados['regras']['chaves'], [chave_texto(t) for t in TEXTOS])
+
+    def test_historico_prorrogacoes_e_documentos(self):
+        regras = self.resultados['regras']
+        self.assertEqual(regras['historico'], {str(self.carlos): 1})
+        self.assertEqual(regras['prorrogacoes'], {str(self.antiga): 1})
+        self.assertEqual(regras['documentos'], {str(self.ana): ['contrato.pdf']})
+
+    # ---- Telas ----------------------------------------------------------------------------------------------
+    def test_todas_as_telas_abrem_sem_erro(self):
+        self.assertEqual(self.resultados['erros'], [])
+        telas = self.resultados['telas']
+        self.assertIn('Lucro previsto', telas['#inicio'])
+        self.assertIn('Bruno Lima', telas['#operacoes'])
+        self.assertIn('Na Lixeira', telas['#lixeira'])
+        self.assertNotIn('Na Lixeira', telas['#operacoes'])
+        self.assertIn('Gráfico mensal', telas['#mais'])
+        self.assertIn('Protegido por senha', telas['#backup'])
+
+    def test_detalhe_mostra_texto_do_backup_como_texto(self):
+        detalhe = self.resultados['telas'][f'#operacao/{self.antiga}']
+        self.assertIn('Linha 2 <b>sem HTML</b>', detalhe)  # Nada do backup vira HTML na página.
+        self.assertIn('30/11/2026', detalhe)              # Prorrogação antiga define a previsão atual.
+
+    def test_fechar_dados_limpa_a_tela(self):
+        self.assertEqual(self.resultados['fechado'], {'abertura': True, 'tela_vazia': True, 'senha_vazia': True})
 
 
 if __name__ == '__main__':

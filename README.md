@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.35.1
+# Gestor de RPV — 0.36.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -452,9 +452,15 @@ backup automático), com a senha dos backups, e mostra os dados. Nada é enviado
 contém o código das telas, e os dados ficam na memória do app enquanto ele está aberto. O programa no
 computador não muda.
 
-Etapa atual: prova técnica que conta os registros do backup e mede o tempo de abertura no aparelho. O leitor
-(`celular/leitor.js`) é conferido por `test_celular.py`, que grava backups com o Python e os abre num navegador
-(requer Node.js com Playwright: `GESTOR_RPV_TESTE_CELULAR=1 python -m unittest test_celular`).
+Telas (só consulta): Início com os indicadores e a situação das operações, Operações em cartões com busca e
+filtros, detalhe de cada operação (todos os campos, conta de destino, histórico da previsão e nomes dos
+documentos), Contas de recebimento, Lixeira, Gráfico mensal e dados do backup aberto. "Fechar dados" apaga
+tudo da memória do celular. O endereço é https://vitoran312.github.io/gestor-rpv/.
+
+`celular/leitor.js` abre o backup e `celular/dados.js` repete as regras de `dados.py` e `grafico.py`
+(situação, valores, busca, indicadores e resumo mensal). `test_celular.py` grava backups com o Python, abre-os
+num navegador e confere que o app chega aos mesmos resultados do programa (requer Node.js com Playwright:
+`GESTOR_RPV_TESTE_CELULAR=1 python -m unittest test_celular`).
 
 ## Versões
 

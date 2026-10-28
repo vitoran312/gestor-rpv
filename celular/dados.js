@@ -1,0 +1,192 @@
+// Regras de exibição do programa, iguais às de dados.py e grafico.py: situação, valores, datas, busca,
+// indicadores e resumo mensal. test_celular.py compara cada uma com o resultado do Python.
+'use strict';
+
+const GestorDados = (() => {
+  const TITULOS_CONTA = {
+    identificacao: 'Identificação', nome: 'Nome completo', cpf: 'CPF', endereco: 'Endereço',
+    numero_endereco: 'Número', cidade: 'Cidade', estado: 'Estado (UF)', banco: 'Nome do banco',
+    agencia: 'Agência', numero: 'Conta bancária', pix: 'Chave Pix',
+  };
+  const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+  // ---- Valores e datas -------------------------------------------------------------------------------
+  function moeda(valor) {
+    const inteiro = Math.floor(Math.abs(valor) / 100);
+    const fracao = Math.abs(valor) % 100;
+    const milhares = String(inteiro).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return (valor < 0 ? '-' : '') + milhares + ',' + String(fracao).padStart(2, '0');
+  }
+
+  function reais(valor) {
+    return 'R$ ' + moeda(valor);
+  }
+
+  function dataBr(iso) {
+    if (!iso) {
+      return '';
+    }
+    const [ano, mes, dia] = iso.slice(0, 10).split('-');
+    return `${dia}/${mes}/${ano}`;
+  }
+
+  // Data e hora como foram gravadas no computador (sem converter fuso): "28/10/2026 às 18:42".
+  function dataHora(iso) {
+    if (!iso || iso.length < 16) {
+      return dataBr(iso);
+    }
+    return `${dataBr(iso)} às ${iso.slice(11, 16)}`;
+  }
+
+  function hojeIso(hoje = new Date()) {
+    const dois = (n) => String(n).padStart(2, '0');
+    return `${hoje.getFullYear()}-${dois(hoje.getMonth() + 1)}-${dois(hoje.getDate())}`;
+  }
+
+  function cpf(texto) {
+    const d = String(texto || '').replace(/\D/g, '');
+    return d.length === 11 ? `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}` : String(texto || '');
+  }
+
+  // ---- Situação e indicadores (dados.situacao e Minhas operações) -------------------------------------
+  function situacao(registro, hoje = hojeIso()) {
+    if (registro.recebimento) {
+      return 'recebida';
+    }
+    return registro.previsao_atual < hoje ? 'atrasada' : 'pendente';
+  }
+
+  function contarSituacoes(registros, hoje = hojeIso()) {
+    const totais = { todas: registros.length, pendente: 0, atrasada: 0, recebida: 0 };
+    for (const r of registros) {
+      totais[situacao(r, hoje)] += 1;
+    }
+    return totais;
+  }
+
+  function indicadores(registros) {
+    const soma = (lista, valor) => lista.reduce((total, r) => total + valor(r), 0);
+    return {
+      registros: registros.length,
+      previsto: soma(registros, (r) => r.previsto - r.custo),
+      realizado: soma(registros.filter((r) => r.recebimento), (r) => r.previsto - r.custo),
+      aberto: soma(registros.filter((r) => !r.recebimento), (r) => r.custo),
+    };
+  }
+
+  // ---- Busca (dados.normalizar, chave_texto, encontra e Banco.listar) ---------------------------------
+  function normalizar(texto) {
+    return Array.from(texto.normalize('NFKD').toLowerCase())
+      .filter((c) => /[\p{L}\p{N}]/u.test(c)).join('');
+  }
+
+  function chaveTexto(texto) {
+    return texto.replace(/['’`´]/g, '').split(/[^\p{L}\p{N}\p{M}]+|_+/u)
+      .map(normalizar).filter(Boolean).join(' ');
+  }
+
+  function encontra(termo, texto) {
+    if (!termo.includes(' ')) {
+      return texto.includes(termo);
+    }
+    return (' ' + texto).includes(' ' + termo);
+  }
+
+  function filtrar(registros, busca) {
+    const termo = chaveTexto(busca);
+    if (!termo) {
+      const minusculo = busca.toLowerCase();
+      return registros.filter((r) => r.nome.toLowerCase().includes(minusculo) || dataBr(r.aquisicao).includes(busca));
+    }
+    return registros.filter((r) => encontra(termo, chaveTexto(r.nome)) || encontra(termo, chaveTexto(r.conta))
+      || dataBr(r.aquisicao).includes(busca.trim()));
+  }
+
+  // ---- Gráfico (grafico.resumo_mensal) ----------------------------------------------------------------
+  function resumoMensal(registros, meses = 12, hoje = new Date()) {
+    const chaves = [];
+    let ano = hoje.getFullYear();
+    let mes = hoje.getMonth() + 1;
+    for (let i = 0; i < meses; i += 1) {
+      chaves.unshift(`${String(ano).padStart(4, '0')}-${String(mes).padStart(2, '0')}`);
+      [ano, mes] = mes === 1 ? [ano - 1, 12] : [ano, mes - 1];
+    }
+    const totais = new Map(chaves.map((c) => [c, [0, 0]]));
+    for (const r of registros) {
+      if (totais.has(r.aquisicao.slice(0, 7))) {
+        totais.get(r.aquisicao.slice(0, 7))[0] += 1;
+      }
+      if (r.recebimento && totais.has(r.recebimento.slice(0, 7))) {
+        totais.get(r.recebimento.slice(0, 7))[1] += 1;
+      }
+    }
+    return chaves.map((c) => [c, ...totais.get(c)]);
+  }
+
+  function quantidade(total, singular, plural) {
+    return `${total} ${total === 1 ? singular : plural}`;
+  }
+
+  function rotuloMes(chave) {
+    return `${MESES[Number(chave.slice(5, 7)) - 1]}/${chave.slice(2, 4)}`;
+  }
+
+  // ---- Leitura do banco do backup ----------------------------------------------------------------------
+  const CONSULTA_RPVS = `SELECT r.*,
+    COALESCE(r.previsao_atual_definida,
+        (SELECT MAX(data) FROM prorrogacoes WHERE rpv_id=r.id), r.previsao) AS previsao_atual,
+    (SELECT COUNT(*) FROM prorrogacoes WHERE rpv_id=r.id) AS total_prorrogacoes
+    FROM rpvs r`;
+
+  function linhas(db, sql) {
+    const consulta = db.prepare(sql);
+    const resultado = [];
+    try {
+      while (consulta.step()) {
+        resultado.push(consulta.getAsObject());
+      }
+    } finally {
+      consulta.free();
+    }
+    return resultado;
+  }
+
+  function agrupar(lista, chave) {
+    const grupos = new Map();
+    for (const item of lista) {
+      if (!grupos.has(item[chave])) {
+        grupos.set(item[chave], []);
+      }
+      grupos.get(item[chave]).push(item);
+    }
+    return grupos;
+  }
+
+  // Copia tudo o que as telas usam para objetos comuns; depois disso o banco pode ser fechado.
+  function carregar(db) {
+    const configuracoes = Object.fromEntries(linhas(db, 'SELECT chave, valor FROM configuracoes')
+      .map((r) => [r.chave, r.valor]));
+    return {
+      operacoes: linhas(db, CONSULTA_RPVS + ' WHERE r.lixeira_em IS NULL ORDER BY aquisicao DESC, id DESC'),
+      lixeira: linhas(db, CONSULTA_RPVS + ' WHERE r.lixeira_em IS NOT NULL ORDER BY lixeira_em DESC, id DESC'),
+      contas: linhas(db, 'SELECT * FROM contas ORDER BY ativa DESC, identificacao COLLATE NOCASE, id'),
+      documentos: agrupar(linhas(db, 'SELECT id, rpv_id, nome, tipo FROM documentos ORDER BY id'), 'rpv_id'),
+      historico: agrupar(linhas(db, 'SELECT * FROM previsoes_historico ORDER BY id DESC'), 'rpv_id'),
+      prorrogacoes: agrupar(linhas(db, 'SELECT * FROM prorrogacoes ORDER BY data DESC, id DESC'), 'rpv_id'),
+      demonstracao: Boolean(configuracoes.dados_demonstracao),
+    };
+  }
+
+  function contaDaOperacao(registro) {
+    try {
+      return JSON.parse(registro.conta_snapshot || '{}') || {};
+    } catch (erro) {
+      return {};
+    }
+  }
+
+  return {
+    TITULOS_CONTA, moeda, reais, dataBr, dataHora, hojeIso, cpf, situacao, contarSituacoes, indicadores,
+    normalizar, chaveTexto, encontra, filtrar, resumoMensal, quantidade, rotuloMes, carregar, contaDaOperacao,
+  };
+})();
