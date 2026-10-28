@@ -1,0 +1,7 @@
+# Mantém as actions dos workflows atualizadas: como elas são fixadas por SHA, o Dependabot abre um PR a cada versão nova.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

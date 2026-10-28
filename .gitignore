@@ -227,3 +227,7 @@ __marimo__/
 *.db-*
 documentos/
 backups/
+backups_automaticos/
+*.rpvbackup
+*.xlsx
+gestor-danificado-*
