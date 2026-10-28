@@ -16,6 +16,7 @@ import tela_arquivos
 import tela_registro
 from componentes import CampoData, CampoMoeda, AreaRolavel
 from dados import Banco
+from backup import senha_salva
 from test_contas import banco_com_contas, dados_rpv, prorrogacao_antiga
 from tema import cores, PALETAS
 
@@ -726,7 +727,7 @@ class TestInterface(unittest.TestCase):
                 patch.object(messagebox,'showerror') as erro:
             self.programa.exportar_backup()
         self.assertIn('não são iguais', erro.call_args.args[1])
-        self.assertEqual(self.banco.configuracao('senha_backup'), 'segredo1')
+        self.assertEqual(senha_salva(self.banco), 'segredo1')
         arquivo = next(pasta.glob('*.rpvbackup'))
         self.assertTrue(cifra.cifrado(arquivo))
         # Em outro computador, com outra senha salva, a importação pede a senha do arquivo.
@@ -741,7 +742,56 @@ class TestInterface(unittest.TestCase):
         self.assertEqual(pedido.call_count, 2)
         self.assertIn('Senha incorreta', pedido.call_args_list[1].args[1])
         self.assertEqual([r['nome'] for r in self.banco.listar()], ['Primeira'])
-        self.assertEqual(self.banco.configuracao('senha_backup'), 'outra-senha')
+        self.assertEqual(senha_salva(self.banco), 'outra-senha')
+
+    def test_senha_dos_backups_troca_cancelamento_e_backup_sem_senha(self):
+        from backup import criar_backup
+        self.programa.mostrar_historico()
+        self.root.update()
+        # Cancelar a criação da senha no primeiro backup avisa que o backup não foi feito.
+        self.banco.remover_configuracao('senha_backup')
+        self.root.after(200, lambda: botao(next(w for w in filhos(self.root) if isinstance(w, tk.Toplevel)
+                                                and w.title() == 'Senha dos backups'), 'Cancelar').invoke())
+        with patch.object(messagebox, 'showinfo') as aviso:
+            self.programa.exportar_backup()
+        self.assertIn('não foi feito', aviso.call_args.args[1])
+        # Trocar a senha exige a atual; a janela que estava em modo exclusivo volta a estar.
+        self.banco.salvar_configuracao('senha_backup', 'cavalo bateria')
+        self.programa.configurar_backup_automatico()
+        self.root.update()
+        automatico = next(w for w in filhos(self.root) if isinstance(w, tk.Toplevel) and w.title() == 'Backup automático')
+
+        def preencher(atual):
+            tela = next(w for w in filhos(self.root) if isinstance(w, tk.Toplevel) and w.title() == 'Senha dos backups')
+            entradas = [w for w in filhos(tela) if isinstance(w, ttk.Entry)]
+            for entrada, texto in zip(entradas, (atual, 'nova senha 1', 'nova senha 1')):
+                entrada.delete(0, 'end')
+                entrada.insert(0, texto)
+            botao(tela, 'Salvar senha').invoke()
+
+        self.root.after(200, lambda: preencher('chute'))
+        self.root.after(400, lambda: preencher('cavalo bateria'))
+        with patch.object(messagebox, 'showerror') as erro:
+            botao(automatico, 'Senha dos backups…').invoke()
+        self.assertIn('senha atual não confere', erro.call_args.args[1])
+        self.assertEqual(senha_salva(self.banco), 'nova senha 1')
+        self.assertEqual(self.root.grab_current(), automatico)
+        automatico.destroy()
+        # Quem usa senha é avisado ao importar um backup sem senha (pode ter sido forjado).
+        self.banco.remover_configuracao('senha_backup')
+        sem_senha = criar_backup(self.banco, Path(self.pasta.name) / 'antigo', exigir_senha=False)
+        self.banco.salvar_configuracao('senha_backup', 'nova senha 1')
+        with patch.object(filedialog, 'askopenfilename', return_value=str(sem_senha)), \
+                patch.object(messagebox, 'askyesno', return_value=False) as pergunta:
+            self.programa.menus['Arquivo'].invoke('Importar dados')
+        self.assertIn('NÃO tem senha', pergunta.call_args.args[1])
+        # Com um formulário aberto, a importação pede para fechá-lo antes.
+        self.programa.formulario()
+        self.root.update()
+        with patch.object(filedialog, 'askopenfilename') as escolher, patch.object(messagebox, 'showinfo') as aviso:
+            self.programa.importar_dados()
+        escolher.assert_not_called()
+        self.assertIn('feche o formulário', aviso.call_args.args[1])
 
     def test_selecao_mouse_teclado_exclusao_e_restauracao_em_lote(self):
         from test_contas import dados_rpv

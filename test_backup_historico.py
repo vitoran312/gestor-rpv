@@ -85,13 +85,12 @@ class TestBackupHistorico(unittest.TestCase):
         self.assertEqual((destino_docs / contrato.relative_to(contrato.parents[1])).read_bytes(), b'%PDF-teste-do-contrato')
         self.assertFalse((destino_docs / contrato.parent.name / 'solto.exe').exists())
         self.assertFalse(antigo.exists())
+        # A cópia de segurança devolve os dados anteriores, anexos incluídos.
+        de_volta = banco_com_contas(self.pasta / 'de-volta' / 'gestor.sqlite3')
         with BackupPreparado(seguranca, SENHA_TESTE) as anterior:
-            con = sqlite3.connect(anterior.pasta / 'banco.sqlite3')
-            try:
-                self.assertEqual(con.execute('SELECT nome FROM rpvs').fetchone()[0], 'Anterior')
-            finally:
-                con.close()
-            self.assertEqual((anterior.pasta / 'documentos' / antigo.relative_to(antigo.parents[1])).read_bytes(), b'antigo')
+            anterior.restaurar(de_volta)
+        self.assertEqual([r['nome'] for r in de_volta.listar()], ['Anterior'])
+        self.assertEqual((de_volta.pasta_documentos / antigo.relative_to(antigo.parents[1])).read_bytes(), b'antigo')
 
     def test_backup_vazio_documentos_e_falha_importacao_preserva_destino(self):
         self.origem.salvar(dados_rpv(nome='Origem'))

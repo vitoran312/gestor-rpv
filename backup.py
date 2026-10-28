@@ -15,7 +15,7 @@ from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED, BadZipFile
 import cifra
 from documentos import EXTENSOES
 from versao import VERSAO
-from dados import ESQUEMA, VERSAO_BANCO, Banco, limitar_backups
+from dados import ESQUEMA, PREFIXO_EXCLUSAO, TABELAS_LEGADAS, VERSAO_BANCO, Banco, limitar_backups
 from diario import log
 
 
@@ -29,13 +29,19 @@ CONFIGURACOES_LOCAIS = (PASTA_AUTOMATICA, SENHA_BACKUP)
 
 LIMITE_IMPORTACAO = 4 * 1024 ** 3  # Soma dos arquivos descompactados de um backup.
 RAZAO_MAXIMA = 200                  # PDFs e imagens quase não comprimem; razões maiores indicam arquivo forjado.
+LIMITE_ARQUIVOS = 20000
+LIMITE_MANIFESTO = 8 * 1024 ** 2
+FOLGA_DISCO = 200 * 1024 ** 2       # Espaço livre que sempre sobra depois de extrair.
+BLOCO_LEITURA = 1024 * 1024
 PREFIXO_TEMPORARIO = '.importar-rpv-'
+PREFIXO_RESTAURACAO = '.restaurar-rpv-'
+PREFIXO_BACKUP = '.backup-rpv-'
 
 
 def limpar_temporarios(pasta, idade_segundos=24 * 60 * 60):
     """Remove pastas de trabalho que um encerramento forçado deixou para trás na pasta de dados."""
     limite = time.time() - idade_segundos
-    for prefixo in (PREFIXO_TEMPORARIO, '.restaurar-rpv-', '.excluir-rpv-', '.backup-rpv-'):
+    for prefixo in (PREFIXO_TEMPORARIO, PREFIXO_RESTAURACAO, PREFIXO_EXCLUSAO, PREFIXO_BACKUP):
         for sobra in Path(pasta).glob(prefixo + '*'):
             try:
                 if sobra.is_dir() and not sobra.is_symlink() and sobra.stat().st_mtime < limite:
@@ -45,7 +51,7 @@ def limpar_temporarios(pasta, idade_segundos=24 * 60 * 60):
 
 
 def conferir_espaco(pasta, necessario):
-    if shutil.disk_usage(pasta).free < necessario + 200 * 1024 ** 2:
+    if shutil.disk_usage(pasta).free < necessario + FOLGA_DISCO:
         raise ValueError('Não há espaço livre suficiente no disco para abrir este backup.')
 
 
@@ -73,21 +79,25 @@ def aviso_backup(quando, hoje=None):
     return ''
 
 
-def hash_arquivo(caminho):
+def copiar_com_hash(entrada, saida=None):
+    """Lê em blocos de 1 MiB, grava em `saida` (se houver) e devolve o SHA-256 dos bytes lidos."""
     digest = hashlib.sha256()
-    with open(caminho, 'rb') as arquivo:
-        for bloco in iter(lambda: arquivo.read(1024 * 1024), b''):
-            digest.update(bloco)
+    for bloco in iter(lambda: entrada.read(BLOCO_LEITURA), b''):
+        digest.update(bloco)
+        if saida is not None:
+            saida.write(bloco)
     return digest.hexdigest()
+
+
+def hash_arquivo(caminho):
+    with open(caminho, 'rb') as arquivo:
+        return copiar_com_hash(arquivo)
 
 
 # Tabelas que alguma versão do aplicativo já criou. Qualquer outro objeto (trigger, view, índice próprio)
 # não vem do Gestor de RPV: um trigger escondido poderia, por exemplo, trocar a chave Pix de toda conta salva.
-TABELAS_CONHECIDAS = {'rpvs', 'contas', 'prorrogacoes', 'documentos', 'previsoes_historico', 'configuracoes',
-                      'historico_alteracoes', 'sqlite_sequence', 'sqlite_stat1', 'sqlite_stat4'}
-# Ordem de cópia na importação: tabelas referenciadas antes das que apontam para elas.
-TABELAS_IMPORTADAS = ('contas', 'rpvs', 'prorrogacoes', 'documentos', 'previsoes_historico', 'configuracoes')
-
+TABELAS_CONHECIDAS = set(ESQUEMA) | TABELAS_LEGADAS
+VERSAO_MAIS_ANTIGA = 4  # Backups da 0.9.0 em diante.
 
 # Nome que o aplicativo dá a cada anexo: pasta da operação, identificador aleatório e extensão permitida.
 CAMINHO_DOCUMENTO = re.compile(r'(recebimentos/)?[0-9]+/[0-9a-f]{32}(' +
@@ -106,27 +116,27 @@ def conexao_leitura(caminho):
     return sqlite3.connect(Path(caminho).resolve().as_uri() + '?mode=ro', uri=True)
 
 
-def validar_banco(caminho):
+def tem_tabela(con, nome):
+    return con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (nome,)).fetchone() is not None
+
+
+def validar_banco(caminho, migrado=False):
+    """Confere um banco de backup e devolve as quantidades para a confirmação.
+
+    Antes da migração, só o que não depende da versão: integridade, estruturas conhecidas, faixa de versões e
+    vínculos. Depois de migrado (migrado=True), também as colunas do esquema atual (dados.ESQUEMA).
+    """
     try:
         con = conexao_leitura(caminho)
         try:
             if con.execute('PRAGMA integrity_check').fetchall() != [('ok',)]:
                 raise ValueError('O banco do backup está danificado.')
             verificar_estruturas(con)
-            versao_banco = con.execute('PRAGMA user_version').fetchone()[0]
-            if not 4 <= versao_banco <= VERSAO_BANCO:
+            if not VERSAO_MAIS_ANTIGA <= con.execute('PRAGMA user_version').fetchone()[0] <= VERSAO_BANCO:
                 raise ValueError('Este backup exige outra versão do Gestor de RPV.')
-            # As colunas vêm do esquema atual (dados.ESQUEMA); versões antigas ainda não tinham algumas tabelas.
-            tabelas = {'rpvs', 'contas', 'prorrogacoes'}
-            if versao_banco >= 5:
-                tabelas.add('documentos')
-            if versao_banco >= 7:
-                tabelas |= {'previsoes_historico', 'configuracoes'}
-            requisitos = {tabela: ESQUEMA[tabela] - ({'tipo'} if tabela == 'documentos' and versao_banco < 6 else set())
-                          for tabela in tabelas}
-            for tabela, campos in requisitos.items():
-                presentes = {r[1] for r in con.execute(f'PRAGMA table_info({tabela})')}
-                if not campos.issubset(presentes):
+            obrigatorias = ESQUEMA if migrado else {'rpvs': ESQUEMA['rpvs'], 'contas': ESQUEMA['contas']}
+            for tabela, campos in obrigatorias.items():
+                if not campos.issubset({r[1] for r in con.execute(f'PRAGMA table_info({tabela})')}):
                     raise ValueError('O arquivo não contém um banco compatível.')
             if con.execute('PRAGMA foreign_key_check').fetchall():
                 raise ValueError('O backup contém vínculos inconsistentes.')
@@ -139,78 +149,94 @@ def validar_banco(caminho):
         raise ValueError('Não foi possível validar o banco do backup.') from erro
 
 
+def copia_para_backup(banco, destino, quando):
+    """Copia consistente do banco, sem as configurações deste computador (a senha não viaja no backup)."""
+    con = sqlite3.connect(destino)
+    try:
+        with banco.conectar() as origem:
+            origem.backup(con)
+        con.execute('PRAGMA journal_mode=DELETE')
+        if tem_tabela(con, 'configuracoes'):
+            con.execute("INSERT OR REPLACE INTO configuracoes (chave,valor) VALUES ('ultimo_backup',?)", (quando,))
+            con.executemany('DELETE FROM configuracoes WHERE chave=?', [(c,) for c in CONFIGURACOES_LOCAIS])
+            con.commit()
+            con.execute('VACUUM')  # Não deixa a senha apagada em páginas livres do arquivo.
+        vinculados = sorted(r[0] for r in con.execute('SELECT caminho FROM documentos')) if tem_tabela(con, 'documentos') else []
+    finally:
+        con.close()
+    return vinculados
+
+
+def gravar_documentos(pacote, documentos, vinculados):
+    """Só entram os anexos cadastrados; arquivos soltos na pasta não fazem parte dos dados."""
+    if documentos.is_symlink():
+        raise ValueError('A pasta de documentos não pode ser um atalho simbólico.')
+    hashes = {}
+    for caminho in vinculados:
+        arquivo = documentos / caminho
+        if arquivo.is_symlink():
+            raise ValueError('Há um atalho simbólico na pasta de documentos.')
+        if not arquivo.is_file():
+            continue
+        relativo = 'documentos/' + caminho
+        # O hash é calculado sobre os mesmos bytes gravados no ZIP, inclusive se a origem mudar durante a cópia.
+        # O nome é montado com barras, sem depender da normalização do Windows.
+        info = ZipInfo(relativo, max(time.localtime(arquivo.stat().st_mtime)[:6], (1980, 1, 1, 0, 0, 0)))
+        info.compress_type = ZIP_DEFLATED
+        with open(arquivo, 'rb') as entrada, pacote.open(info, 'w') as saida:
+            hashes[relativo] = copiar_com_hash(entrada, saida)
+    return hashes
+
+
 def criar_backup(banco, pasta, prefixo='GestorRPV-', exigir_senha=True):
     """Grava um backup completo, cifrado com a senha dos backups deste computador.
 
-    Sem senha definida, só as cópias de segurança locais (exigir_senha=False) saem sem criptografia.
+    Todo o trabalho acontece na pasta dos dados do programa; na pasta escolhida (que pode ser sincronizada
+    com a nuvem) só chega o arquivo final, já cifrado. Sem senha definida, só as cópias de segurança locais
+    (exigir_senha=False) saem sem criptografia.
     """
-    senha = banco.configuracao(SENHA_BACKUP)
+    senha = senha_salva(banco)
     if exigir_senha and not senha:
         raise SenhaAusente('Defina a senha dos backups antes de criar um backup.')
     pasta = Path(pasta)
     pasta.mkdir(parents=True, exist_ok=True)
-    quando=datetime.now().astimezone().isoformat(timespec='seconds')
-    nome = prefixo + datetime.now().strftime('%Y%m%d-%H%M%S-%f') + '.rpvbackup'
-    destino = pasta / nome
-    with tempfile.TemporaryDirectory(prefix='.backup-rpv-', dir=pasta) as temporaria:
+    agora = datetime.now().astimezone()
+    quando = agora.isoformat(timespec='seconds')
+    destino = pasta / (prefixo + agora.strftime('%Y%m%d-%H%M%S-%f') + '.rpvbackup')
+    with tempfile.TemporaryDirectory(prefix=PREFIXO_BACKUP, dir=banco.caminho.parent) as temporaria:
         trabalho = Path(temporaria)
         copia = trabalho / 'banco.sqlite3'
-        con = sqlite3.connect(copia)
-        try:
-            with banco.conectar() as origem:
-                origem.backup(con)
-            con.execute('PRAGMA journal_mode=DELETE')
-            if con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='configuracoes'").fetchone():
-                con.execute("INSERT OR REPLACE INTO configuracoes (chave,valor) VALUES ('ultimo_backup',?)",(quando,))
-                con.executemany('DELETE FROM configuracoes WHERE chave=?', [(c,) for c in CONFIGURACOES_LOCAIS])
-                con.commit()
-                con.execute('VACUUM')  # Não deixa a senha apagada em páginas livres do arquivo.
-        finally:
-            con.close()
+        vinculados = copia_para_backup(banco, copia, quando)
         validar_banco(copia)
         arquivos = {'banco.sqlite3': hash_arquivo(copia)}
-        zip_temporario = trabalho / 'pacote.tmp'
-        with ZipFile(zip_temporario, 'w', ZIP_DEFLATED) as pacote:
+        pronto = trabalho / 'pacote.tmp'
+        with ZipFile(pronto, 'w', ZIP_DEFLATED) as pacote:
             pacote.write(copia, 'banco.sqlite3')
-            documentos = banco.pasta_documentos
-            if documentos.is_symlink():
-                raise ValueError('A pasta de documentos não pode ser um atalho simbólico.')
-            # Só entram os anexos cadastrados; arquivos soltos na pasta não fazem parte dos dados.
-            # A lista sai da cópia gravada no backup, que pode ser de um banco antigo, ainda sem anexos.
-            con = sqlite3.connect(copia)
-            try:
-                tem_tabela = con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='documentos'").fetchone()
-                vinculados = sorted(r[0] for r in con.execute('SELECT caminho FROM documentos')) if tem_tabela else []
-            finally:
-                con.close()
-            if documentos.exists():
-                for caminho in vinculados:
-                    arquivo = documentos / caminho
-                    if arquivo.is_symlink():
-                        raise ValueError('Há um atalho simbólico na pasta de documentos.')
-                    if arquivo.is_file():
-                        relativo = 'documentos/' + caminho
-                        # O hash é calculado sobre os mesmos bytes gravados no ZIP, inclusive se a origem mudar
-                        # durante a cópia. O nome é montado com barras, sem depender da normalização do Windows.
-                        info = ZipInfo(relativo, max(time.localtime(arquivo.stat().st_mtime)[:6], (1980, 1, 1, 0, 0, 0)))
-                        info.compress_type = ZIP_DEFLATED
-                        digest = hashlib.sha256()
-                        with open(arquivo, 'rb') as entrada, pacote.open(info, 'w') as saida:
-                            for bloco in iter(lambda: entrada.read(1024 * 1024), b''):
-                                digest.update(bloco)
-                                saida.write(bloco)
-                        arquivos[relativo] = digest.hexdigest()
-            manifesto = {'formato': FORMATO, 'versao_formato': 1, 'versao_app': VERSAO,
-                         'criado_em': datetime.now().astimezone().isoformat(timespec='seconds'),
+            arquivos.update(gravar_documentos(pacote, banco.pasta_documentos, vinculados))
+            manifesto = {'formato': FORMATO, 'versao_formato': 1, 'versao_app': VERSAO, 'criado_em': quando,
                          'arquivos': arquivos}
             pacote.writestr('manifesto.json', json.dumps(manifesto, ensure_ascii=False, indent=2))
         if senha:
             protegido = trabalho / 'protegido.tmp'
-            cifra.cifrar_arquivo(zip_temporario, protegido, senha)
-            zip_temporario = protegido
-        os.replace(zip_temporario, destino)
+            cifra.cifrar_arquivo(pronto, protegido, senha)
+            pronto = protegido
+        # Cópia para um nome provisório na pasta escolhida e troca no fim: o arquivo nunca fica pela metade.
+        parcial = pasta / f'.{destino.name}.parcial'
+        try:
+            shutil.copyfile(pronto, parcial)
+            os.replace(parcial, destino)
+        finally:
+            parcial.unlink(missing_ok=True)
     banco.registrar_backup(quando)
     return destino
+
+
+def senha_salva(banco):
+    return cifra.revelar_senha(banco.configuracao(SENHA_BACKUP))
+
+
+def salvar_senha(banco, senha):
+    banco.salvar_configuracao(SENHA_BACKUP, cifra.proteger_senha(cifra.validar_senha(senha)))
 
 
 def executar_backup_automatico(banco, forcar=False, hoje=None):
@@ -253,8 +279,8 @@ def copiar_dados(origem, destino):
         con.execute('PRAGMA foreign_keys=OFF')
         con.execute('ATTACH DATABASE ? AS origem', (Path(origem).resolve().as_uri() + '?mode=ro',))
         with con:
-            for tabela in TABELAS_IMPORTADAS:
-                # tabela vem da lista fixa acima; as colunas, do banco novo, criado pelo aplicativo.
+            for tabela in ESQUEMA:
+                # tabela vem do esquema do aplicativo; as colunas, do banco novo, criado por ele.
                 campos = ','.join(r[1] for r in con.execute(f'PRAGMA main.table_info({tabela})'))
                 con.execute(f'INSERT INTO main.{tabela} ({campos}) SELECT {campos} FROM origem.{tabela}')
         if con.execute('PRAGMA main.foreign_key_check').fetchall():
@@ -264,14 +290,57 @@ def copiar_dados(origem, destino):
         con.close()
 
 
+def conferir_nomes(infos):
+    """Nomes, tamanhos e caminhos do ZIP, antes de ler qualquer conteúdo."""
+    nomes = [i.filename for i in infos]
+    if len(nomes) != len({n.casefold() for n in nomes}) or len(nomes) > LIMITE_ARQUIVOS:
+        raise ValueError('O backup contém arquivos repetidos ou arquivos demais.')
+    if sum(i.file_size for i in infos) > LIMITE_IMPORTACAO:
+        raise ValueError('O backup excede o limite de 4 GB.')
+    if any(i.file_size > BLOCO_LEITURA and i.file_size > RAZAO_MAXIMA * max(i.compress_size, 1) for i in infos):
+        raise ValueError('O backup contém um arquivo compactado de forma suspeita e foi recusado.')
+    for info in infos:
+        caminho = PurePosixPath(info.filename)
+        if (caminho.as_posix() != info.filename or caminho.is_absolute() or '..' in caminho.parts or
+                '\\' in info.filename or ':' in info.filename or stat.S_ISLNK(info.external_attr >> 16) or info.is_dir()):
+            raise ValueError('O backup contém um caminho inválido.')
+        if info.filename not in ('banco.sqlite3', 'manifesto.json') and not info.filename.startswith('documentos/'):
+            raise ValueError('O backup contém arquivos desconhecidos.')
+    return nomes
+
+
+def ler_manifesto(pacote, nomes):
+    if 'manifesto.json' not in nomes or pacote.getinfo('manifesto.json').file_size > LIMITE_MANIFESTO:
+        raise ValueError('Manifesto do backup ausente ou inválido.')
+    manifesto = json.loads(pacote.read('manifesto.json'))
+    if not isinstance(manifesto, dict) or manifesto.get('formato') != FORMATO or manifesto.get('versao_formato') != 1:
+        raise ValueError('Formato de backup não reconhecido.')
+    hashes = manifesto.get('arquivos')
+    if not isinstance(hashes, dict) or set(hashes) != set(nomes) - {'manifesto.json'} or 'banco.sqlite3' not in hashes:
+        raise ValueError('A lista de arquivos do backup está incompleta.')
+    return manifesto, hashes
+
+
+def conferir_hash(pacote, nome, esperado, destino=None):
+    with pacote.open(nome) as entrada:
+        if destino is None:
+            obtido = copiar_com_hash(entrada)
+        else:
+            with destino.open('wb') as saida:
+                obtido = copiar_com_hash(entrada, saida)
+    if obtido != esperado:
+        raise ValueError('Um arquivo do backup está danificado ou foi alterado.')
+
+
 class BackupPreparado:
-    """Valida e extrai em uma pasta temporária; só restaura após confirmação da UI."""
+    """Confere o backup numa pasta temporária; os anexos só são gravados em restaurar(), após a confirmação."""
     def __init__(self, arquivo, senha=None, pasta_trabalho=None):
         self.arquivo = Path(arquivo)
         self.senha = senha
-        # A cópia extraída fica junto dos dados do aplicativo, não na pasta temporária do sistema.
+        # A pasta de trabalho fica junto dos dados do aplicativo, não na pasta temporária do sistema.
         self.pasta_trabalho = pasta_trabalho
         self.temporario = None
+        self.cifrado = False
 
     def __enter__(self):
         if self.pasta_trabalho is not None:
@@ -279,17 +348,8 @@ class BackupPreparado:
         self.temporario = tempfile.TemporaryDirectory(prefix=PREFIXO_TEMPORARIO, dir=self.pasta_trabalho)
         self.pasta = Path(self.temporario.name)
         try:
-            self.pacote = self.arquivo
-            if cifra.cifrado(self.arquivo):
-                if not self.senha:
-                    raise SenhaNecessaria('Este backup é protegido por senha.')
-                self.pacote = self.pasta / 'pacote.zip'
-                conferir_espaco(self.pasta, self.arquivo.stat().st_size)
-                try:
-                    cifra.decifrar_arquivo(self.arquivo, self.pacote, self.senha)
-                except cifra.SenhaIncorreta as erro:
-                    raise SenhaNecessaria(str(erro)) from None
-            self.validar_extrair()
+            self.pacote = self.decifrar()
+            self.validar()
             return self
         except Exception:
             self.temporario.cleanup()
@@ -298,84 +358,85 @@ class BackupPreparado:
     def __exit__(self, *_):
         self.temporario.cleanup()
 
-    def validar_extrair(self):
+    def decifrar(self):
+        self.cifrado = cifra.cifrado(self.arquivo)
+        if not self.cifrado:
+            return self.arquivo
+        if not self.senha:
+            raise SenhaNecessaria('Este backup é protegido por senha.')
+        pacote = self.pasta / 'pacote.zip'
+        conferir_espaco(self.pasta, self.arquivo.stat().st_size)
+        try:
+            cifra.decifrar_arquivo(self.arquivo, pacote, self.senha)
+        except cifra.SenhaIncorreta as erro:
+            raise SenhaNecessaria(str(erro)) from None
+        return pacote
+
+    def validar(self):
+        """Confere tudo sem gravar os anexos: só o banco é extraído; os anexos têm o hash lido em fluxo."""
         try:
             with ZipFile(self.pacote) as pacote:
-                infos = pacote.infolist()
-                nomes = [i.filename for i in infos]
-                if len(nomes) != len({n.casefold() for n in nomes}) or len(nomes) > 20000:
-                    raise ValueError('O backup contém arquivos repetidos ou arquivos demais.')
-                total = sum(i.file_size for i in infos)
-                if total > LIMITE_IMPORTACAO:
-                    raise ValueError('O backup excede o limite de 4 GB.')
-                if any(i.file_size > 1024 ** 2 and i.file_size > RAZAO_MAXIMA * max(i.compress_size, 1) for i in infos):
-                    raise ValueError('O backup contém um arquivo compactado de forma suspeita e foi recusado.')
-                conferir_espaco(self.pasta, total)
-                for info in infos:
-                    caminho = PurePosixPath(info.filename)
-                    if (caminho.as_posix() != info.filename or caminho.is_absolute() or '..' in caminho.parts or '\\' in info.filename or
-                        ':' in info.filename or stat.S_ISLNK(info.external_attr >> 16) or info.is_dir()):
-                        raise ValueError('O backup contém um caminho inválido.')
-                    if info.filename not in ('banco.sqlite3', 'manifesto.json') and not info.filename.startswith('documentos/'):
-                        raise ValueError('O backup contém arquivos desconhecidos.')
-                if 'manifesto.json' not in nomes or pacote.getinfo('manifesto.json').file_size > 8 * 1024**2:
-                    raise ValueError('Manifesto do backup ausente ou inválido.')
-                manifesto = json.loads(pacote.read('manifesto.json'))
-                if manifesto.get('formato') != FORMATO or manifesto.get('versao_formato') != 1:
-                    raise ValueError('Formato de backup não reconhecido.')
-                hashes = manifesto.get('arquivos')
-                if not isinstance(hashes, dict) or set(hashes) != set(nomes) - {'manifesto.json'} or 'banco.sqlite3' not in hashes:
-                    raise ValueError('A lista de arquivos do backup está incompleta.')
-                for nome, esperado in hashes.items():
-                    destino = self.pasta.joinpath(*PurePosixPath(nome).parts)
-                    destino.parent.mkdir(parents=True, exist_ok=True)
-                    digest = hashlib.sha256()
-                    with pacote.open(nome) as entrada, destino.open('wb') as saida:
-                        for bloco in iter(lambda: entrada.read(1024 * 1024), b''):
-                            digest.update(bloco)
-                            saida.write(bloco)
-                    if digest.hexdigest() != esperado:
-                        raise ValueError('Um arquivo do backup está danificado ou foi alterado.')
-                validar_banco(self.pasta / 'banco.sqlite3')
-                banco_preparado = Banco(self.pasta / 'banco.sqlite3')
-                with banco_preparado.conectar() as con:
-                    caminhos = [r['caminho'] for r in con.execute('SELECT caminho FROM documentos')]
-                for caminho in caminhos:
-                    if not CAMINHO_DOCUMENTO.fullmatch(caminho):
-                        raise ValueError('Um documento contém um caminho inválido.')
-                    if not (self.pasta / 'documentos' / caminho).is_file():
-                        raise ValueError('Um documento vinculado está ausente no backup.')
-                # Cada arquivo de documentos/ precisa ser um anexo cadastrado: nada de executáveis, atalhos
-                # ou outros arquivos soltos chegando à pasta de documentos da pessoa.
-                if {n for n in hashes if n.startswith('documentos/')} != {'documentos/' + c for c in caminhos}:
-                    raise ValueError('O backup contém arquivos que não são documentos cadastrados.')
-                self.resumo = validar_banco(self.pasta / 'banco.sqlite3')
-                self.resumo['documentos'] = sum(n.startswith('documentos/') for n in hashes)
-                self.criado_em = manifesto.get('criado_em', '')
-                (self.pasta / 'documentos').mkdir(exist_ok=True)
+                nomes = conferir_nomes(pacote.infolist())
+                manifesto, hashes = ler_manifesto(pacote, nomes)
+                banco = self.pasta / 'banco.sqlite3'
+                conferir_espaco(self.pasta, pacote.getinfo('banco.sqlite3').file_size)
+                conferir_hash(pacote, 'banco.sqlite3', hashes['banco.sqlite3'], banco)
+                for nome in hashes:
+                    if nome.startswith('documentos/'):
+                        conferir_hash(pacote, nome, hashes[nome])
+                self.documentos = {nome: hashes[nome] for nome in hashes if nome.startswith('documentos/')}
+                self.tamanho_documentos = sum(pacote.getinfo(nome).file_size for nome in self.documentos)
         except (BadZipFile, KeyError, json.JSONDecodeError, UnicodeDecodeError, TypeError, AttributeError) as erro:
             raise ValueError('O arquivo não é um backup válido do Gestor de RPV.') from erro
+        validar_banco(banco)
+        with Banco(banco).conectar() as con:  # Migra a cópia extraída para o esquema atual.
+            caminhos = [r['caminho'] for r in con.execute('SELECT caminho FROM documentos')]
+        if not all(CAMINHO_DOCUMENTO.fullmatch(caminho) for caminho in caminhos):
+            raise ValueError('Um documento contém um caminho inválido.')
+        # Cada arquivo de documentos/ precisa ser um anexo cadastrado, e cada anexo cadastrado precisa estar lá:
+        # nada de executáveis, atalhos ou outros arquivos soltos chegando à pasta de documentos da pessoa.
+        cadastrados = {'documentos/' + c for c in caminhos}
+        if cadastrados - set(self.documentos):
+            raise ValueError('Um documento vinculado está ausente no backup.')
+        if set(self.documentos) - cadastrados:
+            raise ValueError('O backup contém arquivos que não são documentos cadastrados.')
+        self.resumo = validar_banco(banco, migrado=True)
+        self.resumo['documentos'] = len(self.documentos)
+        self.criado_em = manifesto.get('criado_em', '')
 
-    def restaurar(self, banco):
-        # Esta cópia permanece disponível mesmo se uma falha interromper a importação.
-        seguranca = criar_backup(banco, banco.caminho.parent / 'backups_automaticos', exigir_senha=False)
+    def extrair_documentos(self, destino):
+        conferir_espaco(destino.parent, self.tamanho_documentos)
+        destino.mkdir()
+        try:
+            with ZipFile(self.pacote) as pacote:
+                for nome, esperado in self.documentos.items():
+                    arquivo = destino.joinpath(*PurePosixPath(nome).parts[1:])
+                    arquivo.parent.mkdir(parents=True, exist_ok=True)
+                    conferir_hash(pacote, nome, esperado, arquivo)
+        except BadZipFile as erro:
+            raise ValueError('O arquivo de backup mudou durante a importação.') from erro
+
+    def restaurar(self, banco, copia_de_seguranca=True):
+        """Troca os dados de `banco` pelos do backup. Devolve a cópia de segurança dos dados anteriores."""
+        seguranca = None
+        if copia_de_seguranca:
+            # Esta cópia permanece disponível mesmo se uma falha interromper a importação.
+            seguranca = criar_backup(banco, banco.caminho.parent / 'backups_automaticos', exigir_senha=False)
+            limitar_backups(seguranca.parent, 'GestorRPV-*.rpvbackup')
         locais = {chave: banco.configuracao(chave) for chave in CONFIGURACOES_LOCAIS}
-        limitar_backups(seguranca.parent, 'GestorRPV-*.rpvbackup')
-        with tempfile.TemporaryDirectory(prefix='.restaurar-rpv-', dir=banco.caminho.parent) as temporaria:
+        with tempfile.TemporaryDirectory(prefix=PREFIXO_RESTAURACAO, dir=banco.caminho.parent) as temporaria:
             trabalho = Path(temporaria)
-            novos = trabalho / 'documentos_novos'
-            antigos = trabalho / 'documentos_anteriores'
-            destino = banco.pasta_documentos
+            novos, antigos, destino = trabalho / 'documentos_novos', trabalho / 'documentos_anteriores', banco.pasta_documentos
             if destino.is_symlink():
                 raise ValueError('A pasta atual de documentos não pode ser um atalho simbólico.')
-            shutil.copytree(self.pasta / 'documentos', novos)
-            tinha_documentos = destino.exists()
-            if tinha_documentos:
-                os.replace(destino, antigos)
+            self.extrair_documentos(novos)
             # Só os dados do backup são aproveitados: as tabelas vêm de um banco novo, criado pelo próprio
             # aplicativo, e os valores são copiados linha a linha. Nada do esquema do arquivo importado sobrevive.
             limpo = trabalho / 'banco_limpo.sqlite3'
             copiar_dados(self.pasta / 'banco.sqlite3', limpo)
+            tinha_documentos = destino.exists()
+            if tinha_documentos:
+                os.replace(destino, antigos)
             try:
                 os.replace(novos, destino)
                 # SQLite faz a substituição do banco em uma transação própria.

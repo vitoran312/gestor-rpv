@@ -211,6 +211,15 @@ class OperacoesMixin:
             for valor in cartao.winfo_children()[1:]:
                 valor.configure(wraplength=largura)
 
+    def reiniciar_filtros(self):
+        """Busca vazia, filtro Todas e sem ordenação, como ao abrir a página."""
+        self.busca.set('')
+        self.filtro.set('todas')
+        self.ordenacao = None
+        for chave, titulo in self.titulos_colunas.items():
+            self.tabela.heading(chave, text=titulo)
+        self.atualizar()
+
     def colorir_linhas(self):
         """Cores das linhas no tema atual: alternada, atrasada (vermelha) e recebida (verde)."""
         c = cores()

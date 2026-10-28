@@ -54,10 +54,36 @@ class TestCifra(unittest.TestCase):
                     with self.assertRaises(cifra.SenhaIncorreta):
                         self.decifrar(cifrado)
 
-    def test_senha_curta_e_recusada(self):
-        with self.assertRaisesRegex(ValueError, '6 caracteres'):
-            cifra.validar_senha('12345')
-        self.assertEqual(cifra.validar_senha('123456'), '123456')
+    def test_regras_da_senha(self):
+        for senha, trecho in (('1234567', '8 a 256'), ('x' * 257, '8 a 256'), (' segredo1', 'espaço'),
+                              ('segredo1 ', 'espaço'), ('        ', 'espaço'), ('aaaaaaaa', 'fácil'),
+                              ('12345678', 'fácil'), ('Password', 'fácil')):
+            with self.subTest(senha=senha), self.assertRaisesRegex(ValueError, trecho):
+                cifra.validar_senha(senha)
+        self.assertEqual(cifra.validar_senha('cavalo bateria'), 'cavalo bateria')
+
+    def test_senha_guardada_e_lida_de_volta(self):
+        guardada = cifra.proteger_senha('cavalo bateria')
+        self.assertNotIn('cavalo bateria', guardada if guardada.startswith('dpapi:') else '')
+        self.assertEqual(cifra.revelar_senha(guardada), 'cavalo bateria')
+        self.assertEqual(cifra.revelar_senha('senha-antiga'), 'senha-antiga')  # Gravada pela 0.30.0.
+        self.assertIsNone(cifra.revelar_senha(None))
+        self.assertIsNone(cifra.revelar_senha('dpapi:bGl4bw=='))  # Protegida para outro usuário: não abre aqui.
+
+    def test_senha_com_acentos_compostos_de_jeitos_diferentes_abre_o_mesmo_arquivo(self):
+        import unicodedata
+        cifrado = self.cifrar(b'conteudo', unicodedata.normalize('NFC', 'sênha çá 1'))
+        self.assertEqual(self.decifrar(cifrado, unicodedata.normalize('NFD', 'sênha çá 1')), b'conteudo')
+
+    def test_falha_ao_decifrar_nao_deixa_texto_aberto_no_destino(self):
+        with patch.object(cifra, 'BLOCO', 64):
+            cifrado = self.cifrar(os.urandom(200))
+            dados = bytearray(cifrado.read_bytes())
+            dados[-5] ^= 1  # Estraga só o último bloco: os anteriores chegariam a ser gravados.
+            cifrado.write_bytes(bytes(dados))
+            with self.assertRaises(cifra.SenhaIncorreta):
+                self.decifrar(cifrado)
+        self.assertFalse((self.pasta / 'destino').exists())
 
 
 class TestBackupComSenha(unittest.TestCase):
@@ -90,6 +116,20 @@ class TestBackupComSenha(unittest.TestCase):
         with self.assertRaises(SenhaAusente):
             criar_backup(self.origem, self.pasta / 'backups')
         self.assertFalse(cifra.cifrado(criar_backup(self.origem, self.pasta / 'locais', exigir_senha=False)))
+
+    def test_nada_aberto_passa_pela_pasta_escolhida(self):
+        # A pasta escolhida pode ser sincronizada com a nuvem: nela só pode aparecer o arquivo final, cifrado.
+        vistos = []
+        original = cifra.cifrar_arquivo
+
+        def espiar(origem, destino, senha):
+            vistos.extend(p.name for p in (self.pasta / 'nuvem').rglob('*'))
+            return original(origem, destino, senha)
+
+        with patch.object(cifra, 'cifrar_arquivo', espiar):
+            arquivo = criar_backup(self.origem, self.pasta / 'nuvem')
+        self.assertEqual(vistos, [])
+        self.assertEqual([p.name for p in (self.pasta / 'nuvem').iterdir()], [arquivo.name])
 
     def test_importar_mantem_a_senha_e_a_pasta_automatica_deste_computador(self):
         arquivo = criar_backup(self.origem, self.pasta / 'backups')

@@ -26,6 +26,7 @@ CONSULTA_RPVS = '''SELECT r.*,
 
 
 MANTER_BACKUPS = 10
+PREFIXO_EXCLUSAO = '.excluir-rpv-'  # Pasta de trabalho da exclusão de anexos; sobras são limpas na abertura.
 LIMITE_NOME, LIMITE_OBSERVACOES = 150, 5000
 VERSAO_BANCO = 8  # PRAGMA user_version gravado pela versão atual do esquema.
 
@@ -49,16 +50,19 @@ TITULOS_CONTA = {'identificacao': 'Identificação', 'nome': 'Nome completo', 'c
                  'numero_endereco': 'Número', 'cidade': 'Cidade', 'estado': 'Estado (UF)', 'banco': 'Nome do banco',
                  'agencia': 'Agência', 'numero': 'Conta bancária', 'pix': 'Chave Pix'}
 CAMPOS_CONTA = tuple(TITULOS_CONTA)
-# Esquema atual, em um lugar só: colunas que cada tabela precisa ter. A importação de backup confere por ele.
+# Esquema atual, em um lugar só: colunas que cada tabela precisa ter. A importação de backup confere por ele
+# e copia as tabelas nesta ordem (as referenciadas vêm antes das que apontam para elas).
 ESQUEMA = {
+    'contas': {'id', 'identificacao_chave', 'ativa', 'banco_chave', 'agencia_chave', 'numero_chave', *CAMPOS_CONTA},
     'rpvs': {'id', 'nome', 'aquisicao', 'previsto', 'custo', 'conta', 'previsao', 'comissao', 'observacoes',
              'conta_id', 'conta_snapshot', 'recebimento', 'previsao_atual_definida', 'lixeira_em'},
-    'contas': {'id', 'identificacao_chave', 'ativa', 'banco_chave', 'agencia_chave', 'numero_chave', *CAMPOS_CONTA},
     'prorrogacoes': {'id', 'rpv_id', 'data', 'criada_em'},
     'documentos': {'id', 'rpv_id', 'nome', 'caminho', 'tipo'},
     'previsoes_historico': {'id', 'rpv_id', 'anterior', 'nova', 'alterada_em'},
     'configuracoes': {'chave', 'valor'},
 }
+# Tabelas de versões antigas que a migração ainda reconhece (e remove), além das internas do SQLite.
+TABELAS_LEGADAS = {'historico_alteracoes', 'sqlite_sequence', 'sqlite_stat1', 'sqlite_stat4'}
 
 
 class VersaoMaisNova(ValueError):
@@ -656,7 +660,7 @@ class Banco:
     @contextmanager
     def arquivos_para_excluir(self):
         movidos=[]
-        with tempfile.TemporaryDirectory(prefix='.excluir-rpv-',dir=self.caminho.parent) as pasta:
+        with tempfile.TemporaryDirectory(prefix=PREFIXO_EXCLUSAO,dir=self.caminho.parent) as pasta:
             def preparar(documentos):
                 raiz=self.pasta_documentos.resolve()
                 for documento in documentos:

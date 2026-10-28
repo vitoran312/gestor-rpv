@@ -7,7 +7,7 @@ TEXTOS_OSERROR = {
     errno.EACCES: 'Sem permissão para usar este local. Se o arquivo estiver aberto em outro programa, feche-o e tente de novo.',
     errno.EPERM: 'Sem permissão para usar este local. Se o arquivo estiver aberto em outro programa, feche-o e tente de novo.',
     errno.ENOENT: 'O arquivo ou a pasta não foi encontrado.',
-    errno.EISDIR: 'Já existe uma pasta com esse nome. Escolha outro nome de arquivo.',
+    errno.EISDIR: 'O caminho escolhido é uma pasta, e não um arquivo.',
     errno.ENOTDIR: 'O caminho escolhido não é uma pasta.',
     errno.EEXIST: 'Já existe um arquivo com esse nome.',
     errno.ENAMETOOLONG: 'O nome do arquivo ou da pasta é longo demais.',

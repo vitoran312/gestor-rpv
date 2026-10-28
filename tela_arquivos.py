@@ -6,7 +6,7 @@ from tkinter import messagebox, filedialog, simpledialog, ttk
 
 import cifra
 from backup import (criar_backup, BackupPreparado, aviso_backup, executar_backup_automatico, PASTA_AUTOMATICA,
-                    SENHA_BACKUP, SenhaAusente, SenhaNecessaria)
+                    SenhaAusente, SenhaNecessaria, salvar_senha, senha_salva)
 from componentes import centralizar
 from visual import px
 from tema import cores
@@ -34,7 +34,10 @@ class ArquivosMixin:
         except (ValueError,TypeError):
             data = 'não disponível'
         if self.texto_ultimo_backup is not None:
-            automatico = ' · Backup automático semanal ativo' if self.banco.configuracao(PASTA_AUTOMATICA) else ''
+            automatico = ''
+            if self.banco.configuracao(PASTA_AUTOMATICA):
+                automatico = (' · Backup automático semanal ativo' if senha_salva(self.banco) else
+                              ' · Backup automático parado: falta criar a senha dos backups')
             self.texto_ultimo_backup.set('Último backup: '+data+automatico)
 
     def verificar_backup_automatico(self, forcar=False):
@@ -46,6 +49,7 @@ class ArquivosMixin:
             arquivo = executar_backup_automatico(self.banco, forcar=forcar)
             self.falha_backup_automatico = False
         except (OSError, sqlite3.Error, ValueError) as erro:
+            log.warning('Backup automático não gravado.', exc_info=True)
             self.falha_backup_automatico = 'senha' if isinstance(erro, SenhaAusente) else True
             if forcar:
                 raise
@@ -142,10 +146,12 @@ class ArquivosMixin:
 
     def garantir_senha_backup(self, pai):
         """Os backups só saem com senha; na primeira vez, a pessoa cria a sua."""
-        return bool(self.banco.configuracao(SENHA_BACKUP)) or self.definir_senha_backup(pai)
+        return bool(senha_salva(self.banco)) or self.definir_senha_backup(pai)
 
     def definir_senha_backup(self, pai):
         """Cria ou troca a senha dos backups. Devolve True quando uma senha foi salva."""
+        atual = senha_salva(self.banco)
+        modal_anterior = pai.grab_current()
         tela = tk.Toplevel(pai)
         tela.withdraw()
         tela.title('Senha dos backups')
@@ -158,29 +164,33 @@ class ArquivosMixin:
         ttk.Label(corpo, wraplength=px(corpo, 460), justify='left', style='Subtitulo.TLabel', text=(
             'Os backups guardam CPFs, contas e chaves Pix, por isso são protegidos por senha. Anote-a em lugar '
             'seguro: sem ela, não há como abrir os backups. A senha fica salva neste computador para o backup '
-            'automático funcionar; a troca vale para os próximos backups.')).pack(anchor='w', pady=(6, 16))
-        senha, confirmacao = tk.StringVar(), tk.StringVar()
-        campos = []
-        for rotulo, variavel in (('Nova senha (pelo menos 6 caracteres)', senha), ('Repita a senha', confirmacao)):
+            'automático funcionar; a troca vale para os próximos backups (os anteriores continuam com a senha '
+            'com que foram feitos).')).pack(anchor='w', pady=(6, 16))
+        variaveis, campos = {}, []
+        rotulos = ((('atual', 'Senha atual'),) if atual else ()) + (
+            ('nova', f'Nova senha (pelo menos {cifra.SENHA_MINIMA} caracteres)'), ('repetida', 'Repita a nova senha'))
+        for chave, rotulo in rotulos:
             ttk.Label(corpo, text=rotulo).pack(anchor='w')
-            campo = ttk.Entry(corpo, textvariable=variavel, show='•', width=40)
+            variaveis[chave] = tk.StringVar()
+            campo = ttk.Entry(corpo, textvariable=variaveis[chave], show='•', width=40)
             campo.pack(fill='x', pady=(2, 12))
             campos.append(campo)
         salva = []
 
         def salvar(_evento=None):
             try:
-                cifra.validar_senha(senha.get())
-                if senha.get() != confirmacao.get():
-                    raise ValueError('As duas senhas não são iguais.')
-                self.banco.salvar_configuracao(SENHA_BACKUP, senha.get())
-            except (ValueError, sqlite3.Error) as erro:
+                if atual and variaveis['atual'].get() != atual:
+                    raise ValueError('A senha atual não confere.')
+                if variaveis['nova'].get() != variaveis['repetida'].get():
+                    raise ValueError('As duas senhas novas não são iguais.')
+                salvar_senha(self.banco, variaveis['nova'].get())
+            except (ValueError, OSError, sqlite3.Error) as erro:
                 messagebox.showerror('Senha dos backups', descrever_erro(erro), parent=tela)
                 return
             salva.append(True)
             if self.falha_backup_automatico == 'senha':
                 self.falha_backup_automatico = False
-                self.atualizar_ultimo_backup()
+            self.atualizar_ultimo_backup()
             tela.destroy()
 
         botoes = ttk.Frame(corpo)
@@ -194,11 +204,16 @@ class ArquivosMixin:
         campos[0].focus_set()
         tela.grab_set()
         tela.wait_window()
+        # A janela que estava em modo exclusivo (por exemplo, "Backup automático") volta a estar.
+        if modal_anterior is not None and modal_anterior.winfo_exists():
+            modal_anterior.grab_set()
         return bool(salva)
 
     def exportar_backup(self):
         pai = self.janela_ativa()
         if not self.garantir_senha_backup(pai):
+            messagebox.showinfo('Backup', 'O backup não foi feito: os backups só são gravados com senha. '
+                                'Crie a senha para fazer o backup.', parent=pai)
             return
         pasta = filedialog.askdirectory(parent=pai, title='Escolha onde salvar o backup')
         if not pasta:
@@ -212,20 +227,24 @@ class ArquivosMixin:
         messagebox.showinfo('Backup concluído', f'Backup salvo em:\n{arquivo}', parent=pai)
 
     def importar_dados(self):
+        if self.janela_formulario is not None and self.janela_formulario.winfo_exists():
+            messagebox.showinfo('Importar dados', 'Salve ou feche o formulário aberto antes de importar um backup.',
+                                parent=self.historico)
+            return
         arquivo = filedialog.askopenfilename(parent=self.historico, title='Importar backup do Gestor de RPV',
                                              filetypes=[('Backup do Gestor de RPV', '*.rpvbackup')])
         if not arquivo:
             return
-        senha = self.banco.configuracao(SENHA_BACKUP)
+        # Primeiro tenta a senha deste computador, sem perguntar; depois, a que a pessoa digitar.
+        senha, digitada = senha_salva(self.banco), False
         while True:
             try:
                 with BackupPreparado(arquivo, senha, pasta_trabalho=self.banco.caminho.parent) as pacote:
                     self.confirmar_importacao(pacote)
-                break
+                return
             except SenhaNecessaria as erro:
-                pedido = ('Digite a senha deste backup:' if senha is None or senha == self.banco.configuracao(SENHA_BACKUP)
-                          else f'{erro}\n\nDigite a senha deste backup:')
-                senha = simpledialog.askstring('Importar dados', pedido, show='•', parent=self.historico)
+                pedido = (f'{erro}\n\n' if digitada else '') + 'Digite a senha deste backup:'
+                senha, digitada = simpledialog.askstring('Importar dados', pedido, show='•', parent=self.historico), True
                 if senha is None:
                     return
             except (OSError, sqlite3.Error, ValueError, RuntimeError) as erro:
@@ -234,7 +253,13 @@ class ArquivosMixin:
 
     def confirmar_importacao(self, pacote):
         resumo = pacote.resumo
-        if not messagebox.askyesno('Importar dados',
+        aviso = ''
+        if not pacote.cifrado and senha_salva(self.banco):
+            # Backups feitos pelo programa saem sempre com senha; um arquivo sem ela pode ter sido montado por outra
+            # pessoa para trocar os dados bancários.
+            aviso = ('ATENÇÃO: este backup NÃO tem senha. Os backups deste programa têm senha desde a versão 0.30.0; '
+                     'só continue se tiver certeza de que o arquivo é seu e veio de uma versão antiga.\n\n')
+        if not messagebox.askyesno('Importar dados', aviso +
             f"O backup contém {resumo['registros']} entrada(s), {resumo['lixeira']} na lixeira, "
             f"{resumo['contas']} conta(s) e {resumo['documentos']} documento(s).\n\n"
             'Ele substituirá os dados deste computador, sem juntar os históricos. '
@@ -250,12 +275,7 @@ class ArquivosMixin:
         for janela in list(self.historico.winfo_children()):
             if isinstance(janela, tk.Toplevel):
                 janela.destroy()
-        self.busca.set('')
-        self.filtro.set('todas')
-        self.ordenacao = None
-        for chave, titulo in self.titulos_colunas.items():
-            self.tabela.heading(chave, text=titulo)
-        self.atualizar()
+        self.reiniciar_filtros()
         messagebox.showinfo('Importação concluída', 'Dados recuperados. Backup anterior salvo em:\n' + str(seguranca),
                             parent=self.historico)
 
