@@ -36,7 +36,7 @@ def restaurar_em_banco_novo(caminho, arquivo, senha=None):
         os.replace(caminho, guardado)
     try:
         banco = Banco(caminho)
-        with BackupPreparado(arquivo, senha) as preparado:
+        with BackupPreparado(arquivo, senha, pasta_trabalho=caminho.parent) as preparado:
             preparado.restaurar(banco)
         banco = Banco(caminho)
         if senha:

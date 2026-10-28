@@ -6,6 +6,7 @@ from datetime import date
 from tkinter import ttk
 
 import demonstracao
+from backup import limpar_temporarios
 from recuperacao import abrir_banco
 from componentes import centralizar, maximizar
 from contas import JanelaContas
@@ -28,6 +29,7 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
         self.janela = janela
         janela.withdraw()
         self.banco = abrir_banco(janela)
+        limpar_temporarios(self.banco.caminho.parent)
         if demonstracao.deve_carregar(self.banco):
             try:
                 demonstracao.carregar(self.banco)

@@ -215,7 +215,7 @@ class ArquivosMixin:
         senha = self.banco.configuracao(SENHA_BACKUP)
         while True:
             try:
-                with BackupPreparado(arquivo, senha) as pacote:
+                with BackupPreparado(arquivo, senha, pasta_trabalho=self.banco.caminho.parent) as pacote:
                     self.confirmar_importacao(pacote)
                 break
             except SenhaNecessaria as erro:

@@ -167,6 +167,34 @@ class TestBackupHistorico(unittest.TestCase):
                                                                            numero='777-1', cpf='52998224725')))
         self.assertEqual(conta['pix'], 'meu@exemplo.com')
 
+    def test_bomba_de_descompressao_e_recusada_antes_de_extrair(self):
+        arquivo = self.backup_sem_senha()
+        manifesto = json.loads(ZipFile(arquivo).read('manifesto.json'))
+        bomba = self.pasta / 'bomba.rpvbackup'
+        nome = 'documentos/1/' + 'a' * 32 + '.pdf'
+        manifesto['arquivos'][nome] = '0' * 64
+        with ZipFile(arquivo) as origem, ZipFile(bomba, 'w', ZIP_DEFLATED) as alvo:
+            for item in origem.namelist():
+                alvo.writestr(item, json.dumps(manifesto) if item == 'manifesto.json' else origem.read(item))
+            alvo.writestr(nome, b'\0' * (20 * 1024 ** 2))
+        with self.assertRaisesRegex(ValueError, 'suspeita'), BackupPreparado(bomba, pasta_trabalho=self.pasta / 'trabalho'):
+            pass
+        self.assertEqual(list((self.pasta / 'trabalho').iterdir()), [])
+
+    def test_importacao_trabalha_na_pasta_de_dados_e_sobras_antigas_sao_limpas(self):
+        from backup import limpar_temporarios
+        arquivo = criar_backup(self.origem, self.pasta / 'backups')
+        dados = self.destino.caminho.parent
+        with BackupPreparado(arquivo, SENHA_TESTE, pasta_trabalho=dados) as preparado:
+            self.assertEqual(preparado.pasta.parent, dados)
+        antiga, recente = dados / '.importar-rpv-antiga', dados / '.importar-rpv-recente'
+        for sobra in (antiga, recente):
+            (sobra / 'documentos').mkdir(parents=True)
+        os.utime(antiga, (0, 0))
+        limpar_temporarios(dados)
+        self.assertFalse(antiga.exists())
+        self.assertTrue(recente.exists())
+
     def test_banco_local_com_trigger_e_limpo_ao_abrir(self):
         con = sqlite3.connect(self.destino.caminho)
         con.executescript(TRIGGER_PIX + 'CREATE VIEW "v""x" AS SELECT 1;')

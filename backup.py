@@ -26,6 +26,28 @@ SENHA_BACKUP = 'senha_backup'
 CONFIGURACOES_LOCAIS = (PASTA_AUTOMATICA, SENHA_BACKUP)
 
 
+LIMITE_IMPORTACAO = 4 * 1024 ** 3  # Soma dos arquivos descompactados de um backup.
+RAZAO_MAXIMA = 200                  # PDFs e imagens quase não comprimem; razões maiores indicam arquivo forjado.
+PREFIXO_TEMPORARIO = '.importar-rpv-'
+
+
+def limpar_temporarios(pasta, idade_segundos=24 * 60 * 60):
+    """Remove pastas de trabalho que um encerramento forçado deixou para trás na pasta de dados."""
+    limite = time.time() - idade_segundos
+    for prefixo in (PREFIXO_TEMPORARIO, '.restaurar-rpv-', '.excluir-rpv-', '.backup-rpv-'):
+        for sobra in Path(pasta).glob(prefixo + '*'):
+            try:
+                if sobra.is_dir() and not sobra.is_symlink() and sobra.stat().st_mtime < limite:
+                    shutil.rmtree(sobra, ignore_errors=True)
+            except OSError:
+                pass
+
+
+def conferir_espaco(pasta, necessario):
+    if shutil.disk_usage(pasta).free < necessario + 200 * 1024 ** 2:
+        raise ValueError('Não há espaço livre suficiente no disco para abrir este backup.')
+
+
 class SenhaAusente(ValueError):
     """Ainda não há senha definida para proteger os backups."""
 
@@ -249,13 +271,17 @@ def copiar_dados(origem, destino):
 
 class BackupPreparado:
     """Valida e extrai em uma pasta temporária; só restaura após confirmação da UI."""
-    def __init__(self, arquivo, senha=None):
+    def __init__(self, arquivo, senha=None, pasta_trabalho=None):
         self.arquivo = Path(arquivo)
         self.senha = senha
+        # A cópia extraída fica junto dos dados do aplicativo, não na pasta temporária do sistema.
+        self.pasta_trabalho = pasta_trabalho
         self.temporario = None
 
     def __enter__(self):
-        self.temporario = tempfile.TemporaryDirectory(prefix='gestor-rpv-importar-')
+        if self.pasta_trabalho is not None:
+            Path(self.pasta_trabalho).mkdir(parents=True, exist_ok=True)
+        self.temporario = tempfile.TemporaryDirectory(prefix=PREFIXO_TEMPORARIO, dir=self.pasta_trabalho)
         self.pasta = Path(self.temporario.name)
         try:
             self.pacote = self.arquivo
@@ -263,6 +289,7 @@ class BackupPreparado:
                 if not self.senha:
                     raise SenhaNecessaria('Este backup é protegido por senha.')
                 self.pacote = self.pasta / 'pacote.zip'
+                conferir_espaco(self.pasta, self.arquivo.stat().st_size)
                 try:
                     cifra.decifrar_arquivo(self.arquivo, self.pacote, self.senha)
                 except cifra.SenhaIncorreta as erro:
@@ -283,8 +310,12 @@ class BackupPreparado:
                 nomes = [i.filename for i in infos]
                 if len(nomes) != len({n.casefold() for n in nomes}) or len(nomes) > 20000:
                     raise ValueError('O backup contém arquivos repetidos ou arquivos demais.')
-                if sum(i.file_size for i in infos) > 8 * 1024**3:
-                    raise ValueError('O backup excede o limite de 8 GB.')
+                total = sum(i.file_size for i in infos)
+                if total > LIMITE_IMPORTACAO:
+                    raise ValueError('O backup excede o limite de 4 GB.')
+                if any(i.file_size > 1024 ** 2 and i.file_size > RAZAO_MAXIMA * max(i.compress_size, 1) for i in infos):
+                    raise ValueError('O backup contém um arquivo compactado de forma suspeita e foi recusado.')
+                conferir_espaco(self.pasta, total)
                 for info in infos:
                     caminho = PurePosixPath(info.filename)
                     if (caminho.as_posix() != info.filename or caminho.is_absolute() or '..' in caminho.parts or '\\' in info.filename or
