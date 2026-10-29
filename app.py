@@ -23,6 +23,7 @@ from interacao import instalar_menu_texto
 from estilos import criar_estilos
 from identidade import aplicar_icone, preparar_windows
 from tela_inicio import InicioMixin
+from barra_lateral import BarraLateral
 from navegacao import NavegacaoMixin
 from tela_operacoes import OperacoesMixin
 from tela_registro import RegistroMixin
@@ -75,8 +76,13 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
         instalar_menu_texto(janela)
         janela.bind_all('<Map>', self.tematizar_novo_widget, add='+')
 
+        # Barra lateral à esquerda de todas as páginas; ela cria os botões de tema, Sobre e Sair.
+        self.barra_lateral = BarraLateral(self)
+        self.barra_lateral.pack(side='left', fill='y')
+        self.barra_lateral.pack_propagate(False)
         self.construir_inicio(janela)
         self.atualizar_alternador_tema()
+        self.barra_lateral.pagina_mudou(self.inicio, self.inicio)
         self.atualizar_ultimo_backup()
         self.atualizar_aviso_atrasadas()
         janela.bind('<FocusIn>', self.atualizar_backup_ao_ativar, add='+')
@@ -135,7 +141,9 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
     def atualizar_alternador_tema(self):
         if self.texto_alternar_tema is not None:
             self.texto_alternar_tema.set('Modo escuro' if self.modo_tema.get() == 'claro' else 'Modo claro')
-            self.botao_alternar_tema.configure(image=icone_tema(self.janela, self.modo_tema.get()))
+            c = cores()
+            apagado, aceso = (icone_tema(self.janela, self.modo_tema.get(), c[chave]) for chave in ('heroi_secundario', 'heroi_texto'))
+            self.botao_alternar_tema.configure(image=(apagado, 'active', aceso))
 
     def mostrar_atrasadas(self):
         self.mostrar_historico()

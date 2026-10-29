@@ -209,9 +209,12 @@ class TestInicio(TesteDeInterface):
         self.root.geometry('1420x900')
         self.root.update()
         self.root.update()
-        # Emblema à esquerda do título; título, subtítulo e assinatura são textos do Canvas, sem caixas de fundo.
-        self.assertEqual(tela.itemcget(self.programa.emblema_inicio, 'image'), str(self.root._marca_vitoran))
-        self.assertLess(tela.bbox(self.programa.emblema_inicio)[2], tela.bbox(self.programa.titulo_inicio)[0])
+        # A marca fica na barra lateral; na tela, a data por extenso acima do título. Data, título, subtítulo e
+        # assinatura são textos do Canvas, sem caixas de fundo.
+        self.assertEqual(self.root.tk.splitlist(self.programa.barra_lateral.emblema.cget('image')), (str(self.root._icones_vitoran[2]),))
+        from tela_inicio import data_por_extenso
+        self.assertEqual(tela.itemcget(self.programa.data_inicio, 'text'), data_por_extenso())
+        self.assertLess(tela.bbox(self.programa.data_inicio)[3], tela.bbox(self.programa.titulo_inicio)[3])
         self.assertEqual(tela.itemcget(self.programa.titulo_inicio, 'text'), 'Gestor de RPV')
         self.assertEqual(tela.itemcget(self.programa.subtitulo_inicio, 'text'),
                          'Registros, recebimentos e documentos. Tudo no seu lugar.')
@@ -221,10 +224,14 @@ class TestInicio(TesteDeInterface):
         entrada, historico, contas = self.programa.cartoes_inicio
         self.assertTrue(self.programa.layout_largo_inicio)
         largura_util = tela.winfo_width() - 2 * 40
-        self.assertAlmostEqual(entrada.winfo_width() + 2 * 18, largura_util * 0.56, delta=8)
+        # O conteúdo fica recuado da borda da superfície pela sombra e pelo canto arredondado.
+        from tela_inicio import recuo_superficie
+        from visual import px
+        esquerda, _topo, direita, _base = recuo_superficie(cores(), 'destaque', lambda v: px(tela, v))
+        self.assertAlmostEqual(entrada.winfo_width() + esquerda + direita, largura_util * 0.56, delta=8)
         # Em telas maiores, a composição não estica: mantém o tamanho e fica centralizada.
         medidas = []
-        for geometria in ('1700x1100', '2000x1200'):
+        for geometria in ('1900x1100', '2200x1200'):  # Já descontada a barra lateral.
             self.root.geometry(geometria)
             self.root.update()
             self.root.update()
@@ -288,7 +295,9 @@ class TestInicio(TesteDeInterface):
         area, cartao = janela.area, janela.cartao
         self.assertEqual(cartao.winfo_manager(), 'place')
         self.assertEqual(str(cartao.cget('style')), 'Cartao.TFrame')
-        self.assertAlmostEqual(cartao.winfo_width(), area.winfo_width() // 2, delta=2)
+        from visual import px
+        # Metade da área, sem ficar abaixo da largura mínima (a barra lateral ocupa parte da janela).
+        self.assertAlmostEqual(cartao.winfo_width(), max(px(cartao, 660), area.winfo_width() // 2), delta=2)
         self.assertLess(cartao.winfo_height(), area.winfo_height())
         centro_cartao = cartao.winfo_rootx() + cartao.winfo_width() / 2
         centro_area = area.winfo_rootx() + area.winfo_width() / 2
@@ -363,7 +372,7 @@ class TestInicio(TesteDeInterface):
         self.programa.alternar_tema()
         self.root.update()
         self.assertEqual(arte.inicio, inicio)
-        self.assertEqual(arte.cget('bg'), PALETAS['escuro']['superficie'])
+        self.assertEqual(arte.cget('bg'), PALETAS['escuro']['heroi'])  # Sobre o cartão de destaque, em nanquim.
         self.assertIn(arte.itemcget(arte.itens[-1][1], 'image'),
                       {str(imagem) for imagem in arte_inicio.imagens_vidro(self.root, 'escuro').values()})
         luzes = self.programa.luzes_inicio

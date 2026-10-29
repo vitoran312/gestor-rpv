@@ -2,24 +2,34 @@
 import tkinter as tk
 from tkinter import ttk
 
-# Vitoran Pro: base neutra e um único acento de marca por tema (carmim no claro, pêssego no escuro).
+# Ledger: identidade de banco privado. Porcelana quente e tinta azul-nanquim no claro; nanquim profundo e
+# marfim no escuro. O acento champanhe marca foco, seleção e o item ativo; o vinho fica só no emblema.
+# Barra lateral e cartão de destaque usam a superfície "herói" (nanquim) nos dois temas.
+# Texto sobre fundo atende ao contraste WCAG AA (4,5:1); o champanhe sobre branco (marca) é usado em
+# contornos, ícones e textos grandes ou em negrito.
 PALETAS = {
-    'claro': dict(fundo='#f5f6f8', campo='#ffffff', superficie='#ffffff', texto='#14171f',
-                  secundario='#5c6576', botao='#ffffff', borda='#c9ced8', borda_suave='#e3e6ec',
-                  ativo='#eef0f4', selecao='#f6e4e8', texto_selecao='#14171f', verde='#1d7a4c',
-                  vermelho='#c02a3b', desabilitado='#8a93a3', primario='#8c1d34', primario_texto='#ffffff',
-                  primario_ativo='#a3243f', primario_pressionado='#6a1527', marca='#8c1d34',
-                  cabecalho='#f0f2f5', realce='#fbeae4', linha='#f9fafb', atraso='#fde8eb',
-                  recebida='#e5f4ea', hover_linha='#f1f3f7', notificacao='#1b1f29', notificacao_texto='#f5f6f8',
-                  notificacao_sucesso='#5fd39d', notificacao_erro='#ff8a94'),
-    'escuro': dict(fundo='#0e1117', campo='#141820', superficie='#161a22', texto='#e9ecf1',
-                   secundario='#9aa3b2', botao='#1b2029', borda='#333a47', borda_suave='#232935',
-                   ativo='#232935', selecao='#3a2a27', texto_selecao='#fff4ef', verde='#5fd39d',
-                   vermelho='#ff7b86', desabilitado='#6b7484', primario='#ffa586', primario_texto='#1b100c',
-                   primario_ativo='#ffb79e', primario_pressionado='#e98d6f', marca='#ffa586',
-                   cabecalho='#181d26', realce='#2b201d', linha='#12161d', atraso='#2c1519',
-                   recebida='#11281e', hover_linha='#1c212b', notificacao='#e9ecf1', notificacao_texto='#14171f',
-                   notificacao_sucesso='#1d7a4c', notificacao_erro='#c02a3b'),
+    'claro': dict(fundo='#f4f2ec', campo='#ffffff', superficie='#ffffff', texto='#12161f',
+                  secundario='#5f6571', botao='#ffffff', borda='#d6d0c3', borda_suave='#e7e2d8',
+                  ativo='#f1ede4', selecao='#efe4cc', texto_selecao='#12161f', verde='#1c6f4c',
+                  vermelho='#ad2e42', desabilitado='#8c919b', primario='#172030', primario_texto='#f7f2e7',
+                  primario_ativo='#26314a', primario_pressionado='#0c121c', marca='#8a6a2e',
+                  cabecalho='#f8f6f1', realce='#f6efe0', linha='#faf9f5', atraso='#fbeced',
+                  recebida='#e8f3ec', hover_linha='#f3efe6', notificacao='#172030', notificacao_texto='#f7f2e7',
+                  notificacao_sucesso='#7fd6ac', notificacao_erro='#ff9aa6',
+                  heroi='#141b28', heroi_texto='#f5efe2', heroi_secundario='#aab1bf', heroi_borda='#2a3346',
+                  heroi_hover='#1e2738', heroi_ativo='#263048', acento='#d8b878', acento_texto='#141b28',
+                  acento_hover='#e4c88f', acento_pressionado='#c7a463', sombra='#2b2416'),
+    'escuro': dict(fundo='#0b0e14', campo='#0f141c', superficie='#121722', texto='#ece6d8',
+                   secundario='#9aa1ae', botao='#161c28', borda='#2b3242', borda_suave='#1d2331',
+                   ativo='#1b2232', selecao='#3a3120', texto_selecao='#fff6e2', verde='#6fd2a3',
+                   vermelho='#ff8e9b', desabilitado='#687181', primario='#d8b878', primario_texto='#141b28',
+                   primario_ativo='#e4c88f', primario_pressionado='#c7a463', marca='#d8b878',
+                   cabecalho='#151b27', realce='#272013', linha='#10151e', atraso='#2a1419',
+                   recebida='#0f2419', hover_linha='#1a2030', notificacao='#ece6d8', notificacao_texto='#141b28',
+                   notificacao_sucesso='#1c6f4c', notificacao_erro='#ad2e42',
+                   heroi='#121825', heroi_texto='#f5efe2', heroi_secundario='#a2a9b6', heroi_borda='#2c3446',
+                   heroi_hover='#1a2233', heroi_ativo='#222b3e', acento='#d8b878', acento_texto='#141b28',
+                   acento_hover='#e4c88f', acento_pressionado='#c7a463', sombra='#000000'),
 }
 _modo = 'claro'
 
@@ -52,7 +62,8 @@ def atualizar_widgets(widget):
         widget.atualizar_tema()
     elif isinstance(widget, tk.Text):
         widget.configure(bg=c['campo'], fg=c['texto'], insertbackground=c['texto'],
-                         selectbackground=c['selecao'], selectforeground=c['texto_selecao'])
+                         selectbackground=c['selecao'], selectforeground=c['texto_selecao'],
+                         highlightthickness=1, highlightbackground=c['borda'], highlightcolor=c['marca'])
     elif isinstance(widget, tk.Menu):
         widget.configure(bg=c['campo'], fg=c['texto'], activebackground=c['selecao'],
                          activeforeground=c['texto_selecao'], disabledforeground=c['desabilitado'])

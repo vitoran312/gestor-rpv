@@ -1,6 +1,28 @@
 {
   "versoes": [
     {
+      "versao": "0.54.0",
+      "resumo": "4 novidades",
+      "itens": [
+        {
+          "tipo": "novidade",
+          "texto": "Programa: nova identidade visual Ledger, em nanquim e champanhe, com títulos em serifa e cartões com sombra suave."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Programa: barra lateral sempre visível com Nova entrada, as páginas, backup, Excel, tema e Sobre; recolhe para ícones em janelas estreitas."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Programa: tela inicial com a data por extenso e o cartão de destaque em nanquim."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Programa: gráfico mensal com barras planas de topo arredondado."
+        }
+      ]
+    },
+    {
       "versao": "0.53.0",
       "resumo": "5 novidades",
       "itens": [
@@ -65,28 +87,6 @@
         {
           "tipo": "novidade",
           "texto": "Celular: resumo da operação em imagem, com o logo, para mandar no WhatsApp sem dados sensíveis."
-        }
-      ]
-    },
-    {
-      "versao": "0.50.0",
-      "resumo": "4 novidades",
-      "itens": [
-        {
-          "tipo": "novidade",
-          "texto": "Celular: editar os dados de uma entrada, alterar a previsão e excluir operações pelo app."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Celular: anexar fotos (direto da câmera) e PDFs às operações e às entradas novas."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Celular: agenda das previsões — calendário do mês e, no Início, quantas vencem hoje, amanhã e nos próximos 7 dias, além das atrasadas."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Programa: importa do celular alterações, previsões, exclusões e documentos, sem gravar por cima do que mudou no computador."
         }
       ]
     }

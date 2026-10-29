@@ -1,4 +1,6 @@
-"""Tela inicial: cabeçalho, cartão Nova entrada em destaque, cartões de acesso, avisos e rodapé.
+"""Tela inicial: data e título, cartão Nova entrada em destaque (nanquim), cartões de acesso, avisos e rodapé.
+
+Marca, tema, Sobre e Sair ficam na barra lateral (barra_lateral.py), sempre visível ao lado desta tela.
 
 A tela é um Canvas: as luzes de fundo e as superfícies arredondadas dos cartões são desenhadas nele, e o
 conteúdo de cada cartão fica num quadro posicionado por cima. Assim as luzes aparecem entre os cartões
@@ -6,13 +8,14 @@ sem retângulos de fundo, e títulos soltos (cabeçalho e assinatura) são texto
 """
 import sqlite3
 import tkinter as tk
+from datetime import date
 from tkinter import ttk
 
 from arte_inicio import ArteVidro, LuzesFundo, Relogio
 from dados import situacao
 from tema import cores, modo_atual, PALETAS
 from versao import VERSAO
-from visual import Icone, LARGURA_LAYOUT_LARGO, _png_arredondado, misturar, px
+from visual import Icone, LARGURA_LAYOUT_LARGO, _png_arredondado, familia_titulo, margens_sombra, misturar, px, sombra_cartao
 
 # Tamanho máximo da composição da tela inicial (em pixels a 100% de escala), nas proporções de referência.
 COMPOSICAO = (1420, 900)
@@ -24,13 +27,31 @@ ATALHOS = (
 )
 
 
+DIAS = ('segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado', 'domingo')
+MESES = ('janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro',
+         'novembro', 'dezembro')
+
+
+def data_por_extenso(dia=None):
+    """"Quinta-feira, 29 de outubro de 2026": a data no alto da tela inicial."""
+    dia = dia or date.today()
+    return f'{DIAS[dia.weekday()].capitalize()}, {dia.day} de {MESES[dia.month - 1]} de {dia.year}'
+
+
 def cores_superficie(paleta, tipo):
     """Preenchimento, contorno e raio de cada tipo de superfície da tela inicial."""
     if tipo == 'destaque':
-        return paleta['superficie'], misturar(paleta['borda_suave'], paleta['marca'], 0.55), 18
+        return paleta['heroi'], paleta['heroi_borda'], 20
     if tipo == 'aviso':
-        return paleta['superficie'], misturar(paleta['borda_suave'], paleta['vermelho'], 0.45), 14
+        return paleta['superficie'], misturar(paleta['borda_suave'], paleta['vermelho'], 0.4), 16
     return paleta['superficie'], paleta['borda_suave'], 16
+
+
+def recuo_superficie(paleta, tipo, p):
+    """Distância da borda da imagem até o conteúdo: margem da sombra mais o raio do canto."""
+    esquerda, topo, direita, base = margens_sombra(sombra_cartao(paleta))
+    raio = p(cores_superficie(paleta, tipo)[2])
+    return esquerda + raio, topo + raio, direita + raio, base + raio
 
 
 class IconeAlerta(tk.Canvas):
@@ -69,11 +90,7 @@ class InicioMixin:
         self.pecas_inicio = {}
         self.luzes_inicio = LuzesFundo(tela)
 
-        self.texto_alternar_tema = tk.StringVar()
-        self.botao_alternar_tema = ttk.Button(tela, textvariable=self.texto_alternar_tema, command=self.alternar_tema,
-                                              width=15, compound='left')
-        self.botao_sobre = ttk.Button(tela, text='Sobre', command=self.mostrar_sobre)
-        self.emblema_inicio = tela.create_image(0, 0, image=janela._marca_vitoran, anchor='w')
+        self.data_inicio = tela.create_text(0, 0, text=data_por_extenso(), anchor='sw')
         self.titulo_inicio = tela.create_text(0, 0, text='Gestor de RPV', anchor='sw')
         self.subtitulo_inicio = tela.create_text(0, 0, text='Registros, recebimentos e documentos. Tudo no seu lugar.',
                                                  anchor='nw')
@@ -83,9 +100,10 @@ class InicioMixin:
         acoes = {'entrada': self.formulario, 'historico': self.mostrar_historico, 'contas': self.mostrar_contas}
         for icone, titulo, descricao, rotulo in ATALHOS:
             destaque = icone == 'entrada'
-            cartao = ttk.Frame(tela, style='Superficie.TFrame')
-            faixa = ttk.Frame(cartao, style='Superficie.TFrame')
-            Icone(faixa, icone).pack(side='left')
+            fundo_cartao = 'Heroi.TFrame' if destaque else 'Superficie.TFrame'
+            cartao = ttk.Frame(tela, style=fundo_cartao)
+            faixa = ttk.Frame(cartao, style=fundo_cartao)
+            Icone(faixa, icone, heroi=destaque).pack(side='left')
             rotulo_titulo = ttk.Label(cartao, text=titulo, style='DestaqueTitulo.TLabel' if destaque else 'CartaoTitulo.TLabel')
             rotulo_descricao = ttk.Label(cartao, text=descricao, justify='left',
                                          style='DestaqueTexto.TLabel' if destaque else 'CartaoTexto.TLabel')
@@ -122,7 +140,7 @@ class InicioMixin:
         for chave, variavel, estilo, acao in (
                 ('atrasadas', self.texto_aviso_atrasadas, 'InicioAtrasadas.TLabel', self.mostrar_atrasadas),
                 ('backup', self.texto_aviso_backup, 'InicioBackup.TLabel', self.exportar_backup)):
-            aviso = ttk.Frame(tela, style='Superficie.TFrame', padding=(px(tela, 22), px(tela, 6)), cursor='hand2')
+            aviso = ttk.Frame(tela, style='Superficie.TFrame', padding=(px(tela, 8), 0), cursor='hand2')
             aviso.columnconfigure(1, weight=1)
             aviso.rowconfigure(0, weight=1)
             IconeAlerta(aviso).grid(row=0, column=0, padx=(0, px(tela, 14)))
@@ -134,12 +152,10 @@ class InicioMixin:
             setattr(self, f'aviso_{chave}_inicio', rotulo)
             variavel.trace_add('write', lambda *_: self.janela.after_idle(self.organizar_inicio))
 
-        self.botao_sair = ttk.Button(tela, text='Sair', command=self.fechar_programa, width=12)
         self.marca_assinatura = tela.create_image(0, 0, image=janela._marca_rodape, anchor='e')
         self.assinatura_inicio = tela.create_text(0, 0, text=f'Vitoran Tech · v{VERSAO}', anchor='e')
-        self.janelas_inicio = {nome: tela.create_window(0, 0, window=widget, anchor='nw') for nome, widget in (
-            ('sobre', self.botao_sobre), ('tema', self.botao_alternar_tema), ('sair', self.botao_sair),
-            *((chave, peca) for chave, (peca, _tipo) in self.pecas_inicio.items()))}
+        self.janelas_inicio = {chave: tela.create_window(0, 0, window=peca, anchor='nw')
+                               for chave, (peca, _tipo) in self.pecas_inicio.items()}
         self.desenhos_inicio = {chave: tela.create_image(0, 0, anchor='nw') for chave in self.pecas_inicio}
         self.relogio_inicio = Relogio(tela, self.arte_inicio)
         tela.bind('<Configure>', lambda _: self.organizar_inicio())
@@ -149,8 +165,9 @@ class InicioMixin:
         c = cores()
         tela = self.inicio
         tela.configure(bg=c['fundo'])
-        tela.itemconfigure(self.titulo_inicio, fill=c['texto'], font=(self.fonte, 34, 'bold'))
-        tela.itemconfigure(self.subtitulo_inicio, fill=c['secundario'], font=(self.fonte, 11))
+        tela.itemconfigure(self.data_inicio, fill=c['marca'], font=(self.fonte, 10, 'bold'))
+        tela.itemconfigure(self.titulo_inicio, fill=c['texto'], font=(familia_titulo(tela), 36, 'bold'))
+        tela.itemconfigure(self.subtitulo_inicio, fill=c['secundario'], font=(self.fonte, 12))
         tela.itemconfigure(self.assinatura_inicio, fill=c['secundario'], font=(self.fonte, 9))
         self.luzes_inicio.atualizar_tema()
         self.organizar_inicio()
@@ -161,7 +178,8 @@ class InicioMixin:
         chave = (modo, tipo, largura, altura)
         if chave not in self.superficies_inicio:
             preenchimento, contorno, raio = cores_superficie(PALETAS[modo], tipo)
-            dados = _png_arredondado(preenchimento, contorno, px(self.inicio, raio), largura, altura)
+            dados = _png_arredondado(preenchimento, contorno, px(self.inicio, raio), largura, altura,
+                                     sombra_cartao(PALETAS[modo]))
             self.superficies_inicio[chave] = tk.PhotoImage(master=self.inicio, data=dados)
         return self.superficies_inicio[chave]
 
@@ -186,28 +204,21 @@ class InicioMixin:
         janela_largura, janela_altura = largura, altura
         largura, altura = min(largura, p(COMPOSICAO[0])), min(altura, p(COMPOSICAO[1]))
         ox, oy = (janela_largura - largura) // 2, (janela_altura - altura) // 2
-        margem, espaco = p(40), p(22)
-        tela.coords(self.janelas_inicio['tema'], largura - margem, p(22))
-        tela.itemconfigure(self.janelas_inicio['tema'], anchor='ne')
-        tela.coords(self.janelas_inicio['sobre'], largura - margem - self.botao_alternar_tema.winfo_reqwidth() - p(10), p(22))
-        tela.itemconfigure(self.janelas_inicio['sobre'], anchor='ne')
-        topo_cabecalho = p(78)
-        tela.coords(self.emblema_inicio, margem - p(16), topo_cabecalho + p(52))
-        texto_x = margem + p(120)
-        tela.coords(self.titulo_inicio, texto_x, topo_cabecalho + p(56))
-        tela.coords(self.subtitulo_inicio, texto_x, topo_cabecalho + p(66))
+        margem, espaco = p(40), p(18)
+        topo_cabecalho = p(40)
+        tela.coords(self.data_inicio, margem + p(4), topo_cabecalho + p(22))
+        tela.coords(self.titulo_inicio, margem, topo_cabecalho + p(78))
+        tela.coords(self.subtitulo_inicio, margem + p(2), topo_cabecalho + p(86))
         rodape = altura - p(24)
-        tela.coords(self.janelas_inicio['sair'], margem, rodape)
-        tela.itemconfigure(self.janelas_inicio['sair'], anchor='sw')
-        tela.coords(self.assinatura_inicio, largura - margem, rodape - p(18))
+        tela.coords(self.assinatura_inicio, largura - margem, rodape - p(6))
         assinatura = tela.bbox(self.assinatura_inicio)
-        tela.coords(self.marca_assinatura, (assinatura[0] if assinatura else largura - margem) - p(6), rodape - p(18))
+        tela.coords(self.marca_assinatura, (assinatura[0] if assinatura else largura - margem) - p(6), rodape - p(6))
 
-        topo = topo_cabecalho + p(130)
-        base = rodape - self.botao_sair.winfo_reqheight() - p(26)
+        topo = topo_cabecalho + p(138)
+        base = rodape - p(30)
         avisos = [chave for chave, variavel in (('atrasadas', self.texto_aviso_atrasadas),
                                                  ('backup', self.texto_aviso_backup)) if variavel.get()]
-        altura_aviso = p(84)
+        altura_aviso = p(96)
         retangulos = {}
         conteudo = largura - 2 * margem
         if largura >= p(LARGURA_LAYOUT_LARGO):
@@ -250,12 +261,13 @@ class InicioMixin:
                 continue
             x, y, w, h = (round(v) for v in retangulos[chave])
             self.medidas_inicio[chave] = (w, h)
-            # O conteúdo fica dentro dos cantos arredondados, que continuam desenhados no Canvas.
-            recuo = p(cores_superficie(cores(), tipo)[2])
+            # O conteúdo fica dentro dos cantos arredondados (e longe da sombra), desenhados no Canvas.
+            esquerda, topo_peca, direita, base_peca = recuo_superficie(cores(), tipo, p)
             tela.coords(desenho, x, y)
             tela.itemconfigure(desenho, image=self.superficie_inicio(tipo, w, h), state='normal')
-            tela.coords(janela_peca, x + recuo, y + recuo)
-            tela.itemconfigure(janela_peca, width=max(1, w - 2 * recuo), height=max(1, h - 2 * recuo), state='normal')
+            tela.coords(janela_peca, x + esquerda, y + topo_peca)
+            tela.itemconfigure(janela_peca, width=max(1, w - esquerda - direita), height=max(1, h - topo_peca - base_peca),
+                               state='normal')
         # Descarta só tamanhos que nenhum cartão usa mais; os dois temas do tamanho atual continuam guardados.
         em_uso = {(tipo, *self.medidas_inicio[chave]) for chave, (_peca, tipo) in self.pecas_inicio.items()
                   if chave in self.medidas_inicio}
@@ -263,9 +275,9 @@ class InicioMixin:
             del self.superficies_inicio[chave]
         # Desloca tudo o que foi posicionado para a composição centralizada.
         visiveis = [chave for chave in self.pecas_inicio if chave in retangulos]
-        itens = [self.janelas_inicio[nome] for nome in ('sobre', 'tema', 'sair', *visiveis)]
+        itens = [self.janelas_inicio[nome] for nome in visiveis]
         itens += [self.desenhos_inicio[chave] for chave in visiveis]
-        itens += [self.emblema_inicio, self.titulo_inicio, self.subtitulo_inicio,
+        itens += [self.data_inicio, self.titulo_inicio, self.subtitulo_inicio,
                   self.assinatura_inicio, self.marca_assinatura]
         for item in itens:
             tela.move(item, ox, oy)

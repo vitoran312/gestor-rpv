@@ -358,7 +358,9 @@ class TestOperacoes(TesteDeInterface):
         self.root.update()
         estilo = ttk.Style()
         self.assertEqual(tkfont.Font(font=estilo.lookup('Operacoes.Treeview', 'font')).actual('size'), 12)
-        self.assertEqual(tkfont.Font(font=estilo.lookup('Operacoes.Treeview.Heading', 'font')).actual('size'), 18)
+        # Cabeçalho discreto (11 pt, negrito) sobre linhas de 12 pt: os valores mandam, os rótulos acompanham.
+        cabecalho = tkfont.Font(font=estilo.lookup('Operacoes.Treeview.Heading', 'font'))
+        self.assertEqual((cabecalho.actual('size'), cabecalho.actual('weight')), (11, 'bold'))
         ultimo = self.programa.cartoes_resumo[-1][1]
         self.assertEqual(ultimo.cget('text'), 'Lucro realizado')
         self.assertIn('ainda não realizado', self.programa.texto_ultimo_backup.get())

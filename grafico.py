@@ -1,4 +1,4 @@
-"""Gráfico mensal de entradas e recebimentos, com barras em 3D desenhadas em Canvas."""
+"""Gráfico mensal de entradas e recebimentos, com barras planas de topo arredondado desenhadas em Canvas."""
 import tkinter as tk
 from datetime import date
 from tkinter import ttk
@@ -9,7 +9,6 @@ from visual import familia_fonte, misturar, px
 MESES = ('jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez')
 LARGURA_MAXIMA = 1000  # O gráfico não estica além disso, mesmo com a janela maximizada.
 ALTURA = 340
-FAIXAS = 6             # Faixas verticais da face frontal, que simulam o brilho de uma superfície curva.
 
 
 def resumo_mensal(registros, meses=12, hoje=None):
@@ -65,24 +64,30 @@ class GraficoMensal(tk.Canvas):
         self.desenhar()
 
     def cores_barras(self):
-        """Recebidas na cor positiva (verde); entradas em tom neutro, para não competir com elas."""
+        """Recebidas na cor positiva (verde); entradas em nanquim apagado, para não competir com elas."""
         c = cores()
-        return {'entradas': misturar(c['secundario'], c['superficie'], 0.25), 'recebidas': c['verde']}
+        return {'entradas': misturar(c['secundario'], c['superficie'], 0.15), 'recebidas': c['verde']}
 
-    def barra_3d(self, x0, x1, y, base, profundidade, cor):
-        """Prisma: face frontal com brilho em faixas, topo mais claro e lateral mais escura."""
-        dx, dy = profundidade, profundidade * 0.6
-        self.create_polygon(x1, y, x1 + dx, y - dy, x1 + dx, base - dy, x1, base,
-                            fill=misturar(cor, '#000000', 0.38), outline='')
-        largura = (x1 - x0) / FAIXAS
-        for faixa in range(FAIXAS):
-            # Mais claro perto da borda esquerda, escurecendo para a direita, como luz lateral.
-            luz = 0.28 * (1 - faixa / (FAIXAS - 1)) - 0.12 * faixa / (FAIXAS - 1)
-            tom = misturar(cor, '#ffffff', luz) if luz >= 0 else misturar(cor, '#000000', -luz)
-            self.create_rectangle(x0 + faixa * largura, y, x0 + (faixa + 1) * largura + 0.5, base, fill=tom, outline='')
-        self.create_polygon(x0, y, x0 + dx, y - dy, x1 + dx, y - dy, x1, y,
-                            fill=misturar(cor, '#ffffff', 0.42), outline='')
-        self.create_line(x0, y, x1, y, fill=misturar(cor, '#ffffff', 0.6))
+    def barra(self, x0, x1, y, base, cor):
+        """Barra plana com o topo arredondado e um degradê vertical leve (mais clara no alto, como luz de cima)."""
+        largura = x1 - x0
+        raio = min(largura / 2, px(self, 5))
+        altura = base - y
+        if altura <= 0:
+            return
+        faixas = max(1, min(24, round(altura / 4)))
+        topo_reto = y + raio if altura > raio else y
+        for faixa in range(faixas):
+            inicio = topo_reto + (base - topo_reto) * faixa / faixas
+            fim = topo_reto + (base - topo_reto) * (faixa + 1) / faixas
+            tom = misturar(cor, '#ffffff', 0.16 * (1 - faixa / faixas))
+            self.create_rectangle(x0, inicio, x1, fim + 0.5, fill=tom, outline='')
+        if altura > raio:
+            # Topo: dois quartos de círculo e o miolo, na cor mais clara do degradê.
+            tom = misturar(cor, '#ffffff', 0.16)
+            self.create_arc(x0, y, x0 + 2 * raio, y + 2 * raio, start=90, extent=90, fill=tom, outline='')
+            self.create_arc(x1 - 2 * raio, y, x1, y + 2 * raio, start=0, extent=90, fill=tom, outline='')
+            self.create_rectangle(x0 + raio, y, x1 - raio, y + raio + 0.5, fill=tom, outline='')
 
     def desenhar(self):
         c = cores()
@@ -90,36 +95,28 @@ class GraficoMensal(tk.Canvas):
         self.barras = []
         p = lambda v: px(self, v)
         largura, altura = max(self.winfo_width(), p(500)), max(self.winfo_height(), p(240))
-        esquerda, direita, topo, base = p(44), p(24), p(34), p(34)
+        esquerda, direita, topo, base = p(44), p(16), p(28), p(34)
         topo_eixo = escala(max([max(e, r) for _, e, r in self.dados] + [0]))
         area = altura - topo - base
         grupo = (largura - esquerda - direita) / len(self.dados)
-        barra = min(p(40), grupo * 0.36)
-        profundidade = barra * 0.4
-        dx, dy = profundidade * 2, profundidade * 1.2  # Fundo do "palco" das barras.
+        barra = min(p(22), grupo * 0.28)
         piso = topo + area
-        # Parede do fundo e piso em perspectiva, com a grade em linhas finas.
-        self.create_polygon(esquerda, piso, esquerda + dx, piso - dy, largura - direita + dx * 0.4, piso - dy,
-                            largura - direita - dx * 0.6, piso, fill=misturar(c['superficie'], c['cabecalho'], 0.9), outline='')
         for passo in range(5):
             y = topo + area * passo / 4
-            cor = c['borda'] if passo == 4 else c['borda_suave']
-            self.create_line(esquerda + dx, y - dy, largura - direita + dx * 0.4, y - dy, fill=cor,
-                             dash=() if passo == 4 else (2, 4))
-            self.create_line(esquerda, y, esquerda + dx, y - dy, fill=c['borda_suave'])
-            self.create_text(esquerda - p(10), y, text=str(topo_eixo * (4 - passo) // 4), anchor='e',
+            self.create_line(esquerda, y, largura - direita, y, fill=c['borda'] if passo == 4 else c['borda_suave'],
+                             dash=() if passo == 4 else (1, 4))
+            self.create_text(esquerda - p(12), y, text=str(topo_eixo * (4 - passo) // 4), anchor='e',
                              fill=c['secundario'], font=(self.fonte, 9))
-        self.create_line(esquerda, topo, esquerda, piso, largura - direita - dx * 0.6, piso, fill=c['borda'])
         tons = self.cores_barras()
         for indice, (chave, entradas, recebidas) in enumerate(self.dados):
             centro = esquerda + grupo * (indice + 0.5)
-            for deslocamento, valor, cor in ((-barra / 2 - p(3), entradas, tons['entradas']),
-                                             (barra / 2 + p(3), recebidas, tons['recebidas'])):
+            for deslocamento, valor, cor in ((-barra / 2 - p(2), entradas, tons['entradas']),
+                                             (barra / 2 + p(2), recebidas, tons['recebidas'])):
                 if valor:
                     x0 = centro + deslocamento - barra / 2
                     y = piso - area * valor / topo_eixo
-                    self.barra_3d(x0, x0 + barra, y, piso, profundidade, cor)
-                    self.create_text(x0 + barra / 2 + profundidade / 2, y - profundidade * 0.6 - p(9), text=str(valor),
+                    self.barra(x0, x0 + barra, y, piso, cor)
+                    self.create_text(x0 + barra / 2, y - p(9), text=str(valor),
                                      fill=c['texto'] if cor == tons['recebidas'] else c['secundario'],
                                      font=(self.fonte, 9, 'bold'))
             self.create_text(centro, altura - base + p(18), text=rotulo_mes(chave), fill=c['secundario'],
@@ -135,8 +132,10 @@ class GraficoMensal(tk.Canvas):
         for inicio, fim, chave, entradas, recebidas in self.barras:
             if inicio <= evento.x < fim:
                 c = cores()
-                self.create_rectangle(inicio + 2, px(self, 8), fim - 2, self.winfo_height() - px(self, 30), fill='',
-                                      outline=c['borda'], dash=(3, 3), tags='destaque')
+                # Coluna do mês em tom suave, atrás das barras: o olho isola o mês sem que nada se mexa.
+                self.create_rectangle(inicio + 3, px(self, 10), fim - 3, self.winfo_height() - px(self, 30), fill=c['realce'],
+                                      outline='', tags='destaque')
+                self.tag_lower('destaque')
                 self.mes_destacado = (chave, entradas, recebidas)
                 self.event_generate('<<MesDestacado>>')
                 return
@@ -152,7 +151,7 @@ class JanelaGrafico:
         corpo.pack(fill='both', expand=True)
         # Toda a página (cabeçalho, legenda, gráfico e detalhe) fica numa coluna centralizada na janela.
         coluna = ttk.Frame(corpo)
-        coluna.pack(expand=True)
+        coluna.pack(anchor='n', pady=(8, 0))
         entradas = sum(e for _, e, _r in self.dados)
         recebidas = sum(r for _, _e, r in self.dados)
         aplicativo.cabecalho_pagina(coluna, 'Gráfico mensal',

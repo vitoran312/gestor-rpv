@@ -353,10 +353,11 @@ class AreaRolavel(ttk.Frame):
 class BalaoAjuda:
     """Ajuda ao passar o mouse: não muda o foco nem o controle de janelas modais."""
 
-    def __init__(self, widget, texto, atraso=600):
+    def __init__(self, widget, texto, atraso=600, condicao=None):
         self.widget = widget
         self.texto = texto
         self.atraso = atraso
+        self.condicao = condicao  # Só mostra quando condicao() for verdadeira (ex.: barra lateral recolhida).
         self.agendado = None
         self.janela = None
         widget.balao = self
@@ -379,6 +380,8 @@ class BalaoAjuda:
         if self.janela is not None or not self.widget.winfo_exists() or not self.widget.winfo_ismapped():
             return
         if hasattr(self.widget, 'instate') and self.widget.instate(['disabled']):
+            return
+        if self.condicao is not None and not self.condicao():
             return
         tela = tk.Toplevel(self.widget)
         self.janela = tela

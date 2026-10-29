@@ -1,21 +1,23 @@
 """Estilos ttk dos temas claro e escuro, criados uma única vez por modo."""
 from tkinter import font as tkfont
 
-from tema import PALETAS, cores
-from visual import aplicar_superficies, misturar, px
+from tema import cores
+from visual import aplicar_superficies, familia_titulo, misturar, px
 
 
 def criar_estilos(janela, estilo, fonte):
     c = cores()
     fundo, campo, texto = c['fundo'], c['campo'], c['texto']
     primario_texto = c['primario_texto']
+    # Títulos em serifa (Georgia no Windows): o tom editorial da identidade Ledger. Valores e interface em sem serifa.
+    serifa = familia_titulo(janela)
     estilo.configure('.', font=(fonte, 10), background=fundo, foreground=texto,
                      bordercolor=c['borda'], lightcolor=campo, darkcolor=campo, troughcolor=fundo,
                      focuscolor=c['marca'], selectbackground=c['selecao'], selectforeground=c['texto_selecao'])
     aplicar_superficies(janela)
 
     # Botões planos: secundário com contorno fino, principal preenchido com a cor da marca.
-    estilo.configure('TButton', padding=(16, 8), background=fundo, foreground=texto, anchor='center')
+    estilo.configure('TButton', padding=(16, 9), background=fundo, foreground=texto, anchor='center')
     estilo.map('TButton', background=[('disabled', fundo), ('!disabled', fundo)], foreground=[('disabled', c['desabilitado']), ('!disabled', texto)])
     for nome in ('Inicio.TButton', 'Inicio.Principal.TButton'):
         estilo.configure(nome, background=c['superficie'], padding=(16, 9))
@@ -52,7 +54,7 @@ def criar_estilos(janela, estilo, fonte):
 
     # Janela de nova entrada/edição, cerca de 30% maior (veja tela_registro.ampliar_formulario).
     estilo.configure('Form.TLabel', font=(fonte, 13))
-    estilo.configure('FormTitulo.TLabel', font=(fonte, 29, 'bold'), foreground=texto, background=fundo)
+    estilo.configure('FormTitulo.TLabel', font=(serifa, 27, 'bold'), foreground=texto, background=fundo)
     estilo.configure('FormDataCalculada.TLabel', background=fundo, font=(fonte, 13, 'bold'))
     estilo.map('FormDataCalculada.TLabel', background=[('disabled', fundo), ('!disabled', fundo)], foreground=[('disabled', c['desabilitado']), ('!disabled', texto)])
     estilo.configure('FormDinheiro.TLabel', background=campo, foreground=c['secundario'], font=(fonte, 13))
@@ -63,24 +65,47 @@ def criar_estilos(janela, estilo, fonte):
         estilo.configure('Form.' + tipo, padding=(13, 9), arrowsize=17)
 
     # Tela inicial: cartão em destaque, avisos em cartões e botão principal ampliado.
-    estilo.configure('DestaqueTitulo.TLabel', background=c['superficie'], foreground=texto, font=(fonte, 28, 'bold'))
-    estilo.configure('DestaqueTexto.TLabel', background=c['superficie'], foreground=c['secundario'], font=(fonte, 13))
-    estilo.configure('Destaque.Principal.TButton', background=c['superficie'], font=(fonte, 13, 'bold'), padding=(20, 13))
-    estilo.map('Destaque.Principal.TButton', background=[('disabled', c['superficie']), ('!disabled', c['superficie'])])
+    # Cartão de destaque da tela inicial: nanquim (herói) com título em marfim e o botão champanhe.
+    estilo.configure('Heroi.TFrame', background=c['heroi'])
+    estilo.configure('DestaqueTitulo.TLabel', background=c['heroi'], foreground=c['heroi_texto'], font=(serifa, 26, 'bold'))
+    estilo.configure('DestaqueTexto.TLabel', background=c['heroi'], foreground=c['heroi_secundario'], font=(fonte, 13))
+    estilo.configure('Destaque.Principal.TButton', background=c['heroi'], foreground=c['acento_texto'], font=(fonte, 13, 'bold'),
+                     padding=(20, 13))
+    estilo.map('Destaque.Principal.TButton', background=[('disabled', c['heroi']), ('!disabled', c['heroi'])],
+               foreground=[('disabled', c['desabilitado']), ('!disabled', c['acento_texto'])])
+
+    # Barra lateral: itens em marfim apagado que acendem sob o mouse; o ativo fica claro e em negrito.
+    estilo.configure('Lateral.TFrame', background=c['heroi'])
+    estilo.configure('LateralMarca.TLabel', background=c['heroi'], foreground=c['heroi_texto'], font=(serifa, 15, 'bold'))
+    estilo.configure('LateralEmpresa.TLabel', background=c['heroi'], foreground=c['heroi_secundario'], font=(fonte, 9))
+    estilo.configure('LateralSecao.TLabel', background=c['heroi'], foreground=misturar(c['heroi_secundario'], c['heroi'], 0.25),
+                     font=(fonte, 8, 'bold'))
+    estilo.configure('Lateral.TButton', background=c['heroi'], foreground=c['heroi_secundario'], font=(fonte, 10),
+                     anchor='w', padding=(14, 10))
+    estilo.map('Lateral.TButton', background=[('!disabled', c['heroi'])],
+               foreground=[('selected', c['heroi_texto']), ('active', c['heroi_texto']), ('!disabled', c['heroi_secundario'])],
+               font=[('selected', (fonte, 10, 'bold')), ('!selected', (fonte, 10))])
+    estilo.configure('Acento.TButton', background=c['heroi'], foreground=c['acento_texto'], font=(fonte, 10, 'bold'),
+                     anchor='center', padding=(14, 10))
+    estilo.map('Acento.TButton', background=[('!disabled', c['heroi'])],
+               foreground=[('disabled', c['desabilitado']), ('!disabled', c['acento_texto'])])
+    estilo.configure('LateralIndicador.TFrame', background=c['acento'])
     estilo.configure('InicioAtrasadas.TLabel', background=c['superficie'], foreground=c['vermelho'], font=(fonte, 11, 'bold'))
     estilo.configure('InicioBackup.TLabel', background=c['superficie'], foreground=c['vermelho'], font=(fonte, 10))
 
     # Tipografia: títulos neutros e firmes; a cor da marca fica reservada às ações.
     for nome, tamanho, peso, cor in (
         ('InicioTitulo.TLabel', 34, 'bold', texto),
-        ('Titulo.TLabel', 22, 'bold', texto), ('Subtitulo.TLabel', 11, 'normal', c['secundario']),
+        ('Titulo.TLabel', 24, 'bold', texto), ('Subtitulo.TLabel', 11, 'normal', c['secundario']),
         ('Discreto.TLabel', 9, 'normal', c['secundario'])):
         estilo.configure(nome, font=(fonte, tamanho, peso), foreground=cor, background=fundo)
+    estilo.configure('InicioTitulo.TLabel', font=(serifa, 34, 'bold'))
+    estilo.configure('Titulo.TLabel', font=(serifa, 24, 'bold'))
     estilo.configure('Superficie.TFrame', background=c['superficie'])
     for nome, tamanho, peso, cor in (
-        ('CartaoTitulo.TLabel', 15, 'bold', texto), ('CartaoTexto.TLabel', 10, 'normal', c['secundario']),
+        ('CartaoTitulo.TLabel', 16, 'bold', texto), ('CartaoTexto.TLabel', 10, 'normal', c['secundario']),
         ('ResumoTitulo.TLabel', 10, 'normal', c['secundario']),
-        ('ResumoValor.TLabel', 20, 'bold', texto), ('ResumoRealizado.TLabel', 20, 'bold', c['verde'])):
+        ('ResumoValor.TLabel', 22, 'bold', texto), ('ResumoRealizado.TLabel', 22, 'bold', c['verde'])):
         estilo.configure(nome, background=c['superficie'], font=(fonte, tamanho, peso), foreground=cor)
     estilo.configure('DataCalculada.TLabel', background=fundo, font=(fonte, 10, 'bold'))
     estilo.map('DataCalculada.TLabel', background=[('disabled', fundo), ('!disabled', fundo)], foreground=[('disabled', c['desabilitado']), ('!disabled', texto)])
@@ -121,11 +146,11 @@ def criar_estilos(janela, estilo, fonte):
                        lightcolor=[('focus', c['vermelho']), ('!focus', misturar(c['vermelho'], campo, 0.55))])
         estilo.configure('Form.Erro.' + tipo, padding=(13, 9), arrowsize=17)
     # Diálogos de uma operação (recebimento, previsão): título e o nome do titular logo abaixo.
-    estilo.configure('DialogoTitulo.TLabel', font=(fonte, 16, 'bold'), foreground=texto, background=fundo)
+    estilo.configure('DialogoTitulo.TLabel', font=(serifa, 18, 'bold'), foreground=texto, background=fundo)
     estilo.configure('DialogoSubtitulo.TLabel', font=(fonte, 10), foreground=c['secundario'], background=fundo)
     # Estado vazio das tabelas.
     estilo.configure('Vazio.TFrame', background=campo)
-    estilo.configure('VazioTitulo.TLabel', background=campo, foreground=texto, font=(fonte, 13, 'bold'))
+    estilo.configure('VazioTitulo.TLabel', background=campo, foreground=texto, font=(serifa, 14, 'bold'))
     estilo.configure('VazioTexto.TLabel', background=campo, foreground=c['secundario'], font=(fonte, 10))
 
     # Tabelas: linhas limpas, cabeçalho discreto e seleção em tom suave da marca.
@@ -139,7 +164,8 @@ def criar_estilos(janela, estilo, fonte):
     estilo.map('Treeview.Heading', background=[('active', c['ativo'])], foreground=[('active', texto)])
     estilo.configure('Operacoes.Treeview', font=(fonte, 12), rowheight=max(px(janela, 52), tkfont.Font(font=(fonte, 12)).metrics('linespace') + px(janela, 18)))
     # No claro, o cabeçalho cinza-claro precisa do negrito para se destacar das linhas.
-    estilo.configure('Operacoes.Treeview.Heading', font=(fonte, 18, 'bold') if c is PALETAS['claro'] else (fonte, 18))
+    # Cabeçalho discreto e firme: rótulos de coluna não competem com os valores da linha.
+    estilo.configure('Operacoes.Treeview.Heading', font=(fonte, 11, 'bold'), padding=(14, 12))
     estilo.configure('Operacoes.TCheckbutton', font=(fonte, 12), background=campo)
     estilo.map('Operacoes.TCheckbutton', background=[('active', c['ativo']), ('!disabled', campo)])
     estilo.configure('Recebido.TCheckbutton', foreground=c['verde'], font=(fonte, 12, 'bold'), background=campo)

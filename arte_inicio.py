@@ -85,7 +85,7 @@ class ArteVidro(tk.Canvas):
         self.atualizar_tema()
 
     def atualizar_tema(self):
-        self.configure(bg=cores()['superficie'])
+        self.configure(bg=cores()['heroi'])  # A arte fica sobre o cartão de destaque, em nanquim.
         self.imagens = imagens_vidro(self._root(), modo_atual())
         self.aplicado.clear()
         self.desenhar()

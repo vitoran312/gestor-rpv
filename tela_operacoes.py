@@ -151,7 +151,9 @@ class OperacoesMixin:
         self.titulos_colunas = {coluna: titulo for coluna, (titulo, _alinhamento) in COLUNAS_OPERACOES.items()}
         for coluna, (titulo, alinhamento) in COLUNAS_OPERACOES.items():
             self.tabela.heading(coluna, text=titulo, anchor=alinhamento, command=lambda c=coluna: self.ordenar_coluna(c))
-            largura = max(px(self.janela, 280 if coluna == 'nome' else 160), tkfont.Font(font=(self.fonte, 18)).measure(titulo) + px(self.janela, 40))
+            # Largura pelo maior entre o mínimo da coluna e o título no corpo do cabeçalho (11 pt, negrito).
+            largura = max(px(self.janela, 260 if coluna == 'nome' else 150),
+                          tkfont.Font(font=(self.fonte, 11, 'bold')).measure(titulo) + px(self.janela, 48))
             self.tabela.column(coluna, width=largura, minwidth=100, anchor=alinhamento)
         self.acoes_linhas = {}
         self.reposicionar_pendente = False
@@ -185,7 +187,7 @@ class OperacoesMixin:
         self.cartoes_resumo = []
         for chave, titulo in (('registros', 'Registros'), ('previsto', 'Lucro previsto'),
                              ('aberto', 'Capital investido em aberto'), ('realizado', 'Lucro realizado')):
-            cartao = ttk.Frame(self.resumo, style='Resumo.TFrame', padding=(20, 14, 20, 16))
+            cartao = ttk.Frame(self.resumo, style='Resumo.TFrame', padding=(24, 18, 24, 20))
             rotulo = ttk.Label(cartao, text=titulo, style='ResumoTitulo.TLabel', anchor='sw')
             cartao.columnconfigure(0, weight=1)
             rotulo.grid(row=0, column=0, sticky='sw')

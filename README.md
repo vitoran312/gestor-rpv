@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.53.0
+# Gestor de RPV — 0.54.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -16,31 +16,43 @@ python app.py
 O pacote `cryptography` protege os backups com senha; o executável já o traz embutido.
 
 Mantenha todos os arquivos `.py` e a pasta `recursos` juntos. Essa pasta contém o ícone da Vitoran Tech.
-A tela inicial tem os botões **Nova entrada**, **Minhas operações**,
-**Contas de recebimento** e **Sair**. A assinatura **Vitoran Tech · v0.32.0**, acompanhada do emblema com 50% de opacidade,
-aparece no canto inferior direito.
-O número é lido da versão do programa e acompanha cada atualização.
-O programa funciona em uma única janela, que abre maximizada. **Minhas operações**, **Contas de
-recebimento** e **Gráfico mensal** abrem como páginas dentro dela, com o botão **← Voltar** no topo
-(ou **Alt+←**) para retornar à página anterior. Formulários, confirmações, lixeira, calculadora e
-Sobre continuam como janelas pequenas por cima.
+O programa funciona em uma única janela, que abre maximizada, com uma **barra lateral** sempre visível:
+marca, **Nova entrada**, as páginas (**Início**, **Minhas operações**, **Contas de recebimento**,
+**Gráfico mensal**), as ferramentas (**Calculadora**, **Fazer backup**, **Exportar para Excel**) e, no rodapé,
+**Modo escuro / Modo claro**, **Sobre**, **Sair** e a versão. As páginas também têm **← Voltar** no topo
+(ou **Alt+←**). Formulários, confirmações, lixeira, calculadora e Sobre continuam como janelas pequenas
+por cima. A assinatura **Vitoran Tech · v…**, com o emblema a 50% de opacidade, fica no canto inferior
+direito da tela inicial; o número acompanha a versão do programa.
 
 ## Identidade visual
 
-Linguagem **Vitoran Pro**: base neutra, superfícies planas e um único acento de marca por tema.
-O modo claro usa cinzas frios (`#F5F6F8`, cartões brancos, texto `#14171F`) com ações em carmim (`#8C1D34`);
-o escuro usa grafite (`#0E1117`, superfícies `#161A22`) com ações em pêssego (`#FFA586`).
-Títulos ficam em tons neutros; a cor da marca é reservada às ações principais, ao foco e aos ícones.
-Recebimentos e lucro realizado continuam em verde. Todos os pares de texto e fundo atendem ao contraste WCAG AA. O botão **Modo escuro / Modo claro**, com ícones de lua e sol, alterna a
-aparência; o menu **Exibir** do histórico oferece as mesmas opções.
+Linguagem **Ledger**, de banco privado: tinta, papel e um acento champanhe.
 
-- Tela inicial com composição de até 1420 × 900, centralizada na janela: emblema Vitoran Tech à esquerda do título, cartão **Uma nova operação**
-  grande à esquerda, **Tudo sob controle** e **Contas de recebimento** empilhados à direita e o aviso de
-  atrasadas ou de backup logo abaixo. Em janelas estreitas, os cartões menores descem para baixo do principal.
-  Uma versão discreta do emblema, com 50% de opacidade, acompanha a assinatura no rodapé.
+- **Claro (porcelana):** fundo quente `#F4F2EC`, cartões brancos com sombra suave, texto em nanquim `#12161F`,
+  ação principal em nanquim (`#172030`) e detalhes em bronze (`#8A6A2E`).
+- **Escuro (nanquim):** fundo `#0B0E14`, superfícies `#121722`, texto marfim `#ECE6D8` e ação principal em
+  champanhe (`#D8B878`).
+- **Superfície herói:** a barra lateral e o cartão **Uma nova operação** usam nanquim (`#141B28` no claro,
+  `#121825` no escuro), com texto marfim e o botão champanhe. O vinho e o pêssego ficam só no emblema
+  Vitoran Tech.
+- **Tipografia:** títulos em serifa (Georgia no Windows; Cambria, Constantia ou DejaVu Serif como
+  alternativas) e interface, valores e tabelas em Segoe UI.
+- **Cores com significado:** recebimentos e lucro realizado continuam em verde, atrasadas em vermelho.
+  Todos os pares de texto e fundo atendem ao contraste WCAG AA.
+- **Tema:** o botão **Modo escuro / Modo claro**, na barra lateral, e o menu **Exibir** do histórico alternam
+  a aparência.
+
+- Barra lateral (`barra_lateral.py`) com ícones de linha desenhados pelo próprio programa (início, lista, banco,
+  barras, calculadora, envio, exportação, informação, saída). O item da página à frente fica aceso, com um
+  filete champanhe que desliza até ele em 200 ms. Abaixo de 1240 px de largura, a barra recolhe para só os
+  ícones, com o nome num balão ao passar o mouse.
+- Tela inicial com composição de até 1420 × 900, centralizada na área ao lado da barra: a data por extenso em
+  bronze acima do título em serifa, o cartão **Uma nova operação** em nanquim à esquerda, **Tudo sob controle**
+  e **Contas de recebimento** empilhados à direita e o aviso de atrasadas ou de backup logo abaixo. Em janelas
+  estreitas, os cartões menores descem para baixo do principal.
 - Arte de placas de vidro translúcidas no cartão **Uma nova operação**, no espaço livre à direita dos textos.
   Ao abrir o programa, as placas surgem em sequência durante cerca de 4 segundos, com leve deslocamento e
-  bordas que acendem em pêssego (carmim no tema claro); depois ficam paradas.
+  bordas que acendem em champanhe sobre o nanquim; depois ficam paradas.
   Atrás da tela inicial, duas luzes translúcidas e fixas nas cores do tema.
   Trocar de tema só troca as cores, sem reiniciar a animação.
   As imagens ficam em `recursos/vidro-*.png` e `recursos/luz-*.png`, geradas por
@@ -54,7 +66,8 @@ aparência; o menu **Exibir** do histórico oferece as mesmas opções.
   depois do redesenho. Cartões, botões e filtros usam imagens do tamanho real das superfícies, que o
   Windows desenha de uma vez, em vez de centenas de pedaços pequenos.
   Para medir a troca no Windows, rode o fluxo **Medir troca de tema** em Actions (`scripts/medir_tema.py`).
-- Botões e cartões planos, sem sombras, com contorno de 1 px e cantos de 8 a 12 px.
+- Cartões com sombra suave gerada no próprio programa (mais quente e leve no claro, mais densa no escuro),
+  contorno de 1 px e cantos de 14 a 20 px; botões com cantos de 8 a 10 px.
   Campos com contorno fino e anel de 2 px na cor da marca quando em foco.
   Barras de rolagem finas, sem setas.
   Os botões não mostram retângulo tracejado após o clique; a navegação por
@@ -65,8 +78,10 @@ aparência; o menu **Exibir** do histórico oferece as mesmas opções.
   linhas das tabelas e quebras de texto acompanham a escala.
 - Minhas operações na ordem de um painel financeiro: cabeçalho compacto (Voltar ao lado do título), quatro
   indicadores em cartões no topo, busca com lupa e texto de exemplo (× limpa), filtros, a tabela e, no rodapé,
-  o último backup e a **Lixeira** (ícone e nome). Cabeçalhos de 18 pontos em tom discreto e entradas de 12
-  pontos, linhas alternadas; nomes e contas à esquerda, valores à direita e datas centralizadas.
+  o último backup e a **Lixeira** (ícone e nome). Cabeçalhos de 11 pontos em negrito e tom discreto, entradas
+  de 12 pontos, linhas alternadas; nomes e contas à esquerda, valores à direita e datas centralizadas.
+- Gráfico mensal com barras planas de topo arredondado e degradê leve (entradas em nanquim apagado,
+  recebidas em verde); passar o mouse destaca a coluna do mês num tom suave, sem mover nada.
   Lucro realizado é o último cartão, à direita, inclusive no layout com duas linhas.
 - Tabelas com realce da linha sob o mouse (inclusive nas atrasadas e recebidas, num tom mais forte da própria
   cor) e estado vazio que explica o que aconteceu: busca sem resultado, filtro sem operações, lixeira vazia,

@@ -63,6 +63,9 @@ class NavegacaoMixin:
         # A barra de menus age sobre a tabela de operações, por isso só aparece nessa página.
         menus = self.menus
         self.janela.configure(menu=menus['barra'] if menus and atual is self.historico else '')
+        barra = getattr(self, 'barra_lateral', None)
+        if barra is not None and barra.winfo_exists() and getattr(self, 'inicio', None) is not None:
+            barra.pagina_mudou(atual, self.inicio)
 
     def pagina_reexibida(self):
         atual = self.pagina_atual()

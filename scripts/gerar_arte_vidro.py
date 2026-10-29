@@ -24,8 +24,9 @@ PLACAS = (
     dict(queda=0.14, vidro=(0.16, 0.05), borda=0.60, brilho=0.20),
     dict(queda=0.13, vidro=(0.22, 0.07), borda=0.95, brilho=0.34),
 )
-CORES = {'escuro': (255, 165, 134), 'claro': (140, 29, 52)}  # Pêssego e carmim da paleta Vitoran Pro.
-INTENSIDADE = {'escuro': 1.0, 'claro': 0.75}                   # No claro, o vidro escuro pesaria demais.
+# Champanhe da identidade Ledger nos dois temas: as placas ficam sobre o cartão de destaque, sempre em nanquim.
+CORES = {'escuro': (216, 184, 120), 'claro': (216, 184, 120)}
+INTENSIDADE = {'escuro': 1.0, 'claro': 0.9}
 
 
 def contorno(queda):
@@ -78,8 +79,8 @@ def com_opacidade(imagem, fracao):
 
 LUZ = 520  # Lado de cada mancha de luz.
 # Por tema: (cor, opacidade no centro) de cada mancha. No claro, tons mais leves para não sujar o fundo.
-LUZES = {'escuro': (((255, 165, 134), 0.16), ((181, 26, 43), 0.24)),
-         'claro': (((140, 29, 52), 0.07), ((255, 165, 134), 0.22))}
+LUZES = {'escuro': (((216, 184, 120), 0.10), ((52, 74, 128), 0.22)),
+         'claro': (((23, 32, 48), 0.05), ((216, 184, 120), 0.24))}
 
 
 def luz(cor, opacidade):

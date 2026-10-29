@@ -1,4 +1,5 @@
-"""Elementos Vitoran Pro: superfícies planas, cantos suaves e ícones, só com a biblioteca padrão."""
+"""Elementos da identidade Ledger: superfícies com sombra suave, cantos arredondados e ícones, só com a
+biblioteca padrão (as imagens são PNGs gerados aqui mesmo)."""
 import math
 import struct
 import zlib
@@ -21,6 +22,16 @@ def familia_fonte(raiz):
     disponiveis = {f.casefold() for f in tkfont.families(raiz)}
     raiz._familia_pro = next((f for f in ('Segoe UI', 'Inter', 'DejaVu Sans', 'Liberation Sans', 'Helvetica') if f.casefold() in disponiveis), tkfont.nametofont('TkDefaultFont').actual('family'))
     return raiz._familia_pro
+
+
+def familia_titulo(raiz):
+    """Serifada para títulos (o tom editorial de um banco privado); sem nenhuma instalada, a mesma da interface."""
+    raiz = raiz._root()
+    if not hasattr(raiz, '_familia_titulo'):
+        disponiveis = {f.casefold() for f in tkfont.families(raiz)}
+        raiz._familia_titulo = next((f for f in ('Georgia', 'Cambria', 'Constantia', 'DejaVu Serif', 'Liberation Serif')
+                                     if f.casefold() in disponiveis), familia_fonte(raiz))
+    return raiz._familia_titulo
 
 
 def fator_escala(widget):
@@ -61,6 +72,53 @@ def _mascara_arredondada(largura, altura, raio):
     return tuple(mascara)
 
 
+def _distancia_retangulo(x, y, x0, y0, x1, y1, raio):
+    """Distância com sinal até um retângulo arredondado (negativa dentro)."""
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    qx, qy = abs(x - cx) - ((x1 - x0) / 2 - raio), abs(y - cy) - ((y1 - y0) / 2 - raio)
+    return math.hypot(max(qx, 0), max(qy, 0)) + min(max(qx, qy), 0) - raio
+
+
+def margens_sombra(sombra):
+    """(esquerda, topo, direita, base) que a sombra ocupa em volta da superfície."""
+    if not sombra:
+        return (0, 0, 0, 0)
+    _cor, alcance, queda, _opacidade = sombra
+    return (alcance, max(0, alcance - queda), alcance, alcance + queda)
+
+
+def _pixels_com_sombra(cor, contorno, raio, largura, altura, sombra):
+    """Linhas RGBA de uma superfície com sombra: a forma fica recuada pelas margens e a sombra se espalha
+    em volta, mais forte embaixo (luz vinda de cima), caindo suavemente até zero no alcance."""
+    cor_sombra, alcance, queda, opacidade = sombra
+    esquerda, topo, direita, base = margens_sombra(sombra)
+    x0, y0, x1, y1 = esquerda, topo, largura - direita, altura - base
+    rgb, borda, escura = _rgb(cor), _rgb(contorno or cor), _rgb(cor_sombra)
+    amostras = ((.25, .25), (.75, .25), (.25, .75), (.75, .75))
+    linhas = []
+    for y in range(altura):
+        linha = bytearray()
+        for x in range(largura):
+            dentro = miolo = 0
+            for dx, dy in amostras:
+                d = _distancia_retangulo(x + dx, y + dy, x0, y0, x1, y1, raio)
+                dentro += d <= 0
+                miolo += d <= -1
+            dentro, miolo = dentro / 4, miolo / 4
+            d_sombra = max(0.0, _distancia_retangulo(x + .5, y + .5 - queda, x0, y0, x1, y1, raio))
+            alfa_sombra = opacidade * math.exp(-3.2 * (d_sombra / max(1, alcance)) ** 2) * (1 if d_sombra < alcance else 0)
+            peso = miolo / dentro if dentro else 0
+            superficie = [a * peso + b * (1 - peso) for a, b in zip(rgb, borda)]
+            alfa = dentro + alfa_sombra * (1 - dentro)
+            if alfa <= 0:
+                linha.extend((0, 0, 0, 0))
+                continue
+            mistura = [(s * dentro + e * alfa_sombra * (1 - dentro)) / alfa for s, e in zip(superficie, escura)]
+            linha.extend((*(round(v) for v in mistura), round(255 * alfa)))
+        linhas.append(linha)
+    return linhas
+
+
 def _codificar_png(largura, altura, dados):
     def bloco(nome, valor):
         return struct.pack('!I', len(valor)) + nome + valor + struct.pack('!I', zlib.crc32(nome + valor)&0xffffffff)
@@ -79,19 +137,22 @@ def _pixels_arredondados(cor, contorno, raio, largura, altura):
     return linhas
 
 
-@lru_cache(maxsize=48)
-def _png_arredondado(cor, contorno=None, raio=8, largura=40, altura=36):
+@lru_cache(maxsize=64)
+def _png_arredondado(cor, contorno=None, raio=8, largura=40, altura=36, sombra=None):
     """Superfície plana: preenchimento com contorno opcional de 1 px, sem sombra.
 
     Só os cantos dependem do raio; o resto repete a faixa reta central. Por isso a imagem grande é montada
     a partir de uma pequena, sem calcular pixel a pixel — o que permite gerar superfícies do tamanho real
     dos cartões e botões (veja aplicar_superficies).
     """
-    lado = raio + 2
+    esquerda, topo, direita, fundo_sombra = margens_sombra(sombra)
+    lado = raio + 2 + max(esquerda, topo, direita, fundo_sombra)
     # Em formatos de pílula (menores que dois cantos), aquela dimensão é calculada inteira, sem esticar.
     lx = lado if largura >= 2 * lado else None
     ly = lado if altura >= 2 * lado else None
-    base = _pixels_arredondados(cor, contorno, raio, 2 * lx if lx else largura, 2 * ly if ly else altura)
+    medidas = (2 * lx if lx else largura, 2 * ly if ly else altura)
+    base = (_pixels_com_sombra(cor, contorno, raio, *medidas, sombra) if sombra
+            else _pixels_arredondados(cor, contorno, raio, *medidas))
     def linha(j):
         pixels = base[j]
         if not lx:
@@ -139,11 +200,11 @@ def _png_recebido(c, selecionado):
     return _codificar_png(31, 26, dados)
 
 
-def icone_tema(raiz, modo):
+def icone_tema(raiz, modo, cor=None):
     """Lua para ativar o escuro e sol para ativar o claro, sem depender de uma fonte de símbolos."""
     cache = getattr(raiz, '_icones_modo', {})
     raiz._icones_modo = cache
-    cor = cores()['texto']
+    cor = cor or cores()['texto']
     chave = (modo, cor)
     if chave not in cache:
         rgb = _rgb(cor)
@@ -204,6 +265,48 @@ def icone_limpar(raiz, cor):
                                                                 _segmento(x, y, (10.5, 3.5), (3.5, 10.5))) <= .8, cor)
 
 
+def sombra_cartao(c):
+    """Sombra dos cartões: tinta quente e leve no claro; preta e mais densa no escuro, onde precisa aparecer."""
+    escuro = c['fundo'] < '#808080'
+    return (c['sombra'], 12, 4, 0.42 if escuro else 0.09)
+
+
+def _tracos(segmentos, aneis=(), largura=0.85):
+    """Desenho de linha: segmentos [(x0, y0, x1, y1)] e anéis [(cx, cy, raio)], com espessura uniforme."""
+    def dentro(x, y):
+        return (any(_segmento(x, y, (a, b), (c, d)) <= largura for a, b, c, d in segmentos)
+                or any(abs(math.hypot(x - cx, y - cy) - r) <= largura for cx, cy, r in aneis))
+    return dentro
+
+
+def _polilinha(*pontos):
+    return [(*pontos[i], *pontos[i + 1]) for i in range(len(pontos) - 1)]
+
+
+# Ícones da navegação, num quadro de 20 px: traço de 1,7 px, cantos simples, mesma família visual.
+DESENHOS = {
+    'inicio': _tracos(_polilinha((3, 10), (10, 3.5), (17, 10)) + _polilinha((5, 8.5), (5, 16.5), (15, 16.5), (15, 8.5))
+                      + _polilinha((8.5, 16.5), (8.5, 12), (11.5, 12), (11.5, 16.5))),
+    'operacoes': _tracos([(7, 5, 17, 5), (7, 10, 17, 10), (7, 15, 17, 15), (3, 5, 3.6, 5), (3, 10, 3.6, 10), (3, 15, 3.6, 15)]),
+    'contas': _tracos(_polilinha((3, 7.5), (10, 3), (17, 7.5), (3, 7.5)) + [(5.5, 9.5, 5.5, 14.5), (10, 9.5, 10, 14.5),
+                                                                      (14.5, 9.5, 14.5, 14.5), (3, 17, 17, 17)]),
+    'grafico': _tracos([(3, 17, 17, 17), (5.5, 14.5, 5.5, 10), (10, 14.5, 10, 5), (14.5, 14.5, 14.5, 8)]),
+    'calculadora': _tracos(_polilinha((4.5, 2.5), (15.5, 2.5), (15.5, 17.5), (4.5, 17.5), (4.5, 2.5))
+                           + [(7, 6, 13, 6), (7, 10, 7.4, 10), (10, 10, 10.4, 10), (13, 10, 13.4, 10), (7, 14, 7.4, 14),
+                              (10, 14, 10.4, 14), (13, 14, 13.4, 14)]),
+    'backup': _tracos(_polilinha((3, 12), (3, 17), (17, 17), (17, 12)) + [(10, 3, 10, 13)] + _polilinha((6, 7), (10, 3), (14, 7))),
+    'exportar': _tracos(_polilinha((11, 3), (5, 3), (5, 17), (15, 17), (15, 11)) + [(9, 11, 17, 3)] + _polilinha((12, 3), (17, 3), (17, 8))),
+    'sobre': _tracos([(10, 9, 10, 14.5), (10, 5.8, 10, 6.2)], [(10, 10, 7.5)]),
+    'sair': _tracos(_polilinha((11, 3), (4, 3), (4, 17), (11, 17)) + [(8, 10, 17, 10)] + _polilinha((13.5, 6.5), (17, 10), (13.5, 13.5))),
+    'nova': _tracos([(10, 4, 10, 16), (4, 10, 16, 10)], largura=1.0),
+}
+
+
+def icone_navegacao(raiz, nome, cor):
+    """Ícone de linha de 20 px para a barra lateral (veja DESENHOS)."""
+    return _icone_desenhado(raiz, 'nav-' + nome, 20, DESENHOS[nome], cor)
+
+
 def aplicar_superficies(raiz):
     """Imagens guardadas pela raiz; estilos nativos mantêm foco, teclado e acessibilidade."""
     c = cores()
@@ -227,7 +330,16 @@ def aplicar_superficies(raiz):
         imagens['filtro'] = tk.PhotoImage(master=raiz, data=_png_arredondado(c['fundo'], c['borda_suave'], 16, 240, 32))
         imagens['filtro_ativo'] = tk.PhotoImage(master=raiz, data=_png_arredondado(c['ativo'], c['borda'], 16, 240, 32))
         imagens['filtro_selecionado'] = tk.PhotoImage(master=raiz, data=_png_arredondado(c['realce'], c['marca'], 16, 240, 32))
-        imagens['cartao'] = tk.PhotoImage(master=raiz, data=_png_arredondado(c['superficie'], c['borda_suave'], 12, 1200, 800))
+        sombra = sombra_cartao(c)
+        imagens['cartao'] = tk.PhotoImage(master=raiz, data=_png_arredondado(c['superficie'], c['borda_suave'], 14, 1200, 800,
+                                                                             sombra))
+        # Barra lateral (fundo herói): itens planos que acendem sob o mouse; o ativo fica num tom mais claro.
+        for nome, cor, contorno in (('lateral', c['heroi'], None), ('lateral_hover', c['heroi_hover'], None),
+                                    ('lateral_ativo', c['heroi_ativo'], None), ('lateral_foco', c['heroi_hover'], c['acento']),
+                                    ('acento', c['acento'], None), ('acento_hover', c['acento_hover'], None),
+                                    ('acento_pressionado', c['acento_pressionado'], None),
+                                    ('acento_foco', c['acento_hover'], c['heroi_texto'])):
+            imagens[nome] = tk.PhotoImage(master=raiz, data=_png_arredondado(cor, contorno, 10, 480, 48))
         prefixo = 'Pro' + chave[1:]
         # Ordem dos estados: o primeiro que valer decide (desativado, pressionado, sob o mouse, com foco).
         for nome, normal, hover, pressionado, foco in (('secundario', 'botao', 'ativo', 'pressionado', 'foco'),
@@ -239,7 +351,19 @@ def aplicar_superficies(raiz):
                                   border=(10, 10, 10, 10), padding=0, width=40, height=36, sticky='nsew')
         estilo.element_create(prefixo + 'filtro', 'image', imagens['filtro'], ('selected', imagens['filtro_selecionado']),
                               ('active', imagens['filtro_ativo']), border=(16, 14, 16, 14), padding=0, width=40, height=32, sticky='nsew')
-        estilo.element_create(prefixo + 'cartao', 'image', imagens['cartao'], border=(14, 14, 14, 14), padding=0, width=48, height=48, sticky='nsew')
+        esquerda, topo, direita, base = margens_sombra(sombra)
+        # A sombra fica fora da área do conteúdo (padding), que começa na borda visível do cartão.
+        estilo.element_create(prefixo + 'cartao', 'image', imagens['cartao'],
+                              border=(16 + esquerda, 16 + topo, 16 + direita, 16 + base),
+                              padding=(esquerda, topo, direita, base), width=64, height=64, sticky='nsew')
+        estilo.element_create(prefixo + 'lateral', 'image', imagens['lateral'], ('pressed', imagens['lateral_ativo']),
+                              ('selected', imagens['lateral_ativo']), ('active', imagens['lateral_hover']),
+                              ('focus', imagens['lateral_foco']), border=(12, 12, 12, 12), padding=0, width=40, height=36,
+                              sticky='nsew')
+        estilo.element_create(prefixo + 'acento', 'image', imagens['acento'], ('disabled', imagens['inativo']),
+                              ('pressed', imagens['acento_pressionado']), ('active', imagens['acento_hover']),
+                              ('focus', imagens['acento_foco']), border=(12, 12, 12, 12), padding=0, width=40, height=36,
+                              sticky='nsew')
         for selecionado in (False, True):
             imagens['recebido' + str(selecionado)] = tk.PhotoImage(master=raiz, data=_png_recebido(c, selecionado))
         estilo.element_create(prefixo + 'recebido', 'image', imagens['recebidoFalse'],
@@ -247,7 +371,10 @@ def aplicar_superficies(raiz):
         cache[chave] = (prefixo, imagens)
     prefixo, _imagens = cache[chave]
     for nome, elemento in (('TButton', 'secundario'), ('Salvar.TButton', 'primario'),
-                          ('Principal.TButton', 'primario'), ('DiaSelecionado.TButton', 'primario'), ('Resultado.Calculadora.TButton', 'primario'), ('Menu.TButton', 'secundario')):
+                          ('Principal.TButton', 'primario'), ('DiaSelecionado.TButton', 'primario'),
+                          ('Resultado.Calculadora.TButton', 'primario'), ('Menu.TButton', 'secundario'),
+                          ('Lateral.TButton', 'lateral'), ('Acento.TButton', 'acento'),
+                          ('Destaque.Principal.TButton', 'acento')):
         estilo.layout(nome, [(prefixo + elemento, {'sticky': 'nsew', 'children': [
             ('Button.padding', {'sticky': 'nsew', 'children': [
                 ('Button.label', {'sticky': 'nsew'})]})]})])
@@ -277,17 +404,24 @@ def aplicar_superficies(raiz):
 
 
 class Icone(tk.Canvas):
-    def __init__(self, pai, nome):
+    """Ícone de linha num ladrilho de cantos arredondados; no cartão de destaque (heroi=True), sobre o nanquim."""
+
+    def __init__(self, pai, nome, heroi=False):
         super().__init__(pai, width=54, height=54, highlightthickness=0, bd=0)
         self.nome = nome
+        self.heroi = heroi
         self.atualizar_tema()
 
     def atualizar_tema(self):
         c = cores()
-        self.configure(bg=c['superficie'])
+        fundo = c['heroi'] if self.heroi else c['superficie']
+        self.configure(bg=fundo)
         self.delete('all')
-        self.create_oval(5, 5, 49, 49, fill=c['realce'], outline='')
-        linha = dict(fill=c['marca'], width=1.8, capstyle='round', joinstyle='round')
+        ladrilho = c['heroi_ativo'] if self.heroi else c['realce']
+        r = 12
+        self.create_polygon(5 + r, 5, 49 - r, 5, 49, 5, 49, 5 + r, 49, 49 - r, 49, 49, 49 - r, 49, 5 + r, 49, 5, 49,
+                            5, 49 - r, 5, 5 + r, 5, 5, fill=ladrilho, outline='', smooth=True)
+        linha = dict(fill=c['acento'] if self.heroi else c['marca'], width=1.8, capstyle='round', joinstyle='round')
         if self.nome == 'entrada':
             self.create_line(17, 14, 32, 14, 38, 20, 38, 40, 17, 40, 17, 14, **linha)
             self.create_line(31, 14, 31, 21, 38, 21, **linha)

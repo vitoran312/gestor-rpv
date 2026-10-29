@@ -83,10 +83,11 @@ class JanelaContas:
         aplicativo.abrir_pagina(self.tela, 'Contas de recebimento')
 
     def posicionar_cartao(self, evento):
-        """Metade da largura e pouco mais da metade da altura, sem ficar menor que os botões ou maior que a área."""
+        """Metade da largura e pouco mais da metade da altura, sem ficar menor que os botões ou maior que a área;
+        centralizado na largura e alinhado ao alto, logo abaixo do cabeçalho."""
         largura = min(evento.width, max(px(self.cartao, 660), evento.width // 2))
         altura = min(evento.height, max(px(self.cartao, 380), int(evento.height * 0.6)))
-        self.cartao.place(relx=0.5, rely=0.45, anchor='center', width=largura, height=altura)
+        self.cartao.place(relx=0.5, y=px(self.cartao, 8), anchor='n', width=largura, height=altura)
 
     def atualizar(self):
         for w in self.situacoes_labels.values(): w.destroy()

@@ -1,5 +1,23 @@
 # Histórico de versões
 
+## 0.54.0
+
+Nova identidade visual do programa, **Ledger** (só a camada de apresentação; regras, dados e fluxos iguais):
+- Paletas novas: porcelana e nanquim no claro, nanquim e marfim no escuro, acento champanhe; superfície
+  "herói" em nanquim para a barra lateral e o cartão de destaque. Contraste WCAG AA conferido.
+- Títulos em serifa (visual.familia_titulo); cartões com sombra suave embutida nas superfícies
+  (visual._png_arredondado com sombra, visual.sombra_cartao).
+- Barra lateral (barra_lateral.py): marca, Nova entrada (champanhe), páginas, ferramentas, tema, Sobre, Sair e
+  versão; ícones de linha desenhados no programa (visual.icone_navegacao); item ativo com filete que desliza
+  (200 ms, ease-out); recolhe para ícones abaixo de 1240 px. Tema, Sobre e Sair saíram da tela inicial.
+- Tela inicial: data por extenso em bronze, título em serifa, cartão Nova entrada em nanquim com o ícone num
+  ladrilho e as placas de vidro em champanhe (recursos/vidro-*.png e luz-*.png gerados de novo).
+- Gráfico mensal: barras planas de topo arredondado com degradê leve, no lugar do 3D; destaque do mês em
+  faixa suave; página alinhada ao alto. Contas: cartão alinhado ao alto.
+- Tabela de operações com cabeçalho de 11 pt em negrito; colunas medidas por ele.
+- Testes: test_barra_lateral.py; testes de layout e de estilo da tela inicial e das operações atualizados
+  para a nova identidade.
+
 ## 0.53.0
 
 Repaginada visual (identidade Vitoran Pro mantida):
