@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## 0.41.0
+
+- App do celular: o leitor de PDF passa a usar a versão do pdf.js feita para navegadores como o Safari do
+  iPhone (a anterior exigia recursos que nem todo iPhone tem). Se um PDF ainda assim não puder ser mostrado,
+  a mensagem traz o detalhe técnico, e "Compartilhar ou salvar" continua abrindo o arquivo em outro app.
+- A versão do app aparece na tela de abertura e em Mais, para conferir se o aparelho já carregou a última.
+
 ## 0.40.0
 
 - App do celular: PDFs abrem com a página inteira na largura da tela (antes apareciam em tamanho real,

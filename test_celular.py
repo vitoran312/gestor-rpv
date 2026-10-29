@@ -300,6 +300,12 @@ class TestArquivosDoApp(unittest.TestCase):
                       if c.is_file() and 'testes' not in c.parts and c.name != 'sw.js' and not c.name.startswith('LICEN')}
         self.assertEqual(publicados - set(arquivos), set())
 
+    def test_versao_mostrada_no_app_e_a_do_programa(self):
+        import re
+        from versao import VERSAO
+        texto = (RAIZ / 'celular' / 'app.js').read_text(encoding='utf-8')
+        self.assertEqual(re.search(r"const VERSAO_APP = '([^']+)'", texto).group(1), VERSAO)
+
     def test_manifesto_e_icones(self):
         import struct
         manifesto = json.loads((RAIZ / 'celular' / 'manifest.webmanifest').read_text(encoding='utf-8'))

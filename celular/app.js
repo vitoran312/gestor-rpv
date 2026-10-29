@@ -5,6 +5,9 @@
 'use strict';
 
 (() => {
+  // Igual a versao.py (test_celular confere): mostrada na abertura e em Mais, para saber se o aparelho já
+  // carregou a última versão publicada.
+  const VERSAO_APP = '0.41.0';
   const D = GestorDados;
   const $ = (id) => document.getElementById(id);
   const SITUACOES = { pendente: 'Pendente', atrasada: 'Atrasada', recebida: 'Recebida' };
@@ -463,7 +466,10 @@
     }).catch((erro) => {
       // Se o arquivo saiu do backup mas não pôde ser desenhado, "Compartilhar" ainda abre no visualizador do iPhone.
       area.replaceChildren(el('p', { class: 'erro', texto: erro instanceof LeitorBackup.ErroBackup ? erro.message
-        : 'Não foi possível mostrar o documento aqui. Use "Compartilhar ou salvar" para abrir em outro app.' }), acoes);
+        : 'Não foi possível mostrar o documento aqui. Use "Compartilhar ou salvar" para abrir em outro app.' }),
+      // Detalhe técnico (sem dados do documento), para um print explicar o que o aparelho recusou.
+      !(erro instanceof LeitorBackup.ErroBackup) && el('p', { class: 'discreto pequeno',
+        texto: `Detalhe: ${erro && erro.name ? erro.name : 'erro'}: ${erro && erro.message ? erro.message : erro}` }), acoes);
     });
     return [el('p', { class: 'discreto pequeno', texto: d.tipo === 'recebimento' ? 'Comprovante de recebimento' : 'Documento da entrada' }), area];
   }
@@ -587,7 +593,7 @@
     return [el('div', { class: 'menu' },
       opcao('#grafico', 'Gráfico mensal', 'Entradas e recebimentos dos últimos 12 meses'),
       opcao('#lixeira', `Lixeira (${dados.lixeira.length})`, 'Operações excluídas, só para consulta'),
-      opcao('#backup', 'Sobre este backup', 'Arquivo, data e versão do programa'),
+      opcao('#backup', 'Sobre este backup', `Arquivo, data e versão do programa · app ${VERSAO_APP}`),
       senhaRecente && !faceIdAtivo && el('div', { class: 'cartao' },
         el('div', { texto: 'Ativar o Face ID' }), el('div', { class: 'discreto pequeno', texto: 'Abrir o app com o rosto, sem digitar a senha' }),
         el('div', { class: 'botoes' }, el('button', { type: 'button', class: 'primario', texto: 'Ativar',
@@ -656,6 +662,8 @@
 
   $('voltar').addEventListener('click', () => history.back());
   window.addEventListener('hashchange', desenhar);
+
+  $('versao-app').textContent = `Versão ${VERSAO_APP}`;
 
   // ---- Abertura do app: com Face ID ativo, já pede o rosto ------------------------------------------------
   prepararAbertura().then((faceId) => {
