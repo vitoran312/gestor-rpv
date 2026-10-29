@@ -1,5 +1,10 @@
 # Histórico de versões
 
+## 0.46.0
+
+- App do celular: o logo da abertura fica cerca de 2,5 cm acima do centro, fora da área coberta pela janela de
+  confirmação do Face ID do iPhone.
+
 ## 0.45.0
 
 - App do celular: ao abrir, o logo aparece sozinho e o Face ID só é pedido depois da animação (a janela do

@@ -7,7 +7,7 @@
 (() => {
   // Igual a versao.py (test_celular confere): mostrada na abertura e em Mais, para saber se o aparelho já
   // carregou a última versão publicada.
-  const VERSAO_APP = '0.45.0';
+  const VERSAO_APP = '0.46.0';
   const D = GestorDados;
   const $ = (id) => document.getElementById(id);
   const SITUACOES = { pendente: 'Pendente', atrasada: 'Atrasada', recebida: 'Recebida' };
