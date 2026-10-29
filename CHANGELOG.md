@@ -9,7 +9,7 @@ Nova identidade visual do programa, **Ledger** (só a camada de apresentação; 
   (visual._png_arredondado com sombra, visual.sombra_cartao).
 - Barra lateral (barra_lateral.py): marca, Nova entrada (champanhe), páginas, ferramentas, tema, Sobre, Sair e
   versão; ícones de linha desenhados no programa (visual.icone_navegacao); item ativo com filete que desliza
-  (200 ms, ease-out); recolhe para ícones abaixo de 1240 px. Tema, Sobre e Sair saíram da tela inicial.
+  (200 ms, ease-out); recolhe para ícones abaixo de 1360 px. Tema, Sobre e Sair saíram da tela inicial.
 - Tela inicial: data por extenso em bronze, título em serifa, cartão Nova entrada em nanquim com o ícone num
   ladrilho e as placas de vidro em champanhe (recursos/vidro-*.png e luz-*.png gerados de novo).
 - Gráfico mensal: barras planas de topo arredondado com degradê leve, no lugar do 3D; destaque do mês em

@@ -16,7 +16,7 @@ from visual import icone_navegacao, px
 
 LARGURA = 236
 RECOLHIDA = 76
-LIMITE_RECOLHER = 1240  # Largura da janela (a 100% de escala) abaixo da qual a barra mostra só os ícones.
+LIMITE_RECOLHER = 1360  # Largura da janela (a 100% de escala) abaixo da qual a barra mostra só os ícones.
 TITULOS_PAGINAS = {'Minhas operações': 'historico', 'Contas de recebimento': 'contas', 'Gráfico mensal': 'grafico'}
 
 

@@ -44,7 +44,7 @@ Linguagem **Ledger**, de banco privado: tinta, papel e um acento champanhe.
 
 - Barra lateral (`barra_lateral.py`) com ícones de linha desenhados pelo próprio programa (início, lista, banco,
   barras, calculadora, envio, exportação, informação, saída). O item da página à frente fica aceso, com um
-  filete champanhe que desliza até ele em 200 ms. Abaixo de 1240 px de largura, a barra recolhe para só os
+  filete champanhe que desliza até ele em 200 ms. Abaixo de 1360 px de largura, a barra recolhe para só os
   ícones, com o nome num balão ao passar o mouse.
 - Tela inicial com composição de até 1420 × 900, centralizada na área ao lado da barra: a data por extenso em
   bronze acima do título em serifa, o cartão **Uma nova operação** em nanquim à esquerda, **Tudo sob controle**
