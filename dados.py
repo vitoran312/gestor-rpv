@@ -683,6 +683,21 @@ class Banco:
                             (identificador, atual, nova_data, datetime.now().astimezone().isoformat(timespec='seconds')))
             con.execute('UPDATE rpvs SET previsao_atual_definida=? WHERE id=?', (nova_data, identificador))
 
+    def anexar(self, identificador, anexos):
+        """Documentos novos numa entrada já cadastrada (por exemplo, fotografados no app do celular)."""
+        criados = []
+        try:
+            with self.conectar() as con:
+                con.execute('BEGIN IMMEDIATE')
+                registro = con.execute('SELECT lixeira_em FROM rpvs WHERE id=?', (identificador,)).fetchone()
+                if registro is None or registro['lixeira_em']:
+                    raise ValueError('Registro não encontrado na lista ativa.')
+                self.copiar_anexos(con, identificador, anexos, criados)
+        except Exception:
+            for arquivo in criados:
+                arquivo.unlink(missing_ok=True)
+            raise
+
     def copiar_anexos(self, con, identificador, anexos, criados, tipo='entrada'):
         if tipo not in ('entrada', 'recebimento'):
             raise ValueError('Tipo de documento inválido.')

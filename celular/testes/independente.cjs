@@ -7,7 +7,7 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
 
 (async () => {
   const [endereco, entradaJson] = process.argv.slice(2);
-  const { senha, conta, entrada, hoje, senhas_ruins: senhasRuins, nomes, senhas_regra: senhasRegra } = JSON.parse(entradaJson);
+  const { senha, conta, entrada, segunda, hoje, senhas_ruins: senhasRuins, nomes, senhas_regra: senhasRegra } = JSON.parse(entradaJson);
   const navegador = await playwright[NAVEGADOR].launch();
   const r = {};
   try {
@@ -77,6 +77,63 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
     await pagina.click('text=Registrar recebimento');
     await pagina.waitForFunction(() => !document.querySelector('form.recebimento'));
     r.detalhe_recebido = await texto();
+
+    // 3b. Segunda entrada, já com um PDF e uma foto; depois editada, com nova previsão, mais uma foto, excluída
+    // e restaurada da lixeira.
+    await ir('#nova');
+    await pagina.fill('[name="nome"]', segunda.nome);
+    await pagina.fill('[name="aquisicao"]', entrada.aquisicao);
+    await pagina.fill('[name="custo"]', segunda.custo);
+    await pagina.fill('[name="previsto"]', segunda.previsto);
+    await pagina.selectOption('[name="conta"]', { index: 1 });
+    await pagina.fill('[name="previsao"]', segunda.previsao);
+    await pagina.setInputFiles('[name="documentos"]', [
+      { name: 'Ofício.pdf', mimeType: 'application/pdf', buffer: Buffer.from(segunda.pdf, 'base64') },
+      { name: 'image.png', mimeType: 'image/png', buffer: Buffer.from(segunda.png, 'base64') }]);
+    await pagina.click('text=Salvar entrada');
+    await pagina.waitForFunction(() => location.hash.startsWith('#operacao/'));
+    await pagina.waitForSelector('text=Excluir operação');
+    const segundaId = await pagina.evaluate(() => location.hash.split('/')[1]);
+    r.segunda_criada = await texto();
+    await ir(`#editar/${segundaId}`);
+    await pagina.fill('[name="previsto"]', segunda.novo_previsto);
+    await pagina.fill('[name="observacoes"]', 'editada no celular');
+    await pagina.click('text=Salvar alterações');
+    await pagina.waitForFunction((id) => location.hash === `#operacao/${id}`, segundaId);
+    await pagina.waitForSelector('text=Excluir operação');
+    await pagina.click('details.acao summary');
+    await pagina.fill('[name="nova_previsao"]', segunda.nova_previsao);
+    await pagina.click('text=Salvar nova previsão');
+    await pagina.waitForSelector('text=A previsão nunca foi alterada.', { state: 'detached' });
+    const documentos = () => pagina.evaluate(() => document.querySelectorAll('#tela a[href^="#documento/"]').length);
+    await pagina.setInputFiles('[name="anexar"]', { name: 'Recibo.png', mimeType: 'image/png', buffer: Buffer.from(segunda.png, 'base64') });
+    await pagina.waitForFunction(() => document.querySelectorAll('#tela a[href^="#documento/"]').length === 3);
+    r.segunda_editada = await texto();
+    // A foto anexada agora abre na tela (o anexo saiu do pacote regravado).
+    await pagina.click('text=Recibo.jpg');
+    await pagina.waitForFunction(() => document.querySelector('.documento img') && document.querySelector('.documento img').naturalWidth > 0,
+      null, { timeout: 20000 });
+    r.foto_aberta = true;
+    await ir(`#operacao/${segundaId}`);
+    pagina.once('dialog', (d) => d.accept());
+    await pagina.click('text=Excluir operação');
+    await pagina.waitForFunction(() => location.hash === '#operacoes');
+    await pagina.waitForSelector('text=+ Nova entrada');
+    r.operacoes_sem_segunda = await texto();
+    await ir('#lixeira');
+    r.lixeira = await texto();
+    await ir(`#operacao/${segundaId}`);
+    await pagina.click('text=Restaurar da lixeira');
+    await pagina.waitForSelector('text=Excluir operação');
+    r.restaurada = await texto();
+    r.documentos_restaurada = await documentos();
+    // Agenda: avança os meses até o da nova previsão e toca no dia.
+    await ir('#agenda');
+    for (let i = 0; i < 36 && await pagina.textContent('.mes-agenda .nome') !== segunda.mes_previsao; i += 1) {
+      await pagina.click('[aria-label="Próximo mês"]');
+    }
+    await pagina.click(`[data-dia="${segunda.nova_previsao}"]`);
+    r.agenda = await texto();
     await ir('#inicio');
     r.inicio_com_dados = await texto();
 
@@ -96,6 +153,8 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
     await pagina.waitForSelector('#aplicativo:not([hidden])', { timeout: 120000 });
     await ir('#operacoes');
     r.operacoes_depois = await texto();
+    await ir(`#operacao/${segundaId}`);
+    r.documentos_depois = await documentos();
     await ir('#copia');
     r.copia = await texto();
     await ir('#convite');

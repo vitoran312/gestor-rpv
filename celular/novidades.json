@@ -1,6 +1,28 @@
 {
   "versoes": [
     {
+      "versao": "0.50.0",
+      "resumo": "4 novidades",
+      "itens": [
+        {
+          "tipo": "novidade",
+          "texto": "Celular: editar os dados de uma entrada, alterar a previsão e excluir operações pelo app."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: anexar fotos (direto da câmera) e PDFs às operações e às entradas novas."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: agenda das previsões — calendário do mês e, no Início, quantas vencem hoje, amanhã e nos próximos 7 dias, além das atrasadas."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Programa: importa do celular alterações, previsões, exclusões e documentos, sem gravar por cima do que mudou no computador."
+        }
+      ]
+    },
+    {
       "versao": "0.49.0",
       "resumo": "4 novidades",
       "itens": [
@@ -57,16 +79,6 @@
         {
           "tipo": "correcao",
           "texto": "Celular: o logo da abertura ficava atrás da janela do Face ID; agora fica mais alto, à vista."
-        }
-      ]
-    },
-    {
-      "versao": "0.45.0",
-      "resumo": "1 correção",
-      "itens": [
-        {
-          "tipo": "correcao",
-          "texto": "Celular: a janela do Face ID cobria a animação de abertura; agora o logo aparece primeiro e o Face ID vem logo depois, com o logo ao fundo."
         }
       ]
     }

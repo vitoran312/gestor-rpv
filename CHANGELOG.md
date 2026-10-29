@@ -1,5 +1,21 @@
 # Histórico de versões
 
+## 0.50.0
+
+App do celular:
+- Operação: "Alterar previsão" (a anterior fica no histórico), "Editar dados da entrada" (mesmas regras do
+  programa) e "Excluir operação" (vai para a lixeira; quem usa só o celular pode restaurar).
+- "+ Anexar foto ou PDF" na operação e "Documentos" na entrada nova: a câmera abre direto; fotos são reduzidas
+  (lado maior até 2000 px, JPEG) e PDFs vão como estão (até 25 MB).
+- Agenda: no Início, atrasadas, hoje, amanhã e próximos 7 dias (com os nomes de hoje e amanhã); em Agenda, o
+  calendário do mês com as previsões de cada dia.
+- "Enviar todos para o computador" na lista do que aguarda o computador.
+
+Programa:
+- Importa do celular alterações, novas previsões, exclusões e documentos. Cada mudança traz os valores que o
+  celular via: só os campos mudados são gravados, e se a operação mudou no computador depois daquele backup a
+  mudança é recusada com aviso (e não volta a ser perguntada).
+
 ## 0.49.0
 
 App do celular para quem não usa o computador:

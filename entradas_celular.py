@@ -1,4 +1,4 @@
-"""Entradas e contas de recebimento cadastradas no app do celular, trazidas por arquivos ".rpvcelular".
+"""Entradas, contas e mudanças feitas no app do celular, trazidas por arquivos ".rpvcelular".
 
 O app grava cada entrada num arquivo pequeno, cifrado com a chave do backup que estava aberto nele (o mesmo
 formato de cifra.py), e a pessoa salva esse arquivo na pasta do backup automático (por exemplo, no Google
@@ -6,28 +6,57 @@ Drive). Aqui o programa encontra esses arquivos, abre com a senha dos backups, c
 do formulário e, depois da confirmação, grava as entradas. Cada entrada tem um identificador próprio, anotado
 nas configurações depois de importada: o mesmo arquivo nunca entra duas vezes, e o próximo backup leva essa
 lista ao celular, que então apaga a cópia que guardava.
+
+Além de entradas e contas novas, o celular manda mudanças em operações que já existem: alteração dos dados,
+nova previsão, exclusão (vai para a lixeira) e documentos anexados. Cada mudança leva os valores que o celular
+via; se a operação mudou no computador depois daquele backup, a mudança não é aplicada (o computador não perde
+o que foi feito nele) e a pessoa é avisada.
 """
+import base64
+import binascii
 import json
 import os
 import re
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 
 import cifra
 from backup import PASTA_AUTOMATICA, senha_salva
 from dados import CAMPOS_CONTA, data_br, normalizar, reais
 from diario import log
+from documentos import EXTENSOES
 
 EXTENSAO = '.rpvcelular'
 FORMATO = 'gestor-rpv-celular'
 IMPORTADAS = 'entradas_celular_importadas'
 PASTA_IMPORTADOS = 'importados-do-celular'
-LIMITE_ARQUIVO = 1024 * 1024  # Uma entrada tem poucos KB; mais que isso não é um arquivo do app.
+LIMITE_ARQUIVO = 40 * 1024 * 1024  # Uma entrada tem poucos KB; um documento, até uns 25 MB (PDF) em base64.
 IDENTIFICADOR = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
 CAMPOS = {'id': str, 'nome': str, 'aquisicao': str, 'custo': int, 'previsto': int, 'conta_id': int, 'conta': str,
           'previsao': str, 'comissao': (int, type(None)), 'observacoes': str, 'criada_em': str}
 CAMPOS_DA_CONTA = {'id': str, 'criada_em': str, **{campo: str for campo in CAMPOS_CONTA}}
-TIPOS = {'entrada': CAMPOS, 'conta': CAMPOS_DA_CONTA}
+# Campos de uma operação que o celular pode alterar (os valores como estão gravados no banco).
+CAMPOS_EDITAVEIS = {'nome': str, 'aquisicao': str, 'custo': int, 'previsto': int, 'conta_id': (int, type(None)),
+                    'conta': str, 'previsao': str, 'comissao': (int, type(None)), 'observacoes': str}
+TITULOS_EDITAVEIS = {'nome': 'titular', 'aquisicao': 'data de aquisição', 'custo': 'valor de aquisição',
+                     'previsto': 'Valor Total RPV', 'conta_id': 'conta de destino', 'conta': 'conta de destino',
+                     'previsao': 'previsão inicial', 'comissao': 'comissão', 'observacoes': 'observações'}
+MUDANCA = {'id': str, 'operacao_id': int, 'nome': str, 'criada_em': str}
+TIPOS = {
+    'entrada': CAMPOS, 'conta': CAMPOS_DA_CONTA,
+    'alteracao': {**MUDANCA, 'antes': dict, 'depois': dict},
+    'previsao': {**MUDANCA, 'anterior': str, 'nova': str},
+    'exclusao': MUDANCA,
+    'anexo': {**MUDANCA, 'arquivo': str, 'conteudo': str},
+}
+OPCIONAIS = {'entrada': {'anexos': list}}  # Documentos que vêm junto com uma entrada nova.
+DOCUMENTO = {'arquivo': str, 'conteudo': str}
+# Ordem de importação: contas antes das entradas que as usam, e mudanças depois das entradas.
+ORDEM = {'conta': 0, 'entrada': 1, 'alteracao': 2, 'previsao': 3, 'anexo': 4, 'exclusao': 5}
+NOMES_TIPOS = {'entrada': ('entrada', 'entradas'), 'conta': ('conta de recebimento', 'contas de recebimento'),
+               'alteracao': ('alteração', 'alterações'), 'previsao': ('nova previsão', 'novas previsões'),
+               'anexo': ('documento', 'documentos'), 'exclusao': ('exclusão', 'exclusões')}
 
 
 def importadas(banco):
@@ -68,14 +97,46 @@ def ler(caminho, senha):
         raise ValueError('O arquivo do celular está incompleto.')
     tipo = tipos[0]
     registro = pacote[tipo]
-    if not isinstance(registro, dict) or set(registro) != set(TIPOS[tipo]):
+    if not conforme(registro, TIPOS[tipo], OPCIONAIS.get(tipo, {})) or not IDENTIFICADOR.fullmatch(registro['id']):
         raise ValueError('O arquivo do celular está incompleto.')
-    for campo, classe in TIPOS[tipo].items():
-        if not isinstance(registro[campo], classe) or isinstance(registro[campo], bool):
+    registro = {**registro, 'tipo': tipo}
+    if tipo == 'alteracao' and not all(conforme(registro[lado], CAMPOS_EDITAVEIS) for lado in ('antes', 'depois')):
+        raise ValueError('O arquivo do celular está incompleto.')
+    if tipo == 'anexo':
+        registro['conteudo'] = documento(registro)
+    if tipo == 'entrada':
+        anexos = registro.get('anexos', [])
+        if not all(conforme(a, DOCUMENTO) for a in anexos):
             raise ValueError('O arquivo do celular está incompleto.')
-    if not IDENTIFICADOR.fullmatch(registro['id']):
-        raise ValueError('O arquivo do celular está incompleto.')
-    return {**registro, 'tipo': tipo}
+        registro['anexos'] = [{'arquivo': a['arquivo'], 'conteudo': documento(a)} for a in anexos]
+    return registro
+
+
+def conforme(registro, esquema, opcionais=None):
+    """O registro tem exatamente os campos do esquema (mais os opcionais presentes), cada um do tipo certo."""
+    opcionais = opcionais or {}
+    if not isinstance(registro, dict) or not set(esquema) <= set(registro) <= set(esquema) | set(opcionais):
+        return False
+    tipos = {**esquema, **opcionais}
+    return all(isinstance(valor, tipos[campo]) and not isinstance(valor, bool) for campo, valor in registro.items())
+
+
+def documento(registro):
+    """Bytes de um documento mandado pelo celular (em base64), com nome e tipo aceitos pelo programa."""
+    nome_do_documento(registro['arquivo'])
+    try:
+        return base64.b64decode(registro['conteudo'], validate=True)
+    except (binascii.Error, ValueError):
+        raise ValueError('Um documento do arquivo do celular está ilegível.') from None
+
+
+def nome_do_documento(arquivo):
+    """Nome seguro para gravar no Windows: sem pastas nem caracteres proibidos, e só PDF ou imagem."""
+    nome = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '', arquivo.replace('\\', '/').rsplit('/', 1)[-1]).strip(' .')[-120:]
+    extensao = Path(nome).suffix.lower()
+    if extensao not in EXTENSOES:
+        raise ValueError('O celular mandou um documento que não é PDF nem imagem.')
+    return nome if Path(nome).stem.strip(' .') else 'documento' + extensao
 
 
 def procurar(banco, pasta=None):
@@ -121,55 +182,163 @@ def guardar(arquivo):
 
 
 def importar(banco, encontradas):
-    """Grava contas e entradas. Devolve (importadas, problemas): a quantidade gravada e (nome, mensagem) das
-    recusadas. As contas vêm primeiro: uma entrada feita no celular com uma conta nova a encontra já cadastrada."""
+    """Grava contas, entradas e mudanças. Devolve (importadas, problemas): a quantidade gravada e (nome, mensagem)
+    das recusadas. As contas vêm primeiro: uma entrada feita no celular com uma conta nova a encontra já cadastrada.
+
+    Uma entrada ou conta recusada continua na pasta (corrigida no celular, chega de novo); uma mudança recusada
+    (a operação mudou no computador, ou saiu da lista) não teria como dar certo depois: sai da pasta como as
+    importadas, para não ser perguntada de novo a cada abertura.
+    """
     gravadas, problemas = 0, []
     ja = importadas(banco)
-    for arquivo, registro in sorted(encontradas, key=lambda item: item[1]['tipo'] != 'conta'):
+    for arquivo, registro in sorted(encontradas, key=lambda item: (ORDEM[item[1]['tipo']], item[1]['criada_em'])):
         if registro['id'] in ja:
             continue
         try:
-            if registro['tipo'] == 'conta':
-                banco.salvar_conta({campo: registro[campo] for campo in CAMPOS_CONTA})
-            else:
-                banco.salvar(dados_da_entrada(banco, registro))
+            APLICAR[registro['tipo']](banco, registro)
+            gravadas += 1
         except ValueError as erro:
-            problemas.append((registro['identificacao'] if registro['tipo'] == 'conta' else registro['nome'], str(erro)))
-            continue
+            problemas.append((nome_do_registro(registro), str(erro)))
+            if registro['tipo'] in ('entrada', 'conta'):
+                continue
         ja.add(registro['id'])
         banco.salvar_configuracao(IMPORTADAS, json.dumps(sorted(ja)))
-        gravadas += 1
         guardar(arquivo)
     return gravadas, problemas
+
+
+def nome_do_registro(registro):
+    return registro['identificacao'] if registro['tipo'] == 'conta' else registro['nome']
+
+
+def aplicar_conta(banco, registro):
+    banco.salvar_conta({campo: registro[campo] for campo in CAMPOS_CONTA})
+
+
+def aplicar_entrada(banco, registro):
+    with documentos_temporarios(registro.get('anexos', [])) as anexos:
+        banco.salvar(dados_da_entrada(banco, registro), anexos=anexos)
+
+
+def operacao_ativa(banco, registro):
+    atual = banco.obter(registro['operacao_id'])
+    if atual is None or atual['lixeira_em']:
+        raise ValueError('A operação não está mais na lista ativa do computador; a mudança do celular não foi aplicada.')
+    return atual
+
+
+def aplicar_alteracao(banco, registro):
+    """Só os campos que o celular mudou são gravados, e só se o computador ainda tem o que o celular via."""
+    atual = operacao_ativa(banco, registro)
+    antes, depois = registro['antes'], registro['depois']
+    mudou = [campo for campo in CAMPOS_EDITAVEIS if antes[campo] != depois[campo]]
+    conflitos = dict.fromkeys(TITULOS_EDITAVEIS[c] for c in mudou if atual[c] != antes[c])
+    if conflitos:
+        raise ValueError(f'Alterada no computador depois do backup usado no celular ({", ".join(conflitos)}); '
+                         'a alteração do celular não foi aplicada.')
+    if not mudou:
+        return
+    dados = {campo: atual[campo] for campo in ('nome', 'aquisicao', 'custo', 'previsto', 'previsao', 'comissao',
+                                                'observacoes', 'conta_id', 'conta')}
+    dados.update({campo: depois[campo] for campo in mudou})
+    if {'conta_id', 'conta'} & set(mudou):
+        conta = conta_do_celular(banco, depois['conta_id'], depois['conta'])
+        dados['conta_id'] = conta['id'] if conta else -1
+        dados['conta'] = conta['identificacao'] if conta else depois['conta']
+    banco.salvar(dados, registro['operacao_id'])
+
+
+def aplicar_previsao(banco, registro):
+    atual = operacao_ativa(banco, registro)
+    if atual['previsao_atual'] == registro['nova']:
+        return
+    if atual['previsao_atual'] != registro['anterior']:
+        raise ValueError(f'A previsão foi alterada no computador (agora {data_br(atual["previsao_atual"])}); '
+                         'a nova previsão do celular não foi aplicada.')
+    banco.atualizar_previsao(registro['operacao_id'], registro['nova'])
+
+
+def aplicar_exclusao(banco, registro):
+    atual = banco.obter(registro['operacao_id'])
+    if atual is None:
+        raise ValueError('A operação não existe mais no computador.')
+    if not atual['lixeira_em']:
+        banco.excluir(registro['operacao_id'])
+
+
+def aplicar_anexo(banco, registro):
+    operacao_ativa(banco, registro)
+    with documentos_temporarios([registro]) as anexos:
+        banco.anexar(registro['operacao_id'], anexos)
+
+
+APLICAR = {'conta': aplicar_conta, 'entrada': aplicar_entrada, 'alteracao': aplicar_alteracao,
+           'previsao': aplicar_previsao, 'exclusao': aplicar_exclusao, 'anexo': aplicar_anexo}
+
+
+@contextmanager
+def documentos_temporarios(documentos):
+    """Grava os documentos do celular em arquivos temporários, com o nome original, para o banco copiar."""
+    with tempfile.TemporaryDirectory(prefix='.celular-rpv-') as pasta:
+        caminhos = []
+        for numero, item in enumerate(documentos):
+            subpasta = Path(pasta) / str(numero)  # Dois documentos com o mesmo nome não se sobrepõem.
+            subpasta.mkdir()
+            caminho = subpasta / nome_do_documento(item['arquivo'])
+            caminho.write_bytes(item['conteudo'])
+            caminhos.append(caminho)
+        yield caminhos
+
+
+def conta_do_celular(banco, conta_id, nome):
+    # A conta é procurada pelo número; se não existir (conta nova feita no celular, ou removida no computador),
+    # pelo nome, sem diferença de maiúsculas e acentos.
+    contas = {c['id']: c for c in banco.contas()}
+    return contas.get(conta_id) or next(
+        (c for c in contas.values() if normalizar(c['identificacao']) == normalizar(nome)), None)
 
 
 def dados_da_entrada(banco, entrada):
     dados = {campo: entrada[campo] for campo in ('nome', 'aquisicao', 'custo', 'previsto', 'previsao', 'comissao',
                                                  'observacoes')}
-    # A conta é procurada pelo número; se não existir (conta nova feita no celular, ou removida no computador),
-    # pelo nome, sem diferença de maiúsculas e acentos.
-    contas = {c['id']: c for c in banco.contas()}
-    conta = contas.get(entrada['conta_id']) or next(
-        (c for c in contas.values() if normalizar(c['identificacao']) == normalizar(entrada['conta'])), None)
+    conta = conta_do_celular(banco, entrada['conta_id'], entrada['conta'])
     dados['conta_id'] = conta['id'] if conta else -1
     dados['conta'] = conta['identificacao'] if conta else entrada['conta']
     return dados
 
 
 def contar(encontradas):
-    """"2 entradas e 1 conta", só com o que houver."""
-    entradas = sum(r['tipo'] == 'entrada' for _, r in encontradas)
-    contas = len(encontradas) - entradas
-    partes = ([f'{entradas} entrada' + ('s' if entradas > 1 else '')] if entradas else []) + (
-        [f'{contas} conta' + ('s' if contas > 1 else '') + ' de recebimento'] if contas else [])
-    return ' e '.join(partes)
+    """"2 entradas, 1 alteração e 1 documento", só com o que houver."""
+    partes = []
+    for tipo, (singular, plural) in NOMES_TIPOS.items():
+        quantos = sum(r['tipo'] == tipo for _, r in encontradas)
+        if quantos:
+            partes.append(f'{quantos} {singular if quantos == 1 else plural}')
+    return ', '.join(partes[:-1]) + ' e ' + partes[-1] if len(partes) > 1 else ''.join(partes)
 
 
 def resumo(entrada):
-    if entrada.get('tipo') == 'conta':
+    tipo = entrada.get('tipo')
+    if tipo == 'conta':
         return f"Conta {entrada['identificacao']} — {entrada['banco']} — titular {entrada['nome']}"
+    if tipo == 'alteracao':
+        mudou = dict.fromkeys(TITULOS_EDITAVEIS[c] for c in CAMPOS_EDITAVEIS
+                              if entrada['antes'][c] != entrada['depois'][c])
+        return f"Alteração em {entrada['nome']} — {', '.join(mudou) or 'nada mudou'}"
+    if tipo == 'previsao':
+        return f"Nova previsão de {entrada['nome']} — {data_ou_texto(entrada['anterior'])} → {data_ou_texto(entrada['nova'])}"
+    if tipo == 'exclusao':
+        return f"Excluir {entrada['nome']} (vai para a lixeira)"
+    if tipo == 'anexo':
+        return f"Documento para {entrada['nome']} — {entrada['arquivo']}"
+    texto = (f"{entrada['nome']} — {reais(entrada['previsto'])} — previsão {data_ou_texto(entrada['previsao'])} — "
+             f"conta {entrada['conta']}")
+    anexos = len(entrada.get('anexos', []))
+    return texto + (f' — {anexos} documento' + ('s' if anexos > 1 else '') if anexos else '')
+
+
+def data_ou_texto(texto):
     try:
-        previsao = data_br(entrada['previsao'])
+        return data_br(texto)
     except ValueError:
-        previsao = entrada['previsao']
-    return f"{entrada['nome']} — {reais(entrada['previsto'])} — previsão {previsao} — conta {entrada['conta']}"
+        return texto

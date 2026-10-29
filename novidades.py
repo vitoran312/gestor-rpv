@@ -10,6 +10,14 @@ from pathlib import Path
 MOSTRAR = 5  # Quantas versões aparecem no "Sobre".
 
 NOVIDADES = [
+    ('0.50.0', [
+        ('novidade', 'Celular: editar os dados de uma entrada, alterar a previsão e excluir operações pelo app.'),
+        ('novidade', 'Celular: anexar fotos (direto da câmera) e PDFs às operações e às entradas novas.'),
+        ('novidade', 'Celular: agenda das previsões — calendário do mês e, no Início, quantas vencem hoje, amanhã e '
+                     'nos próximos 7 dias, além das atrasadas.'),
+        ('novidade', 'Programa: importa do celular alterações, previsões, exclusões e documentos, sem gravar por cima '
+                     'do que mudou no computador.'),
+    ]),
     ('0.49.0', [
         ('novidade', 'Celular: usar o app sem computador — cada pessoa cria a própria senha e começa com os dados '
                      'vazios.'),

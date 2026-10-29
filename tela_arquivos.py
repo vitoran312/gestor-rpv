@@ -112,7 +112,8 @@ class ArquivosMixin:
             return
         texto = f'{gravadas} item(ns) importado(s) do celular.'
         if recusadas:
-            texto += '\n\nNão importadas (corrija no celular e envie de novo, ou cadastre aqui):' + ''.join(
+            texto += ('\n\nNão aplicadas (entrada ou conta: corrija no celular e envie de novo; mudança numa '
+                      'operação: confira e faça aqui, se ainda quiser):') + ''.join(
                 f'\n• {nome}: {mensagem}' for nome, mensagem in recusadas)
         messagebox.showinfo('Entradas do celular', texto, parent=pai)
         self.atualizar()

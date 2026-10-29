@@ -84,6 +84,14 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
         documentos: Object.fromEntries([...dados.documentos].map(([id, lista]) => [id, lista.map((d) => d.nome)])),
         anexos,
         recusas,
+        agenda: (() => {
+          const a = D.agenda(dados.operacoes, hoje);
+          const ids = (lista) => lista.map((r) => r.id);
+          return { atrasadas: ids(a.atrasadas), hoje: ids(a.hoje), amanha: ids(a.amanha), semana: ids(a.semana),
+            dias: Object.fromEntries([...a.porDia].map(([dia, lista]) => [dia, ids(lista)])) };
+        })(),
+        semanas: Object.fromEntries(['2026-02', '2026-10', '2027-08', '2028-02'].map((m) => [m, D.semanasDoMes(m)])),
+        previsoes: dados.operacoes.map((r) => D.problemasDaPrevisao(r, '2026-01-01').concat(D.problemasDaPrevisao(r, r.previsao_atual))),
       };
     }, regras);
 
@@ -215,6 +223,83 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
       await pagina.click('#abrir');
       await pagina.waitForSelector('#aplicativo:not([hidden])', { timeout: 120000 });
       resultados.pendentes_depois = await pagina.evaluate(async () => (await Guarda.ler('pendentes')).map((p) => p.id));
+    }
+
+    // Mudanças em operações do computador: editar, alterar a previsão, excluir e anexar uma foto. Cada uma vira um
+    // arquivo para o computador; o Python importa e confere.
+    if (telas.mudancas) {
+      const m = telas.mudancas;
+      const ir = async (hash, seletor) => {
+        await pagina.evaluate((h) => { location.hash = h; }, hash);
+        await pagina.waitForSelector(seletor);
+      };
+      const esperarEnvio = () => pagina.waitForFunction(() => location.hash.startsWith('#enviar/'));
+      await ir(`#editar/${m.editar}`, 'form [name="nome"]');
+      await pagina.click('text=Salvar alterações');
+      await pagina.waitForFunction(() => document.querySelector('form .erro').textContent.length > 0);
+      resultados.editar_sem_mudar = await pagina.textContent('form .erro');
+      resultados.editar_valores = await pagina.evaluate(() => Object.fromEntries(['nome', 'custo', 'previsto', 'previsao', 'conta']
+        .map((n) => [n, document.querySelector(`[name="${n}"]`).value])));
+      await pagina.fill('[name="previsto"]', '3000000');
+      await pagina.fill('[name="observacoes"]', 'editada no celular');
+      await pagina.click('text=Salvar alterações');
+      await esperarEnvio();
+      resultados.editar_tela = await pagina.evaluate(() => document.getElementById('tela').innerText);
+
+      await ir(`#operacao/${m.previsao}`, 'details.acao');
+      await pagina.click('details.acao summary');
+      await pagina.fill('[name="nova_previsao"]', '2020-01-01');
+      await pagina.click('text=Salvar nova previsão');
+      await pagina.waitForFunction(() => document.querySelector('details.acao .erro').textContent.length > 0);
+      resultados.previsao_erro = await pagina.textContent('details.acao .erro');
+      await pagina.fill('[name="nova_previsao"]', m.nova_previsao);
+      await pagina.click('text=Salvar nova previsão');
+      await esperarEnvio();
+
+      await ir(`#operacao/${m.excluir}`, 'text=Excluir operação');
+      pagina.once('dialog', (d) => d.accept());
+      await pagina.click('text=Excluir operação');
+      await esperarEnvio();
+
+      await ir(`#operacao/${m.anexar}`, '[name="anexar"]');
+      await pagina.setInputFiles('[name="anexar"]', { name: 'image.png', mimeType: 'image/png', buffer: Buffer.from(m.png, 'base64') });
+      await pagina.waitForFunction(() => location.hash.startsWith('#enviar/') || document.querySelector('p.erro[role="status"]'));
+      const erroAnexo = await pagina.evaluate(() => (document.querySelector('p.erro[role="status"]') || {}).textContent);
+      if (erroAnexo) {
+        throw new Error('Anexo recusado: ' + erroAnexo);
+      }
+      resultados.anexo_tela = await pagina.evaluate(() => document.getElementById('tela').innerText);
+
+      await ir(`#operacao/${m.editar}`, 'text=Excluir operação');
+      resultados.operacao_com_pendente = await pagina.evaluate(() => document.getElementById('tela').innerText);
+      await ir('#pendentes', '.menu');
+      resultados.pendentes_tela = await pagina.evaluate(() => document.getElementById('tela').innerText);
+      resultados.mudancas_arquivos = await pagina.evaluate(async () => (await Guarda.ler('pendentes'))
+        .filter((p) => !['entrada', 'conta'].includes(p.tipo)).map((p) => {
+          const bytes = new Uint8Array(p.bytes);
+          let texto = '';
+          for (let i = 0; i < bytes.length; i += 0x8000) {
+            texto += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+          }
+          return { id: p.id, tipo: p.tipo, arquivo: p.arquivo, bytes: btoa(texto) };
+        }));
+      // Agenda: no Início e no calendário, com as atrasadas de hoje (pelo relógio do aparelho).
+      await ir('#inicio', '.agenda-resumo');
+      resultados.inicio_agenda = await pagina.evaluate(() => document.querySelector('.agenda-resumo').innerText);
+      await pagina.click('.agenda-resumo');
+      await pagina.waitForSelector('.grade-agenda');
+      resultados.agenda = await pagina.evaluate(() => {
+        const D = GestorDados;
+        const hoje = D.hojeIso();
+        return {
+          texto: document.getElementById('tela').innerText,
+          dias: document.querySelectorAll('.grade-agenda [data-dia]').length,
+          hoje: document.querySelector('.grade-agenda .dia.hoje').dataset.dia === hoje,
+          titulo: document.getElementById('titulo').textContent,
+        };
+      });
+      await pagina.click('[aria-label="Próximo mês"]');
+      resultados.agenda_proximo_mes = await pagina.evaluate(() => document.querySelector('.mes-agenda .nome').textContent);
     }
 
     await pagina.evaluate(() => { location.hash = '#mais'; });

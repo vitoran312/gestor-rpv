@@ -133,13 +133,21 @@ const LeitorBackup = (() => {
       + `${dois(agora.getMinutes())}:${dois(agora.getSeconds())}${fuso >= 0 ? '+' : '-'}${dois(Math.trunc(fuso / 60))}:${dois(fuso % 60)}`;
   }
 
-  // Monta um backup completo (ZIP com manifesto e banco, cifrado) igual ao que o programa grava; origem
+  // Monta um backup completo (ZIP com manifesto, banco e anexos, cifrado) igual ao que o programa grava; origem
   // "celular" marca os dados de quem usa só o app. O programa no computador consegue importar este arquivo.
-  async function empacotar(banco, chave, versaoApp) {
+  // `documentos` traz os anexos como na tabela documentos ({"12/abc….jpg": bytes}).
+  async function empacotar(banco, chave, versaoApp, documentos = {}) {
+    const arquivos = { 'banco.sqlite3': await sha256(banco) };
+    const conteudo = { 'banco.sqlite3': banco };
+    for (const [caminho, bytes] of Object.entries(documentos)) {
+      arquivos['documentos/' + caminho] = await sha256(bytes);
+      conteudo['documentos/' + caminho] = bytes;
+    }
     const manifesto = { formato: FORMATO, versao_formato: 1, versao_app: versaoApp, origem: 'celular',
-      criado_em: dataHoraLocal(), arquivos: { 'banco.sqlite3': await sha256(banco) } };
-    const zip = fflate.zipSync({ 'banco.sqlite3': banco, 'manifesto.json': new TextEncoder().encode(JSON.stringify(manifesto, null, 2)) });
-    return { bytes: await cifrar(zip, chave), manifesto };
+      criado_em: dataHoraLocal(), arquivos };
+    conteudo['manifesto.json'] = new TextEncoder().encode(JSON.stringify(manifesto, null, 2));
+    const zip = fflate.zipSync(conteudo);
+    return { bytes: await cifrar(zip, chave), manifesto, ...anexosDo(zip, manifesto) };
   }
 
   // O sal de um arquivo cifrado (para saber se a chave do backup aberto agora serve para ele).
@@ -196,6 +204,21 @@ const LeitorBackup = (() => {
     return bytes;
   }
 
+  // Acesso aos anexos de um backup aberto: um por vez (para mostrar) ou todos (para empacotar de novo).
+  function anexosDo(zip, manifesto) {
+    return {
+      extrair: (caminho) => extrairDocumento(zip, manifesto, caminho),
+      todos: async () => {
+        const todos = {};
+        for (const nome of Object.keys(manifesto.arquivos).filter((n) => n.startsWith('documentos/'))) {
+          const caminho = nome.slice('documentos/'.length);
+          todos[caminho] = await extrairDocumento(zip, manifesto, caminho);
+        }
+        return todos;
+      },
+    };
+  }
+
   let carregarSql = null;
 
   function sqlJs() {
@@ -228,9 +251,8 @@ const LeitorBackup = (() => {
     const db = new SQL.Database(banco);
     medir('abrir_banco');
     // Os anexos ficam compactados na memória e só são extraídos quando a pessoa abre um deles.
-    const extrair = (caminho) => extrairDocumento(zip, manifesto, caminho);
-    return { db, manifesto, cifrado: ehCifrado, tempos, arquivos, extrair, chave: chaveUsada };
+    return { db, manifesto, cifrado: ehCifrado, tempos, arquivos, ...anexosDo(zip, manifesto), chave: chaveUsada };
   }
 
-  return { ler, decifrar, cifrar, empacotar, novaChave, salDe, cifrado, sqlJs, ErroBackup, SenhaIncorreta };
+  return { ler, decifrar, cifrar, empacotar, novaChave, salDe, cifrado, sqlJs, dataHoraLocal, ErroBackup, SenhaIncorreta };
 })();

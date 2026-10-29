@@ -7,7 +7,7 @@
 (() => {
   // Igual a versao.py (test_celular confere): mostrada na abertura e em Mais, para saber se o aparelho já
   // carregou a última versão publicada.
-  const VERSAO_APP = '0.49.0';
+  const VERSAO_APP = '0.50.0';
   const D = GestorDados;
   const $ = (id) => document.getElementById(id);
   const SITUACOES = { pendente: 'Pendente', atrasada: 'Atrasada', recebida: 'Recebida' };
@@ -19,7 +19,7 @@
   let enderecoAberto = null;  // Anexo exibido agora (blob:), liberado ao sair da tela.
   const TIPOS = { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp',
     gif: 'image/gif', bmp: 'image/bmp', tif: 'image/tiff', tiff: 'image/tiff' };
-  const estado = { busca: '', filtro: 'todas' };
+  const estado = { busca: '', filtro: 'todas', mes: null, dia: null };  // mes e dia: os escolhidos na agenda.
 
   // ---- Montagem de elementos ---------------------------------------------------------------------------
   function el(tag, atributos = {}, ...filhos) {
@@ -228,7 +228,7 @@
         }
       }
       info = { arquivo: fonte.nome, tamanho: fonte.tamanho, manifesto: leitura.manifesto, cifrado: leitura.cifrado,
-        tempos: leitura.tempos, extrair: leitura.extrair, chave: leitura.chave, independente };
+        tempos: leitura.tempos, extrair: leitura.extrair, todos: leitura.todos, chave: leitura.chave, independente };
       await carregarPendentes();
       if (fonte.novo) {
         // O arquivo é guardado como veio do computador: continua trancado pela senha.
@@ -363,6 +363,8 @@
     mostrarSenha = false;
     estado.busca = '';
     estado.filtro = 'todas';
+    estado.mes = null;
+    estado.dia = null;
     $('tela').replaceChildren();
     $('aplicativo').hidden = true;
     $('abertura').hidden = false;
@@ -440,6 +442,7 @@
         el('div', { texto: '2. Cadastre suas entradas na aba Operações (+ Nova entrada).' }),
         el('div', { texto: '3. Quando receber, abra a operação e toque em "Registrar recebimento".' })),
       !info.independente && dias !== null && dias > 7 && el('p', { class: 'aviso', texto: 'Este backup tem mais de uma semana. Faça um backup novo no computador para ver os dados atuais.' }),
+      dados.operacoes.length > 0 && cartaoAgenda(),
       el('div', { class: 'indicadores' },
         indicador('Registros', String(ind.registros)),
         indicador('Lucro previsto', D.reais(ind.previsto)),
@@ -450,6 +453,87 @@
         situacao('pendente', 'Pendentes'),
         situacao('atrasada', 'Atrasadas', totais.atrasada ? 'vermelho' : ''),
         situacao('recebida', 'Recebidas', 'verde')),
+    ];
+  }
+
+  // ---- Agenda das previsões ------------------------------------------------------------------------------
+  const DIAS_SEMANA = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+
+  function nomeDoDia(iso, hoje) {
+    const [ano, mes, dia] = iso.split('-').map(Number);
+    const semana = DIAS_SEMANA[new Date(ano, mes - 1, dia).getDay()];
+    const prefixo = iso === hoje ? 'Hoje, ' : iso === D.somarDias(hoje, 1) ? 'Amanhã, ' : iso === D.somarDias(hoje, -1) ? 'Ontem, ' : '';
+    return `${prefixo}${semana} ${D.dataBr(iso).slice(0, 5)}`;
+  }
+
+  // No Início: quantas previsões estão atrasadas, são hoje, amanhã e nos próximos dias, com os nomes de hoje e amanhã.
+  function cartaoAgenda() {
+    const hoje = D.hojeIso();
+    const ag = D.agenda(dados.operacoes, hoje);
+    const bloco = (rotulo, lista, classe) => el('div', { class: 'bloco-agenda' },
+      el('div', { class: 'numero ' + (lista.length && classe ? classe : ''), texto: String(lista.length) }),
+      el('div', { class: 'discreto pequeno', texto: rotulo }));
+    const nomes = (rotulo, lista) => lista.length > 0 && el('div', { class: 'pequeno nomes-agenda' },
+      el('strong', { texto: `${rotulo}: ` }), lista.slice(0, 3).map((r) => r.nome).join(', ')
+        + (lista.length > 3 ? ` e mais ${lista.length - 3}` : ''));
+    return el('a', { class: 'cartao agenda-resumo', href: '#agenda' },
+      el('div', { class: 'linha1' }, el('span', { class: 'nome', texto: 'Agenda das previsões' }),
+        el('span', { class: 'mostrar pequeno', texto: 'Ver calendário ›' })),
+      el('div', { class: 'blocos-agenda' }, bloco('Atrasadas', ag.atrasadas, 'vermelho'), bloco('Hoje', ag.hoje, 'marca'),
+        bloco('Amanhã', ag.amanha, 'marca'), bloco('Próx. 7 dias', ag.semana)),
+      nomes('Hoje', ag.hoje), nomes('Amanhã', ag.amanha),
+      !ag.atrasadas.length && !ag.hoje.length && !ag.amanha.length && !ag.semana.length
+        && el('div', { class: 'discreto pequeno', texto: 'Nenhuma previsão para os próximos 7 dias.' }));
+  }
+
+  // Calendário do mês com as previsões das operações ainda não recebidas; tocar num dia mostra as operações dele.
+  function telaAgenda() {
+    const hoje = D.hojeIso();
+    const ag = D.agenda(dados.operacoes, hoje);
+    estado.mes = estado.mes || hoje.slice(0, 7);
+    estado.dia = estado.dia || hoje;
+    const area = el('div');
+    const desenharAgenda = () => {
+      const mudarMes = (passo) => {
+        estado.mes = D.mesVizinho(estado.mes, passo);
+        estado.dia = estado.mes === hoje.slice(0, 7) ? hoje : `${estado.mes}-01`;
+        desenharAgenda();
+      };
+      const dia = (iso) => {
+        if (!iso) {
+          return el('div', { class: 'dia fora' });
+        }
+        const lista = ag.porDia.get(iso) || [];
+        const classes = ['dia', iso === hoje && 'hoje', iso === estado.dia && 'escolhido',
+          lista.length && (iso < hoje ? 'com-atraso' : 'com-previsao')].filter(Boolean).join(' ');
+        return el('button', { type: 'button', class: classes, 'data-dia': iso,
+          'aria-label': `${nomeDoDia(iso, hoje)}: ${D.quantidade(lista.length, 'previsão', 'previsões')}`,
+          onclick: () => {
+            estado.dia = iso;
+            desenharAgenda();
+          } }, el('span', { texto: String(Number(iso.slice(8))) }),
+        el('span', { class: 'marca-dia', texto: lista.length > 1 ? String(lista.length) : lista.length ? '•' : '' }));
+      };
+      const doDia = ag.porDia.get(estado.dia) || [];
+      area.replaceChildren(
+        el('div', { class: 'cartao calendario' },
+          el('div', { class: 'mes-agenda' },
+            el('button', { type: 'button', class: 'secundario', 'aria-label': 'Mês anterior', texto: '‹', onclick: () => mudarMes(-1) }),
+            el('span', { class: 'nome', texto: D.nomeDoMes(estado.mes) }),
+            el('button', { type: 'button', class: 'secundario', 'aria-label': 'Próximo mês', texto: '›', onclick: () => mudarMes(1) })),
+          el('div', { class: 'grade-agenda' },
+            DIAS_SEMANA.map((d) => el('div', { class: 'dia-semana', texto: d.slice(0, 3) })),
+            D.semanasDoMes(estado.mes).flat().map(dia))),
+        el('h2', { texto: nomeDoDia(estado.dia, hoje) }),
+        doDia.length ? el('div', { class: 'lista' }, doDia.map((r) => itemOperacao(r, `#operacao/${r.id}`)))
+          : vazio(estado.dia < hoje ? 'Nenhuma operação atrasada com previsão neste dia.' : 'Nenhuma previsão neste dia.'));
+    };
+    desenharAgenda();
+    return [
+      el('p', { class: 'discreto pequeno', texto: 'Previsões atuais das operações ainda não recebidas. Dias em vermelho têm operações atrasadas.' }),
+      area,
+      ag.atrasadas.length > 0 && [el('h2', { texto: `Atrasadas (${ag.atrasadas.length})` }),
+        el('div', { class: 'lista' }, ag.atrasadas.map((r) => itemOperacao(r, `#operacao/${r.id}`)))],
     ];
   }
 
@@ -490,10 +574,14 @@
         desenharLista();
       } });
     desenharLista();
-    const quantas = listaPendentes.filter((p) => (p.tipo || 'entrada') === 'entrada').length;
+    // Contas aparecem na aba Contas; aqui, entradas e mudanças em operações.
+    const itens = listaPendentes.filter((p) => (p.tipo || 'entrada') !== 'conta');
+    const quantas = itens.length;
+    const soEntradas = itens.every((p) => (p.tipo || 'entrada') === 'entrada');
     const pendentes = quantas > 0 && el('a', { class: 'aviso item', href: '#pendentes' },
-      el('div', { class: 'nome', texto: quantas === 1 ? '1 entrada feita no celular aguarda o computador'
-        : `${quantas} entradas feitas no celular aguardam o computador` }),
+      el('div', { class: 'nome', texto: soEntradas
+        ? (quantas === 1 ? '1 entrada feita no celular aguarda o computador' : `${quantas} entradas feitas no celular aguardam o computador`)
+        : (quantas === 1 ? '1 mudança feita no celular aguarda o computador' : `${quantas} itens feitos no celular aguardam o computador`) }),
       el('div', { class: 'discreto pequeno', texto: 'Toque para ver ou enviar de novo' }));
     const nova = el('a', { class: 'botao-link primario', href: '#nova', texto: '+ Nova entrada' });
     return [nova, pendentes, busca, filtros, lista];
@@ -504,6 +592,8 @@
   // senha dos backups). O arquivo fica guardado aqui até um backup mais novo mostrar que o computador já o
   // importou (configuração entradas_celular_importadas); até lá, pode ser enviado de novo.
   let listaPendentes = [];          // [{id, arquivo, criada_em, bytes}] como guardadas no aparelho.
+  // Entradas e contas novas, e mudanças em operações que já existem no computador (entradas_celular.py).
+  const TIPOS_PENDENTES = ['entrada', 'conta', 'alteracao', 'previsao', 'exclusao', 'anexo'];
   const abertasPendentes = new Map();  // id → {tipo, ...dados}, para as que a chave do backup aberto consegue ler.
 
   async function carregarPendentes() {
@@ -517,7 +607,8 @@
       try {
         const { conteudo } = await LeitorBackup.decifrar(new Uint8Array(p.bytes), { chave: info.chave });
         const pacote = JSON.parse(new TextDecoder().decode(conteudo));
-        abertasPendentes.set(p.id, pacote.conta ? { ...pacote.conta, tipo: 'conta' } : { ...pacote.entrada, tipo: 'entrada' });
+        const tipo = TIPOS_PENDENTES.find((t) => pacote[t]);
+        abertasPendentes.set(p.id, { ...pacote[tipo], tipo });
       } catch (erro) {
         // Feita com um backup de outra chave: continua guardada e pode ser enviada, só não é mostrada.
       }
@@ -553,14 +644,16 @@
 
   // ---- Quem usa só o celular: gravações direto nos dados do aparelho ---------------------------------------
   // Cada gravação reempacota os dados como um backup (trancado pela mesma chave) e o guarda no aparelho.
-  async function salvarLocal() {
+  // `novos` traz os anexos acrescentados agora ({caminho: bytes}); os que já existiam vão junto.
+  async function salvarLocal(novos = {}) {
     const banco = bancoLocal.export();
-    const { bytes, manifesto } = await LeitorBackup.empacotar(banco, info.chave, VERSAO_APP);
+    const { bytes, manifesto, extrair, todos } = await LeitorBackup.empacotar(banco, info.chave, VERSAO_APP,
+      { ...await info.todos(), ...novos });
     fonte = { ...fonte, bytes, tamanho: bytes.length, criado_em: manifesto.criado_em, independente: true };
     await Guarda.gravar('backup', { bytes, nome: fonte.nome, tamanho: bytes.length, criado_em: manifesto.criado_em,
       guardado_em: new Date().toISOString(), independente: true });
     Guarda.persistir();
-    info.manifesto = manifesto;
+    Object.assign(info, { manifesto, extrair, todos });
     dados = D.carregar(bancoLocal);
     localStorageGravar('copia_pendente', '1');
   }
@@ -574,15 +667,132 @@
 
   // Como Banco.salvar: nome com iniciais maiúsculas, observação com a primeira maiúscula e a cópia dos dados da
   // conta guardada na operação.
-  async function gravarEntradaLocal(entrada, conta) {
+  async function gravarEntradaLocal(entrada, conta, documentos = []) {
     const id = inserir('rpvs', {
       nome: D.nomeTitulo(entrada.nome), aquisicao: entrada.aquisicao, previsto: entrada.previsto, custo: entrada.custo,
       conta: conta.identificacao, previsao: entrada.previsao, comissao: entrada.comissao,
       observacoes: D.primeiraMaiuscula(entrada.observacoes), conta_id: conta.id, conta_snapshot: D.snapshotConta(conta),
     });
-    await salvarLocal();
+    await salvarLocal(registrarDocumentos(id, documentos));
     return id;
   }
+
+  // Como Banco.salvar com um identificador: a conta (e a cópia dos dados dela) só muda se outra foi escolhida.
+  async function editarLocal(r, entrada, conta) {
+    const mesma = conta.manter || conta.id === r.conta_id;
+    bancoLocal.run(`UPDATE rpvs SET nome=?, aquisicao=?, previsto=?, custo=?, previsao=?, comissao=?, observacoes=?,
+      conta=?, conta_id=?, conta_snapshot=? WHERE id=? AND lixeira_em IS NULL`, [
+      D.nomeTitulo(entrada.nome), entrada.aquisicao, entrada.previsto, entrada.custo, entrada.previsao, entrada.comissao,
+      D.primeiraMaiuscula(entrada.observacoes), mesma ? r.conta : conta.identificacao, mesma ? r.conta_id : conta.id,
+      mesma ? r.conta_snapshot : D.snapshotConta(conta), r.id]);
+    await salvarLocal();
+  }
+
+  // Como Banco.atualizar_previsao: a previsão anterior fica no histórico.
+  async function previsaoLocal(r, nova) {
+    bancoLocal.run('INSERT INTO previsoes_historico (rpv_id,anterior,nova,alterada_em) VALUES (?,?,?,?)',
+      [r.id, r.previsao_atual, nova, LeitorBackup.dataHoraLocal()]);
+    bancoLocal.run('UPDATE rpvs SET previsao_atual_definida=? WHERE id=?', [nova, r.id]);
+    await salvarLocal();
+  }
+
+  // Excluir manda para a lixeira (como no computador); restaurar tira de lá.
+  async function lixeiraLocal(r, excluir) {
+    bancoLocal.run('UPDATE rpvs SET lixeira_em=? WHERE id=?', [excluir ? LeitorBackup.dataHoraLocal() : null, r.id]);
+    await salvarLocal();
+  }
+
+  // Anexos como Banco.copiar_anexos grava ("12/<32 letras>.jpg"); devolve os arquivos para salvarLocal.
+  function registrarDocumentos(rpvId, documentos) {
+    const novos = {};
+    for (const d of documentos) {
+      const caminho = `${rpvId}/${crypto.randomUUID().replaceAll('-', '')}.${d.extensao}`;
+      bancoLocal.run("INSERT INTO documentos (rpv_id,nome,caminho,tipo) VALUES (?,?,?,'entrada')", [rpvId, d.nome, caminho]);
+      novos[caminho] = d.bytes;
+    }
+    return novos;
+  }
+
+  // ---- Documentos escolhidos no celular (câmera, fotos ou Arquivos) ----------------------------------------
+  // Fotos são reduzidas (lado maior até 2000 px, em JPEG): continuam legíveis e o arquivo fica leve para guardar
+  // e mandar ao computador. PDFs vão como estão.
+  const LADO_MAXIMO = 2000;
+  const LIMITE_PDF = 25 * 1024 * 1024;
+
+  async function prepararDocumento(arquivo) {
+    const extensao = (arquivo.name.includes('.') ? arquivo.name.split('.').pop() : '').toLowerCase();
+    if (arquivo.type === 'application/pdf' || extensao === 'pdf') {
+      if (arquivo.size > LIMITE_PDF) {
+        throw new Error(`${arquivo.name}: o PDF passa de 25 MB.`);
+      }
+      return { nome: nomeDoDocumento(arquivo.name, 'pdf'), extensao: 'pdf', bytes: new Uint8Array(await arquivo.arrayBuffer()) };
+    }
+    if (!arquivo.type.startsWith('image/') && !TIPOS[extensao]) {
+      throw new Error(`${arquivo.name}: escolha um PDF ou uma foto.`);
+    }
+    const imagem = await abrirImagem(arquivo);
+    const largura = imagem.naturalWidth || imagem.width;
+    const altura = imagem.naturalHeight || imagem.height;
+    const escala = Math.min(1, LADO_MAXIMO / Math.max(largura, altura));
+    const tela = el('canvas', { width: Math.max(1, Math.round(largura * escala)), height: Math.max(1, Math.round(altura * escala)) });
+    const contexto = tela.getContext('2d');
+    contexto.fillStyle = '#ffffff';  // Imagem com transparência: fundo branco, como no papel.
+    contexto.fillRect(0, 0, tela.width, tela.height);
+    contexto.drawImage(imagem, 0, 0, tela.width, tela.height);
+    if (imagem.close) {
+      imagem.close();
+    }
+    const blob = await new Promise((ok, falha) => tela.toBlob((b) => (b ? ok(b) : falha(new Error(`${arquivo.name}: não foi possível preparar a foto.`))), 'image/jpeg', 0.85));
+    return { nome: nomeDoDocumento(arquivo.name, 'jpg'), extensao: 'jpg', bytes: new Uint8Array(await blob.arrayBuffer()) };
+  }
+
+  // createImageBitmap primeiro (respeita a rotação da foto); se o aparelho não decodificar assim, pela <img>.
+  async function abrirImagem(arquivo) {
+    try {
+      return await createImageBitmap(arquivo);
+    } catch (erro) {
+      const endereco = URL.createObjectURL(arquivo);
+      try {
+        const imagem = new Image();
+        imagem.src = endereco;
+        await imagem.decode();
+        return imagem;
+      } catch (erroImagem) {
+        throw new Error(`${arquivo.name}: não foi possível ler esta imagem.`);
+      } finally {
+        URL.revokeObjectURL(endereco);
+      }
+    }
+  }
+
+  // A câmera do iPhone entrega "image.jpg": esse vira "Foto 29-10-2026 14h32.jpg".
+  function nomeDoDocumento(original, extensao) {
+    const base = original.replace(/\.[^.]*$/, '').replace(/[<>:"/\\|?*\u0000-\u001f]/g, '').trim().slice(0, 100);
+    if (base && !/^image$/i.test(base)) {
+      return `${base}.${extensao}`;
+    }
+    const agora = new Date();
+    const dois = (n) => String(n).padStart(2, '0');
+    return `Foto ${D.dataBr(D.hojeIso(agora)).replaceAll('/', '-')} ${dois(agora.getHours())}h${dois(agora.getMinutes())}.${extensao}`;
+  }
+
+  async function prepararDocumentos(arquivos) {
+    const documentos = [];
+    for (const arquivo of arquivos) {
+      documentos.push(await prepararDocumento(arquivo));
+    }
+    return documentos;
+  }
+
+  function paraBase64(bytes) {
+    let texto = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) {
+      texto += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    }
+    return btoa(texto);
+  }
+
+  const documentoParaEnvio = (d) => ({ arquivo: d.nome, conteudo: paraBase64(d.bytes) });
 
   async function gravarContaLocal(valores) {
     inserir('contas', D.linhaDaConta(valores));
@@ -631,8 +841,8 @@
     ];
   }
 
-  // Cifra e guarda no aparelho uma entrada ou conta feita aqui, e abre a tela de envio ao computador.
-  async function guardarPendente(tipo, dados) {
+  // Cifra e guarda no aparelho uma entrada, conta ou mudança feita aqui, e abre a tela de envio ao computador.
+  async function guardarPendente(tipo, dados, { ir = true } = {}) {
     const completa = { id: crypto.randomUUID(), ...dados, criada_em: new Date().toISOString() };
     const pacote = { formato: 'gestor-rpv-celular', versao_formato: 1, versao_app: VERSAO_APP, [tipo]: completa };
     const bytes = await LeitorBackup.cifrar(new TextEncoder().encode(JSON.stringify(pacote)), info.chave);
@@ -643,7 +853,18 @@
     listaPendentes = [...listaPendentes, registro];
     await Guarda.gravar('pendentes', listaPendentes);
     abertasPendentes.set(completa.id, { ...completa, tipo });
-    location.replace(`#enviar/${completa.id}`);
+    if (ir) {
+      location.replace(`#enviar/${completa.id}`);
+    }
+    return completa.id;
+  }
+
+  // Mudanças feitas no celular numa operação do computador, ainda não importadas.
+  function pendentesDa(operacaoId) {
+    return listaPendentes.filter((p) => {
+      const aberta = abertasPendentes.get(p.id);
+      return aberta && aberta.operacao_id === operacaoId;
+    });
   }
 
   // Contas feitas no celular que o computador ainda não importou: já podem ser usadas em entradas novas.
@@ -657,29 +878,54 @@
   }
 
   function telaNovaEntrada() {
+    return telaEntrada(null);
+  }
+
+  function telaEditar(id) {
+    const r = dados.operacoes.find((o) => o.id === id);
+    return r ? telaEntrada(r) : [vazio('Operação não encontrada.')];
+  }
+
+  // Campos de uma operação que o celular pode mudar, como estão gravados (o computador confere com os dele).
+  const CAMPOS_EDITAVEIS = ['nome', 'aquisicao', 'custo', 'previsto', 'conta_id', 'conta', 'previsao', 'comissao', 'observacoes'];
+
+  // Formulário de entrada: nova (r = null) ou edição de uma operação que já existe.
+  function telaEntrada(r) {
     if (!info.chave) {
-      return [el('p', { class: 'aviso', texto: 'Para cadastrar entradas no celular, abra um backup com senha (feito pelo programa a partir da versão 0.30).' })];
+      return [el('p', { class: 'aviso', texto: 'Para cadastrar ou mudar entradas no celular, abra um backup com senha (feito pelo programa a partir da versão 0.30).' })];
     }
-    const contas = [...dados.contas.filter((c) => c.ativa), ...(info.independente ? [] : contasPendentes()
+    const contas = [...dados.contas.filter((c) => c.ativa || (r && c.id === r.conta_id)), ...(info.independente ? [] : contasPendentes()
       .map((c) => ({ id: `p:${c.id}`, conta_id: -1, identificacao: c.identificacao, pendente: true })))];
+    if (r && !dados.contas.some((c) => c.id === r.conta_id)) {
+      // Conta removida no computador: a operação guarda o nome e os dados dela, que continuam se não for trocada.
+      contas.unshift({ id: 'manter', identificacao: `${r.conta} (removida)`, manter: true });
+    }
     if (!contas.length) {
       return [el('p', { class: 'aviso', texto: 'Cadastre uma conta de recebimento (aba Contas) antes de cadastrar entradas.' }),
         el('a', { class: 'botao-link primario', href: '#nova-conta', texto: '+ Nova conta' })];
     }
-    const valor = campoMoeda;
+    const valor = (nome, centavos) => {
+      const campo = campoMoeda(nome);
+      campo.value = centavos === null || centavos === undefined ? '' : D.moeda(centavos);
+      return campo;
+    };
     const c = {
-      nome: el('input', { name: 'nome', autocomplete: 'off', autocapitalize: 'words', maxlength: '150' }),
-      aquisicao: el('input', { name: 'aquisicao', type: 'date', value: D.hojeIso() }),
-      custo: valor('custo'),
-      previsto: valor('previsto'),
+      nome: el('input', { name: 'nome', autocomplete: 'off', autocapitalize: 'words', maxlength: '150', value: r ? r.nome : '' }),
+      aquisicao: el('input', { name: 'aquisicao', type: 'date', value: r ? r.aquisicao : D.hojeIso() }),
+      custo: valor('custo', r && r.custo),
+      previsto: valor('previsto', r && r.previsto),
       conta: el('select', { name: 'conta' }, el('option', { value: '', texto: 'Escolha a conta' }),
         contas.map((conta) => el('option', { value: String(conta.id),
-          texto: conta.identificacao + (conta.pendente ? ' (aguardando o computador)' : '') }))),
-      previsao: el('input', { name: 'previsao', type: 'date' }),
-      comissao: valor('comissao'),
+          texto: conta.identificacao + (conta.pendente ? ' (aguardando o computador)' : conta.ativa === 0 ? ' (desativada)' : '') }))),
+      previsao: el('input', { name: 'previsao', type: 'date', value: r ? r.previsao : '' }),
+      comissao: valor('comissao', r && r.comissao),
       observacoes: el('textarea', { name: 'observacoes', rows: '3', maxlength: '5000' }),
+      documentos: !r && el('input', { name: 'documentos', type: 'file', accept: 'image/*,application/pdf', multiple: true }),
     };
-    if (contas.length === 1) {
+    c.observacoes.value = r ? r.observacoes : '';
+    if (r) {
+      c.conta.value = r.conta_id === null || !dados.contas.some((x) => x.id === r.conta_id) ? 'manter' : String(r.conta_id);
+    } else if (contas.length === 1) {
       c.conta.value = String(contas[0].id);
     }
     const lucro = el('p', { class: 'discreto' });
@@ -694,7 +940,11 @@
     c.custo.addEventListener('input', atualizarLucro);
     c.previsto.addEventListener('input', atualizarLucro);
     atualizarLucro();
-    const salvar = el('button', { type: 'submit', class: 'primario', texto: 'Salvar entrada' });
+    const salvar = el('button', { type: 'submit', class: 'primario', texto: r ? 'Salvar alterações' : 'Salvar entrada' });
+    const mostrarErros = (problemas) => {
+      erros.replaceChildren(...problemas.map((p) => el('div', { texto: p })));
+      erros.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
     const formulario = el('form', { class: 'cartao formulario', autocomplete: 'off', onsubmit: async (evento) => {
       evento.preventDefault();
       const problemas = [];
@@ -716,27 +966,31 @@
       };
       // Todos os problemas de uma vez, como no computador: primeiro os valores mal escritos, depois as regras.
       if (!problemas.length) {
-        problemas.push(...D.problemasDaEntrada(entrada));
+        problemas.push(...(r ? D.problemasDaEdicao(r, entrada) : D.problemasDaEntrada(entrada)));
       }
       const conta = contas.find((x) => String(x.id) === c.conta.value);
       if (!conta) {
         problemas.push('Escolha a conta de destino.');
       }
       if (problemas.length) {
-        erros.replaceChildren(...problemas.map((p) => el('div', { texto: p })));
-        erros.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        mostrarErros(problemas);
         return;
       }
       salvar.disabled = true;
       try {
-        if (info.independente) {
-          location.replace(`#operacao/${await gravarEntradaLocal(entrada, conta)}`);
-          return;
+        const documentos = c.documentos ? await prepararDocumentos([...c.documentos.files]) : [];
+        if (r) {
+          await salvarEdicao(r, entrada, conta);
+        } else if (info.independente) {
+          location.replace(`#operacao/${await gravarEntradaLocal(entrada, conta, documentos)}`);
+        } else {
+          // Conta ainda não importada: o computador a encontra pelo nome (conta_id -1), importando-a antes.
+          await guardarPendente('entrada', { ...entrada, conta_id: conta.pendente ? -1 : conta.id, conta: conta.identificacao,
+            ...(documentos.length ? { anexos: documentos.map(documentoParaEnvio) } : {}) });
         }
-        // Conta ainda não importada: o computador a encontra pelo nome (conta_id -1), importando-a antes.
-        await guardarPendente('entrada', { ...entrada, conta_id: conta.pendente ? -1 : conta.id, conta: conta.identificacao });
       } catch (erro) {
-        erros.replaceChildren(el('div', { texto: 'Não foi possível guardar a entrada neste aparelho: ' + (erro && erro.message ? erro.message : erro) }));
+        mostrarErros([erro instanceof AvisoEdicao ? erro.message
+          : 'Não foi possível guardar neste aparelho: ' + (erro && erro.message ? erro.message : erro)]);
         salvar.disabled = false;
       }
     } },
@@ -746,22 +1000,69 @@
     campoFormulario('Valor Total RPV', c.previsto),
     lucro,
     campoFormulario('Conta de destino', c.conta),
-    campoFormulario('Previsão inicial de recebimento', c.previsao),
+    campoFormulario('Previsão inicial de recebimento', c.previsao,
+      r && r.previsao_atual !== r.previsao ? `A previsão atual (${D.dataBr(r.previsao_atual)}) muda em "Alterar previsão", na operação.` : null),
     campoFormulario('Comissão (opcional)', c.comissao),
     campoFormulario('Observações (opcional)', c.observacoes),
+    c.documentos && campoFormulario('Documentos (opcional)', c.documentos, 'Fotos ou PDFs: tire uma foto do documento ou escolha em Arquivos.'),
     erros,
     salvar);
-    return [el('p', { class: 'discreto pequeno', texto: info.independente ? 'A entrada é gravada nos seus dados deste celular.'
-      : 'A entrada fica guardada neste celular e vai para o computador por um arquivo que você salva na pasta do backup no Google Drive. Ao abrir, o Gestor no computador pergunta se quer importá-la.' }), formulario];
+    const explicacao = info.independente ? (r ? 'As alterações são gravadas nos seus dados deste celular.' : 'A entrada é gravada nos seus dados deste celular.')
+      : r ? 'A alteração vai para o computador como as entradas feitas aqui. Lá, só os campos que você mudou são gravados; se a operação tiver mudado no computador depois deste backup, ele avisa e não grava.'
+        : 'A entrada fica guardada neste celular e vai para o computador por um arquivo que você salva na pasta do backup no Google Drive. Ao abrir, o Gestor no computador pergunta se quer importá-la.';
+    return [el('p', { class: 'discreto pequeno', texto: explicacao }), formulario];
   }
+
+  class AvisoEdicao extends Error {}
+
+  async function salvarEdicao(r, entrada, conta) {
+    if (info.independente) {
+      await editarLocal(r, entrada, conta);
+      location.replace(`#operacao/${r.id}`);
+      return;
+    }
+    const antes = Object.fromEntries(CAMPOS_EDITAVEIS.map((k) => [k, r[k]]));
+    const mesma = conta.manter || conta.id === r.conta_id;
+    const depois = { ...entrada, nome: D.nomeTitulo(entrada.nome), observacoes: D.primeiraMaiuscula(entrada.observacoes),
+      conta_id: mesma ? r.conta_id : conta.pendente ? -1 : conta.id, conta: mesma ? r.conta : conta.identificacao };
+    if (CAMPOS_EDITAVEIS.every((k) => antes[k] === depois[k])) {
+      throw new AvisoEdicao('Nada foi alterado.');
+    }
+    await guardarPendente('alteracao', { operacao_id: r.id, nome: r.nome, antes, depois });
+  }
+
+  const TITULOS_EDITAVEIS = { nome: 'titular', aquisicao: 'data de aquisição', custo: 'valor de aquisição',
+    previsto: 'Valor Total RPV', conta_id: 'conta de destino', conta: 'conta de destino', previsao: 'previsão inicial',
+    comissao: 'comissão', observacoes: 'observações' };
 
   function resumoPendente(p) {
     const e = abertasPendentes.get(p.id);
-    if (e && e.tipo === 'conta') {
-      return [`Conta: ${e.identificacao}`, `${e.banco} · titular ${e.nome}`];
+    if (!e) {
+      return ['Feita com um backup anterior', `Criada em ${D.dataHora(p.criada_em)}`];
     }
-    return e ? [e.nome, `${D.reais(e.previsto)} · previsão ${D.dataBr(e.previsao)} · ${e.conta}`]
-      : ['Feita com um backup anterior', `Criada em ${D.dataHora(p.criada_em)}`];
+    switch (e.tipo) {
+      case 'conta':
+        return [`Conta: ${e.identificacao}`, `${e.banco} · titular ${e.nome}`];
+      case 'alteracao':
+        return [`Alteração: ${e.nome}`, 'Mudou: ' + [...new Set(CAMPOS_EDITAVEIS.filter((k) => e.antes[k] !== e.depois[k])
+          .map((k) => TITULOS_EDITAVEIS[k]))].join(', ')];
+      case 'previsao':
+        return [`Nova previsão: ${e.nome}`, `${D.dataBr(e.anterior)} → ${D.dataBr(e.nova)}`];
+      case 'exclusao':
+        return [`Exclusão: ${e.nome}`, 'Vai para a lixeira do computador'];
+      case 'anexo':
+        return [`Documento: ${e.nome}`, e.arquivo];
+      default: {
+        const anexos = (e.anexos || []).length;
+        return [e.nome, `${D.reais(e.previsto)} · previsão ${D.dataBr(e.previsao)} · ${e.conta}`
+          + (anexos ? ` · ${D.quantidade(anexos, 'documento', 'documentos')}` : '')];
+      }
+    }
+  }
+
+  // Arquivo de um item guardado, pronto para o menu Compartilhar do iPhone.
+  function arquivoPendente(p) {
+    return new File([new Uint8Array(p.bytes)], p.arquivo, { type: 'application/octet-stream' });
   }
 
   // Conta de recebimento nova: mesmas regras do computador, inclusive não repetir apelido, conta ou Pix.
@@ -823,7 +1124,18 @@
     if (!listaPendentes.length) {
       return [vazio('Nada aguardando o computador.')];
     }
+    // Vários de uma vez: o menu do iPhone salva todos na mesma pasta.
+    const arquivos = listaPendentes.map(arquivoPendente);
+    const resultado = el('p', { class: 'discreto pequeno' });
+    const todos = listaPendentes.length > 1 && navigator.canShare && navigator.canShare({ files: arquivos })
+      && el('button', { type: 'button', class: 'primario', texto: `Enviar todos (${listaPendentes.length}) para o computador`,
+        onclick: () => {
+          navigator.share({ files: arquivos }).then(() => {
+            resultado.textContent = 'Arquivos enviados. Ao abrir o Gestor no computador, ele vai perguntar se quer importar.';
+          }).catch(() => {});
+        } });
     return [el('p', { class: 'discreto pequeno', texto: 'Somem daqui sozinhas quando um backup mais novo, feito depois da importação no computador, for aberto no celular.' }),
+      todos, resultado,
       el('div', { class: 'menu' }, listaPendentes.map((p) => {
         const [titulo, detalhe] = resumoPendente(p);
         return el('a', { class: 'cartao', href: `#enviar/${p.id}` }, el('div', { class: 'nome', texto: titulo }),
@@ -837,7 +1149,7 @@
       return [vazio('Isto já foi importado pelo computador ou apagado.')];
     }
     const [titulo, detalhe] = resumoPendente(p);
-    const arquivo = new File([new Uint8Array(p.bytes)], p.arquivo, { type: 'application/octet-stream' });
+    const arquivo = arquivoPendente(p);
     const podeCompartilhar = navigator.canShare && navigator.canShare({ files: [arquivo] });
     const resultado = el('p', { class: 'discreto pequeno' });
     const enviar = podeCompartilhar
@@ -854,10 +1166,12 @@
         el('li', { texto: 'Toque em "Enviar para o computador".' }),
         el('li', { texto: 'No menu do iPhone, escolha "Salvar em Arquivos".' }),
         el('li', { texto: 'Abra Google Drive e a pasta onde ficam os backups do Gestor (a do backup automático) e toque em Salvar.' }),
-        el('li', { texto: 'Abra o Gestor no computador: ele mostra as entradas do celular e pergunta se quer importar.' })),
+        el('li', { texto: 'Abra o Gestor no computador: ele mostra o que veio do celular e pergunta se quer importar.' })),
       enviar, resultado,
-      el('button', { type: 'button', class: 'secundario', texto: 'Apagar esta entrada do celular', onclick: async () => {
-        if (!confirm('Apagar esta entrada do celular? Se o arquivo já foi salvo no Google Drive, o computador ainda pode importá-la.')) {
+      listaPendentes.length > 1 && el('a', { class: 'botao-link', href: '#pendentes',
+        texto: `Ver tudo o que aguarda o computador (${listaPendentes.length})` }),
+      el('button', { type: 'button', class: 'secundario', texto: 'Apagar do celular', onclick: async () => {
+        if (!confirm('Apagar do celular? Se o arquivo já foi salvo no Google Drive, o computador ainda pode importá-lo.')) {
           return;
         }
         listaPendentes = listaPendentes.filter((x) => x.id !== id);
@@ -895,8 +1209,14 @@
     const historico = dados.historico.get(id) || [];
     const prorrogacoes = dados.prorrogacoes.get(id) || [];
     const documentos = dados.documentos.get(id) || [];
+    const aguardando = !info.independente && pendentesDa(r.id).map((p) => {
+      const [titulo, detalhe] = resumoPendente(p);
+      return el('a', { class: 'aviso item', href: `#enviar/${p.id}` }, el('div', { class: 'nome', texto: titulo }),
+        el('div', { class: 'discreto pequeno', texto: `${detalhe} · aguarda o computador` }));
+    });
     return [
       r.lixeira_em && el('p', { class: 'aviso', texto: `Na lixeira desde ${D.dataHora(r.lixeira_em)}.` }),
+      aguardando,
       cartao(campos([
         ['Situação', SITUACOES[s], s === 'atrasada' ? 'vermelho' : s === 'recebida' ? 'verde' : ''],
         ['Titular original', r.nome],
@@ -926,7 +1246,108 @@
           el('div', { class: 'nome', texto: d.nome }),
           el('div', { class: 'discreto pequeno', texto: d.tipo === 'recebimento' ? 'Comprovante de recebimento' : 'Documento da entrada' }))))
         : el('p', { class: 'discreto', texto: 'Nenhum documento anexado.' }),
+      anexarDocumento(r),
+      acoesDaOperacao(r),
     ];
+  }
+
+  // Foto (câmera ou álbum) ou PDF anexado à operação: gravado aqui (só celular) ou mandado ao computador.
+  function anexarDocumento(r) {
+    if (!info.chave || r.lixeira_em) {
+      return null;
+    }
+    const situacao = el('p', { class: 'discreto pequeno', role: 'status' });
+    const entrada = el('input', { type: 'file', accept: 'image/*,application/pdf', multiple: true, class: 'oculto-visual',
+      name: 'anexar', onchange: async () => {
+        const arquivos = [...entrada.files];
+        if (!arquivos.length) {
+          return;
+        }
+        situacao.className = 'discreto pequeno';
+        situacao.textContent = 'Preparando…';
+        try {
+          const documentos = await prepararDocumentos(arquivos);
+          if (info.independente) {
+            await salvarLocal(registrarDocumentos(r.id, documentos));
+            desenhar();
+            return;
+          }
+          const ids = [];
+          for (const d of documentos) {
+            ids.push(await guardarPendente('anexo', { operacao_id: r.id, nome: r.nome, ...documentoParaEnvio(d) }, { ir: false }));
+          }
+          location.replace(ids.length === 1 ? `#enviar/${ids[0]}` : '#pendentes');
+        } catch (erro) {
+          situacao.className = 'erro';
+          situacao.textContent = erro && erro.message ? erro.message : String(erro);
+        } finally {
+          entrada.value = '';
+        }
+      } });
+    return [el('label', { class: 'botao-link secundario anexar' }, '+ Anexar foto ou PDF', entrada), situacao];
+  }
+
+  // Alterar a previsão, editar e excluir: gravado aqui (só celular) ou mandado ao computador, que confere.
+  function acoesDaOperacao(r) {
+    if (!info.chave) {
+      return null;
+    }
+    if (r.lixeira_em) {
+      return info.independente && el('button', { type: 'button', class: 'secundario', texto: 'Restaurar da lixeira',
+        onclick: async (evento) => {
+          evento.target.disabled = true;
+          await lixeiraLocal(r, false);
+          desenhar();
+        } });
+    }
+    const excluir = el('button', { type: 'button', class: 'secundario perigo', texto: 'Excluir operação', onclick: async () => {
+      if (!confirm(info.independente ? 'Excluir esta operação? Ela vai para a lixeira (em Mais), de onde pode ser restaurada.'
+        : 'Excluir esta operação? O pedido vai para o computador, que a coloca na lixeira.')) {
+        return;
+      }
+      excluir.disabled = true;
+      if (info.independente) {
+        await lixeiraLocal(r, true);
+        location.replace('#operacoes');
+      } else {
+        await guardarPendente('exclusao', { operacao_id: r.id, nome: r.nome });
+      }
+    } });
+    return [
+      el('h2', { texto: 'Mudar esta operação' }),
+      !r.recebimento && formularioPrevisao(r),
+      el('a', { class: 'botao-link secundario', href: `#editar/${r.id}`, texto: 'Editar dados da entrada' }),
+      excluir,
+    ];
+  }
+
+  function formularioPrevisao(r) {
+    const data = el('input', { type: 'date', name: 'nova_previsao', value: r.previsao_atual });
+    const erro = el('div', { class: 'erro', role: 'alert' });
+    const botao = el('button', { type: 'submit', class: 'primario', texto: 'Salvar nova previsão' });
+    return el('details', { class: 'cartao acao' },
+      el('summary', {}, el('span', { class: 'nome', texto: 'Alterar previsão' }),
+        el('span', { class: 'discreto pequeno', texto: `Atual: ${D.dataBr(r.previsao_atual)}` })),
+      el('form', { class: 'formulario', onsubmit: async (evento) => {
+        evento.preventDefault();
+        const problemas = D.problemasDaPrevisao(r, data.value);
+        if (problemas.length) {
+          erro.textContent = problemas.join(' ');
+          return;
+        }
+        botao.disabled = true;
+        try {
+          if (info.independente) {
+            await previsaoLocal(r, data.value);
+            desenhar();
+          } else {
+            await guardarPendente('previsao', { operacao_id: r.id, nome: r.nome, anterior: r.previsao_atual, nova: data.value });
+          }
+        } catch (e) {
+          erro.textContent = 'Não foi possível guardar neste aparelho: ' + (e && e.message ? e.message : e);
+          botao.disabled = false;
+        }
+      } }, campoFormulario('Nova previsão de recebimento', data, 'A previsão anterior fica no histórico.'), erro, botao));
   }
 
   function documentoPorId(id) {
@@ -1002,7 +1423,8 @@
     if (!dados.lixeira.length) {
       return [vazio('A lixeira está vazia.')];
     }
-    return [el('p', { class: 'discreto pequeno', texto: 'Operações excluídas no computador. Para restaurar, use o programa no computador.' }),
+    return [el('p', { class: 'discreto pequeno', texto: info.independente ? 'Operações excluídas. Toque numa delas para ver ou restaurar.'
+      : 'Operações excluídas no computador. Para restaurar, use o programa no computador.' }),
       el('div', { class: 'lista' }, dados.lixeira.map((r) => itemOperacao(r, `#operacao/${r.id}`)))];
   }
 
@@ -1101,6 +1523,7 @@
     const opcao = (href, titulo, detalhe) => el('a', { class: 'cartao', href },
       el('div', { texto: titulo }), el('div', { class: 'discreto pequeno', texto: detalhe }));
     return [el('div', { class: 'menu' },
+      opcao('#agenda', 'Agenda das previsões', 'Calendário com as datas previstas de recebimento'),
       opcao('#grafico', 'Gráfico mensal', 'Entradas e recebimentos dos últimos 12 meses'),
       opcao('#lixeira', `Lixeira (${dados.lixeira.length})`, 'Operações excluídas, só para consulta'),
       opcao('#backup', 'Sobre este backup', `Arquivo, data e versões · app ${VERSAO_APP}`),
@@ -1200,6 +1623,8 @@
     backup: { titulo: 'Sobre este backup', aba: 'mais', montar: telaBackup, voltar: true },
     novidades: { titulo: 'Novidades', aba: 'mais', montar: telaNovidades, voltar: true },
     nova: { titulo: 'Nova entrada', aba: 'operacoes', montar: telaNovaEntrada, voltar: true },
+    editar: { titulo: 'Editar entrada', aba: 'operacoes', montar: telaEditar, voltar: true },
+    agenda: { titulo: 'Agenda', aba: 'inicio', montar: telaAgenda, voltar: true },
     copia: { titulo: 'Cópia de segurança', aba: 'mais', montar: telaCopia, voltar: true },
     convite: { titulo: 'Convidar alguém', aba: 'mais', montar: telaConvite, voltar: true },
     'nova-conta': { titulo: 'Nova conta', aba: 'contas', montar: telaNovaConta, voltar: true },

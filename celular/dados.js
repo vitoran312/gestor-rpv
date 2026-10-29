@@ -9,6 +9,8 @@ const GestorDados = (() => {
     agencia: 'Agência', numero: 'Conta bancária', pix: 'Chave Pix',
   };
   const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+  const MESES_EXTENSO = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro',
+    'outubro', 'novembro', 'dezembro'];
 
   // ---- Valores e datas -------------------------------------------------------------------------------
   function moeda(valor) {
@@ -305,6 +307,85 @@ const GestorDados = (() => {
     return registro.previsao_atual < hoje ? 'atrasada' : 'pendente';
   }
 
+  // ---- Edição no celular (as mesmas regras de Banco.salvar e Banco.atualizar_previsao) ------------------
+  function problemasDaEdicao(registro, d, hoje = hojeIso()) {
+    const problemas = problemasDaEntrada(d, hoje);
+    if (!problemas.length) {
+      if (registro.recebimento && d.aquisicao > registro.recebimento) {
+        problemas.push('A aquisição não pode ser posterior à data do recebimento.');
+      }
+      if ((registro.previsao_atual_definida || registro.total_prorrogacoes) && d.aquisicao > registro.previsao_atual) {
+        problemas.push('A aquisição não pode ser posterior à previsão atual.');
+      }
+    }
+    return problemas;
+  }
+
+  function problemasDaPrevisao(registro, nova) {
+    try {
+      validarDataIso(nova, 'Nova previsão');
+    } catch (erro) {
+      return [erro.message];
+    }
+    if (nova < registro.aquisicao) {
+      return ['A previsão atual não pode ser anterior à aquisição.'];
+    }
+    return nova === registro.previsao_atual ? ['A nova previsão é igual à atual.'] : [];
+  }
+
+  // ---- Agenda das previsões ---------------------------------------------------------------------------
+  function somarDias(iso, dias) {
+    const [ano, mes, dia] = iso.split('-').map(Number);
+    return hojeIso(new Date(ano, mes - 1, dia + dias));
+  }
+
+  // Operações ainda não recebidas, pela previsão atual: atrasadas, hoje, amanhã e nos próximos 7 dias (depois
+  // de amanhã até daqui a uma semana), e todas agrupadas por dia (para o calendário).
+  function agenda(registros, hoje = hojeIso()) {
+    const abertas = registros.filter((r) => !r.recebimento)
+      .sort((a, b) => a.previsao_atual.localeCompare(b.previsao_atual) || a.nome.localeCompare(b.nome, 'pt-BR'));
+    const amanha = somarDias(hoje, 1);
+    const semana = somarDias(hoje, 7);
+    const porDia = new Map();
+    for (const r of abertas) {
+      if (!porDia.has(r.previsao_atual)) {
+        porDia.set(r.previsao_atual, []);
+      }
+      porDia.get(r.previsao_atual).push(r);
+    }
+    return {
+      atrasadas: abertas.filter((r) => r.previsao_atual < hoje),
+      hoje: porDia.get(hoje) || [],
+      amanha: porDia.get(amanha) || [],
+      semana: abertas.filter((r) => r.previsao_atual > amanha && r.previsao_atual <= semana),
+      porDia,
+    };
+  }
+
+  // Semanas de um mês ("2026-10"), de domingo a sábado: cada dia como data ISO, ou null fora do mês.
+  function semanasDoMes(chave) {
+    const [ano, mes] = chave.split('-').map(Number);
+    const dias = new Date(ano, mes, 0).getDate();
+    const celulas = Array(new Date(ano, mes - 1, 1).getDay()).fill(null);
+    for (let dia = 1; dia <= dias; dia += 1) {
+      celulas.push(`${chave}-${String(dia).padStart(2, '0')}`);
+    }
+    while (celulas.length % 7) {
+      celulas.push(null);
+    }
+    return Array.from({ length: celulas.length / 7 }, (_, i) => celulas.slice(i * 7, i * 7 + 7));
+  }
+
+  function mesVizinho(chave, passo) {
+    const [ano, mes] = chave.split('-').map(Number);
+    const data = new Date(ano, mes - 1 + passo, 1);
+    return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  function nomeDoMes(chave) {
+    return `${MESES_EXTENSO[Number(chave.slice(5, 7)) - 1]} de ${chave.slice(0, 4)}`;
+  }
+
   function contarSituacoes(registros, hoje = hojeIso()) {
     const totais = { todas: registros.length, pendente: 0, atrasada: 0, recebida: 0 };
     for (const r of registros) {
@@ -466,5 +547,6 @@ const GestorDados = (() => {
   return {
     TITULOS_CONTA, moeda, reais, dataBr, dataHora, hojeIso, cpf, situacao, contarSituacoes, indicadores,
     centavos, problemasDaEntrada, validarDataIso, nomeFormatado, nomeTitulo, linhaDaConta, snapshotConta, validarSenha, primeiraMaiuscula, ESTADOS, validarCpf, mesmaChavePix, problemasDaConta, normalizar, chaveTexto, encontra, filtrar, resumoMensal, escala, valoresDoMes, quantidade, rotuloMes, carregar, contaDaOperacao,
+    problemasDaEdicao, problemasDaPrevisao, somarDias, agenda, semanasDoMes, mesVizinho, nomeDoMes,
   };
 })();

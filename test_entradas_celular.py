@@ -1,4 +1,5 @@
 """Entradas cadastradas no app do celular chegando ao programa (entradas_celular.py)."""
+import base64
 import json
 import shutil
 import tempfile
@@ -9,7 +10,11 @@ from pathlib import Path
 import cifra
 import entradas_celular
 from backup import PASTA_AUTOMATICA
-from apoio_testes import SENHA_TESTE, banco_com_contas, dados_conta
+from apoio_testes import SENHA_TESTE, banco_com_contas, dados_conta, dados_rpv
+
+PNG_1X1 = bytes.fromhex('89504e470d0a1a0a0000000d4948445200000001000000010802000000907753de0000000c49444154789c6338'
+                        '2167040002ca0119bfd3bf060000000049454e44ae426082')
+EDITAVEIS = ('nome', 'aquisicao', 'custo', 'previsto', 'conta_id', 'conta', 'previsao', 'comissao', 'observacoes')
 
 
 def entrada(**valores):
@@ -152,6 +157,130 @@ class TestEntradasDoCelular(unittest.TestCase):
                                                                     'conta': dict(conta, ativa=True)})
         _, problemas = entradas_celular.conferir(self.banco, [dois, a_mais])
         self.assertEqual([m for _, m in problemas], ['O arquivo do celular está incompleto.'] * 2)
+
+    # ---- Mudanças em operações que já existem -----------------------------------------------------------
+    def mudanca(self, tipo, operacao, **valores):
+        """Arquivo de mudança como o app grava, com o nome do titular e os valores que o celular via."""
+        dados = dict(id=str(uuid.uuid4()), operacao_id=operacao, nome=self.banco.obter(operacao)['nome'],
+                     criada_em='2026-10-29T10:00:00-03:00', **valores)
+        return self.arquivo(dados, nome=f'{tipo}-{dados["id"][:8]}.rpvcelular',
+                            pacote={'formato': 'gestor-rpv-celular', 'versao_formato': 1, tipo: dados})
+
+    def campos(self, operacao):
+        return {k: self.banco.obter(operacao)[k] for k in EDITAVEIS}
+
+    def importar_tudo(self):
+        encontradas, problemas = entradas_celular.procurar(self.banco)
+        self.assertEqual(problemas, [])
+        return entradas_celular.importar(self.banco, encontradas)
+
+    def test_alteracao_grava_so_o_que_o_celular_mudou(self):
+        rpv = self.banco.salvar(dados_rpv(aquisicao='2026-10-01'))
+        antes = self.campos(rpv)
+        depois = dict(antes, previsto=2500000, previsao='2027-01-15', observacoes='corrigido no celular')
+        self.mudanca('alteracao', rpv, antes=antes, depois=depois)
+        # Enquanto isso, no computador, outro campo mudou: os dois ficam.
+        self.banco.salvar(dict(dados_rpv(aquisicao='2026-10-01'), comissao=30000), rpv)
+        encontradas, _ = entradas_celular.procurar(self.banco)
+        self.assertEqual(entradas_celular.resumo(encontradas[0][1]),
+                         'Alteração em Pessoa De Teste — Valor Total RPV, previsão inicial, observações')
+        self.assertEqual(entradas_celular.importar(self.banco, encontradas), (1, []))
+        registro = self.banco.obter(rpv)
+        self.assertEqual((registro['previsto'], registro['previsao'], registro['observacoes'], registro['comissao']),
+                         (2500000, '2027-01-15', 'Corrigido no celular', 30000))
+
+    def test_alteracao_que_conflita_com_o_computador_nao_e_aplicada(self):
+        rpv = self.banco.salvar(dados_rpv(aquisicao='2026-10-01'))
+        antes = self.campos(rpv)
+        arquivo = self.mudanca('alteracao', rpv, antes=antes, depois=dict(antes, previsto=2500000))
+        self.banco.salvar(dict(dados_rpv(aquisicao='2026-10-01'), previsto=3000000), rpv)
+        gravadas, recusadas = self.importar_tudo()
+        self.assertEqual(gravadas, 0)
+        self.assertIn('Alterada no computador', recusadas[0][1])
+        self.assertIn('Valor Total RPV', recusadas[0][1])
+        self.assertEqual(self.banco.obter(rpv)['previsto'], 3000000)
+        # Não tem como dar certo depois: sai da pasta e não é perguntada de novo.
+        self.assertFalse(arquivo.exists())
+        self.assertEqual(entradas_celular.procurar(self.banco), ([], []))
+
+    def test_alteracao_troca_de_conta_e_regras_do_formulario(self):
+        rpv = self.banco.salvar(dados_rpv(aquisicao='2026-10-01'))
+        antes = self.campos(rpv)
+        lilian = next(c['id'] for c in self.banco.contas() if c['identificacao'] == 'Lilian')
+        self.mudanca('alteracao', rpv, antes=antes, depois=dict(antes, conta_id=lilian, conta='Lilian'))
+        outra = self.banco.salvar(dados_rpv(aquisicao='2026-10-01'))
+        antes_outra = self.campos(outra)
+        self.mudanca('alteracao', outra, antes=antes_outra, depois=dict(antes_outra, custo=9999999))
+        gravadas, recusadas = self.importar_tudo()
+        self.assertEqual(gravadas, 1)
+        self.assertEqual(self.banco.obter(rpv)['conta_id'], lilian)
+        self.assertIn('não pode superar', recusadas[0][1])
+
+    def test_nova_previsao_entra_no_historico(self):
+        rpv = self.banco.salvar(dados_rpv(aquisicao='2026-10-01', previsao='2026-12-20'))
+        self.mudanca('previsao', rpv, anterior='2026-12-20', nova='2027-02-10')
+        outra = self.banco.salvar(dados_rpv(aquisicao='2026-10-01', previsao='2026-12-20'))
+        self.mudanca('previsao', outra, anterior='2026-12-20', nova='2027-03-01')
+        self.banco.atualizar_previsao(outra, '2027-01-05')  # Mudou no computador depois do backup.
+        gravadas, recusadas = self.importar_tudo()
+        self.assertEqual(gravadas, 1)
+        self.assertEqual(self.banco.obter(rpv)['previsao_atual'], '2027-02-10')
+        self.assertEqual(self.banco.historico_previsoes(rpv)[0]['anterior'], '2026-12-20')
+        self.assertIn('05/01/2027', recusadas[0][1])
+        self.assertEqual(self.banco.obter(outra)['previsao_atual'], '2027-01-05')
+
+    def test_exclusao_vai_para_a_lixeira(self):
+        rpv = self.banco.salvar(dados_rpv(aquisicao='2026-10-01'))
+        self.mudanca('exclusao', rpv)
+        encontradas, _ = entradas_celular.procurar(self.banco)
+        self.assertEqual(entradas_celular.resumo(encontradas[0][1]), 'Excluir Pessoa De Teste (vai para a lixeira)')
+        self.assertEqual(entradas_celular.importar(self.banco, encontradas), (1, []))
+        self.assertTrue(self.banco.obter(rpv)['lixeira_em'])
+
+    def test_documento_anexado_no_celular(self):
+        rpv = self.banco.salvar(dados_rpv(aquisicao='2026-10-01'))
+        conteudo = base64.b64encode(PNG_1X1).decode()
+        self.mudanca('anexo', rpv, arquivo='Foto do ofício.png', conteudo=conteudo)
+        self.mudanca('anexo', rpv, arquivo='..\\..\\pasta/escondido.jpg', conteudo=conteudo)
+        self.mudanca('anexo', rpv, arquivo='programa.exe', conteudo=conteudo)
+        encontradas, problemas = entradas_celular.procurar(self.banco)
+        self.assertIn('não é PDF nem imagem', problemas[0][1])
+        self.assertEqual(entradas_celular.contar(encontradas), '2 documentos')
+        self.assertEqual(entradas_celular.importar(self.banco, encontradas), (2, []))
+        documentos = self.banco.documentos(rpv)
+        self.assertEqual(sorted(d['nome'] for d in documentos), ['Foto do ofício.png', 'escondido.jpg'])
+        self.assertTrue(all(self.banco.caminho_documento(d['id']).read_bytes() == PNG_1X1 for d in documentos))
+
+    def test_entrada_nova_com_documentos(self):
+        dados = entrada(conta_id=self.vitor, anexos=[
+            {'arquivo': 'Contrato.pdf', 'conteudo': base64.b64encode(b'%PDF-1.4 teste').decode()},
+            {'arquivo': 'Contrato.pdf', 'conteudo': base64.b64encode(b'%PDF-1.4 outro').decode()}])
+        self.arquivo(dados)
+        encontradas, _ = entradas_celular.procurar(self.banco)
+        self.assertTrue(entradas_celular.resumo(encontradas[0][1]).endswith('— 2 documentos'))
+        self.assertEqual(entradas_celular.importar(self.banco, encontradas), (1, []))
+        rpv = self.banco.listar()[0]['id']
+        self.assertEqual([self.banco.caminho_documento(d['id']).read_bytes() for d in self.banco.documentos(rpv)],
+                         [b'%PDF-1.4 teste', b'%PDF-1.4 outro'])
+
+    def test_mudanca_em_operacao_que_saiu_da_lista(self):
+        rpv = self.banco.salvar(dados_rpv(aquisicao='2026-10-01'))
+        self.mudanca('previsao', rpv, anterior='2026-12-20', nova='2027-02-10')
+        self.mudanca('exclusao', rpv)
+        self.banco.excluir(rpv)
+        gravadas, recusadas = self.importar_tudo()
+        # A exclusão já estava feita (conta como aplicada); a previsão é recusada com aviso.
+        self.assertEqual(gravadas, 1)
+        self.assertIn('não está mais na lista ativa', recusadas[0][1])
+
+    def test_mudanca_com_campos_errados_e_recusada(self):
+        rpv = self.banco.salvar(dados_rpv(aquisicao='2026-10-01'))
+        antes = self.campos(rpv)
+        self.mudanca('alteracao', rpv, antes=antes, depois={k: v for k, v in antes.items() if k != 'nome'})
+        self.mudanca('anexo', rpv, arquivo='a.png', conteudo='isto não é base64!')
+        _, problemas = entradas_celular.procurar(self.banco)
+        self.assertEqual(sorted(m for _, m in problemas), ['O arquivo do celular está incompleto.',
+                                                           'Um documento do arquivo do celular está ilegível.'])
 
     def test_sem_pasta_do_backup_automatico_nao_procura(self):
         self.banco.remover_configuracao(PASTA_AUTOMATICA)

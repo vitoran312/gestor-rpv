@@ -3,6 +3,8 @@
 Roda um navegador de verdade (Playwright + Chromium); fica de fora quando não há Node.js com Playwright,
 como no Windows do CI. Exemplo: GESTOR_RPV_TESTE_CELULAR=1 python -m unittest test_celular -v
 """
+import base64
+import calendar
 import functools
 import hashlib
 import json
@@ -24,8 +26,8 @@ from apoio_testes import SENHA_TESTE, banco_com_contas, dados_rpv, prorrogacao_a
 RAIZ = Path(__file__).resolve().parent
 NAVEGADOR = os.environ.get('GESTOR_RPV_NAVEGADOR', 'chromium')
 # Imagem PNG de 1x1 pixel, para o comprovante de teste.
-PNG_1X1 = bytes.fromhex('89504e470d0a1a0a0000000d4948445200000001000000010802000000907753de0000000c49444154789c63f8cf'
-                        'c000000301010018dd8db40000000049454e44ae426082')
+PNG_1X1 = bytes.fromhex('89504e470d0a1a0a0000000d4948445200000001000000010802000000907753de0000000c49444154789c6338'
+                        '2167040002ca0119bfd3bf060000000049454e44ae426082')
 HOJE = date(2026, 10, 28)
 TERMOS = ['', 'ana', 'jose', 'maria jose', 'ria jo', 'lva', 'silva c', 'lva c', 'davila', 'lilian', '10/2026', '---', 'ÁVILA',
           'x y z', '  bruno  ']
@@ -38,7 +40,7 @@ CONTA_VALIDA = {'identificacao': 'Conta Nova', 'nome': 'Fulana De Tal', 'cpf': '
                 'numero': '777-1', 'pix': 'fulana@example.com'}
 CASOS_CONTA = [CONTA_VALIDA, dict(CONTA_VALIDA, nome='', banco=''), dict(CONTA_VALIDA, estado='XX'),
                dict(CONTA_VALIDA, cpf='111.111.111-11'), dict(CONTA_VALIDA, identificacao='vitor')]
-TELAS = ['#inicio', '#operacoes', '#contas', '#mais', '#grafico', '#lixeira', '#backup', '#novidades']
+TELAS = ['#inicio', '#operacoes', '#contas', '#mais', '#grafico', '#lixeira', '#backup', '#novidades', '#agenda']
 
 
 def pdf_de_teste(textos, enchimento=0):
@@ -166,6 +168,8 @@ class TestAppDoCelular(unittest.TestCase):
                          'observacoes': 'veio do celular', 'ja_importada': cls.ja_importada,
                          'backup_com_importada': str(com_importada)}
         telas['conta'] = dict(CONTA_VALIDA, identificacao='Conta Do Celular', cpf='52998224725', pix='celular@example.com')
+        telas['mudancas'] = {'editar': cls.bruno, 'previsao': cls.carlos, 'nova_previsao': '2027-01-30',
+                             'excluir': cls.antiga, 'anexar': cls.ana, 'png': base64.b64encode(PNG_1X1).decode()}
         outro = banco_com_contas(cls.pasta / 'outro' / 'gestor.sqlite3')
         outro.salvar(dados_rpv(nome='Só No Segundo Backup'))
         segundo = criar_backup(outro, cls.pasta / 'segundo')
@@ -321,6 +325,87 @@ class TestAppDoCelular(unittest.TestCase):
                          ('2026-10-20', 500000, 800000, 10000, '2026-12-15', self.conta_vitor, 'Veio do celular'))
         self.assertIn(feita['id'], entradas_celular.importadas(destino))
 
+    # ---- Mudanças em operações do computador -------------------------------------------------------------
+    def test_editar_e_alterar_previsao_conferem_as_regras(self):
+        r = self.resultados
+        self.assertEqual(r['editar_sem_mudar'], 'Nada foi alterado.')
+        lilian = next(c['id'] for c in self.banco.contas() if c['identificacao'] == 'Lilian')
+        self.assertEqual(r['editar_valores'], {'nome': 'Bruno Lima', 'custo': moeda(1200000), 'previsto': moeda(2000000),
+                                               'previsao': '2026-12-01', 'conta': str(lilian)})
+        self.assertIn('não pode ser anterior à aquisição', r['previsao_erro'])
+        self.assertIn('Mudou: Valor Total RPV, observações', r['editar_tela'])
+        self.assertIn('Documento: Ana', r['anexo_tela'])
+        self.assertIn('Alteração: Bruno Lima', r['operacao_com_pendente'])
+        self.assertIn('aguarda o computador', r['operacao_com_pendente'])
+        self.assertIn('Exclusão: Operação Antiga', r['pendentes_tela'])
+
+    def test_mudancas_feitas_no_celular_sao_importadas_pelo_programa(self):
+        import entradas_celular
+        from backup import PASTA_AUTOMATICA
+        arquivos = self.resultados['mudancas_arquivos']
+        self.assertEqual(sorted(a['tipo'] for a in arquivos), ['alteracao', 'anexo', 'exclusao', 'previsao'])
+        pasta = self.pasta / 'mudancas'
+        drive = pasta / 'drive'
+        drive.mkdir(parents=True)
+        shutil.copy(self.banco.caminho, pasta / 'gestor.sqlite3')
+        destino = Banco(pasta / 'gestor.sqlite3')
+        destino.salvar_configuracao(PASTA_AUTOMATICA, str(drive))
+        for arquivo in arquivos:
+            (drive / arquivo['arquivo']).write_bytes(base64.b64decode(arquivo['bytes']))
+        encontradas, problemas = entradas_celular.procurar(destino)
+        self.assertEqual(problemas, [])
+        self.assertEqual(entradas_celular.contar(encontradas), '1 alteração, 1 nova previsão, 1 documento e 1 exclusão')
+        self.assertEqual(entradas_celular.importar(destino, encontradas), (4, []))
+        bruno = destino.obter(self.bruno)
+        self.assertEqual((bruno['previsto'], bruno['custo'], bruno['observacoes']), (3000000, 1200000, 'Editada no celular'))
+        self.assertEqual(destino.obter(self.carlos)['previsao_atual'], '2027-01-30')
+        self.assertTrue(destino.obter(self.antiga)['lixeira_em'])
+        (foto,) = [d for d in destino.documentos(self.ana) if d['nome'].endswith('.jpg')]
+        self.assertTrue(foto['nome'].startswith('Foto '))
+        self.assertEqual(destino.caminho_documento(foto['id']).read_bytes()[:2], b'\xff\xd8')  # Virou JPEG.
+
+    # ---- Agenda -------------------------------------------------------------------------------------------
+    def test_agenda_igual_ao_que_o_programa_calcula(self):
+        abertas = sorted((r for r in self.banco.listar() if not r['recebimento']),
+                         key=lambda r: (r['previsao_atual'], r['nome']))
+        hoje, amanha = HOJE.isoformat(), date.fromordinal(HOJE.toordinal() + 1).isoformat()
+        semana = date.fromordinal(HOJE.toordinal() + 7).isoformat()
+        dias = {}
+        for r in abertas:
+            dias.setdefault(r['previsao_atual'], []).append(r['id'])
+        self.assertEqual(self.resultados['regras']['agenda'], {
+            'atrasadas': [r['id'] for r in abertas if r['previsao_atual'] < hoje],
+            'hoje': dias.get(hoje, []), 'amanha': dias.get(amanha, []),
+            'semana': [r['id'] for r in abertas if amanha < r['previsao_atual'] <= semana], 'dias': dias})
+        self.assertIn(self.ana, self.resultados['regras']['agenda']['atrasadas'])
+
+    def test_calendario_de_domingo_a_sabado(self):
+        for mes, semanas in self.resultados['regras']['semanas'].items():
+            ano, numero = map(int, mes.split('-'))
+            esperado = [[d.isoformat() if d.month == numero else None for d in semana]
+                        for semana in calendar.Calendar(firstweekday=6).monthdatescalendar(ano, numero)]
+            self.assertEqual(semanas, esperado, mes)
+
+    def test_regras_da_nova_previsao(self):
+        esperado = [(['A previsão atual não pode ser anterior à aquisição.'] if '2026-01-01' < r['aquisicao'] else [])
+                    + ['A nova previsão é igual à atual.'] for r in self.banco.listar()]
+        self.assertEqual(self.resultados['regras']['previsoes'], esperado)
+
+    def test_agenda_no_inicio_e_no_calendario(self):
+        agenda = self.resultados['agenda']
+        self.assertIn('Agenda das previsões', self.resultados['inicio_agenda'])
+        self.assertIn('Próx. 7 dias', self.resultados['inicio_agenda'])
+        self.assertEqual(agenda['titulo'], 'Agenda')
+        self.assertTrue(agenda['hoje'])
+        hoje = date.today()
+        self.assertEqual(agenda['dias'], calendar.monthrange(hoje.year, hoje.month)[1])
+        if hoje.isoformat() > '2026-10-01':
+            self.assertIn("Ana Júlia D'Ávila", agenda['texto'])  # Atrasada desde 01/10/2026.
+        meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro',
+                 'novembro', 'dezembro']
+        proximo = date(hoje.year + hoje.month // 12, hoje.month % 12 + 1, 1)
+        self.assertEqual(self.resultados['agenda_proximo_mes'], f'{meses[proximo.month - 1]} de {proximo.year}')
+
     def test_entrada_ja_importada_some_do_celular(self):
         feitas = [a['id'] for a in self.resultados['nova_arquivos'] if a['id'] != self.ja_importada]
         self.assertEqual(self.resultados['pendentes_depois'], feitas)
@@ -411,6 +496,9 @@ class TestQuemUsaSoOCelular(unittest.TestCase):
              'banco': 'nubank', 'agencia': '0001', 'numero': '12345-6', 'pix': 'maria@example.com'}
     ENTRADA = {'nome': "joão d'ávila   santos", 'aquisicao': '2026-10-01', 'custo': '500000', 'previsto': '800000',
                'previsao': '2026-12-01', 'observacoes': 'primeira entrada'}
+    SEGUNDA = {'nome': 'segunda entrada', 'custo': '100000', 'previsto': '200000', 'previsao': '2026-12-10',
+               'novo_previsto': '300000', 'nova_previsao': '2027-03-01', 'mes_previsao': 'março de 2027'}
+    PDF = pdf_de_teste(['Oficio do tribunal'])
     NOMES = ["joão d'ávila", 'MARIA-JOSÉ', '3rd ávila', 'ana  beatriz', "o'neill mcdonald"]
     SENHAS = ['123456789', 'abcdefghij', ' com espaço ', 'senha@12345', 'cavalo azul bebe cafe', 'Mar1aJ0se!x']
 
@@ -426,6 +514,7 @@ class TestQuemUsaSoOCelular(unittest.TestCase):
         try:
             cls.r = json.loads(rodar_node('independente.cjs', f'http://127.0.0.1:{servidor.server_address[1]}', {
                 'senha': cls.SENHA, 'conta': cls.CONTA, 'entrada': cls.ENTRADA, 'hoje': cls.hoje,
+                'segunda': dict(cls.SEGUNDA, pdf=base64.b64encode(cls.PDF).decode(), png=base64.b64encode(PNG_1X1).decode()),
                 'senhas_ruins': [['123', '123'], ['abcdefghij', 'abcdefghij'], [cls.SENHA, cls.SENHA + 'x']],
                 'nomes': cls.NOMES, 'senhas_regra': cls.SENHAS}))
         finally:
@@ -471,14 +560,32 @@ class TestQuemUsaSoOCelular(unittest.TestCase):
         self.assertIn('Começar sem computador', self.r['convite'])
         self.assertTrue(self.r['guardado']['independente'])
 
+    def test_editar_previsao_documentos_e_lixeira_no_celular(self):
+        r = self.r
+        self.assertIn('Ofício.pdf', r['segunda_criada'])
+        self.assertIn('image.jpg', r['segunda_criada'].replace('Foto ', 'image.jpg #'))  # Foto da câmera ganha nome.
+        self.assertIn('R$ 3.000,00', r['segunda_editada'])
+        self.assertIn('Editada no celular', r['segunda_editada'])
+        self.assertIn('10/12/2026 → 01/03/2027', r['segunda_editada'])
+        self.assertIn('Recibo.jpg', r['segunda_editada'])
+        self.assertTrue(r['foto_aberta'])
+        self.assertNotIn('Segunda Entrada', r['operacoes_sem_segunda'])
+        self.assertIn('Segunda Entrada', r['lixeira'])
+        self.assertIn('restaurar', r['lixeira'])
+        self.assertNotIn('Na lixeira desde', r['restaurada'])
+        self.assertEqual((r['documentos_restaurada'], r['documentos_depois']), (3, 3))
+        self.assertIn('Segunda Entrada', r['agenda'])  # Previsão em 01/03/2027, ainda não recebida.
+        self.assertIn('segunda 01/03', r['agenda'])
+        self.assertIn('Agenda das previsões', r['inicio_com_dados'])
+        self.assertIn('Nenhuma previsão para os próximos 7 dias.', r['inicio_com_dados'])
+
     def test_dados_do_celular_abrem_no_programa_como_o_programa_gravaria(self):
-        import base64
         from backup import BackupPreparado
         arquivo = self.pasta / 'GestorRPV-celular.rpvbackup'
         arquivo.write_bytes(base64.b64decode(self.r['guardado']['bytes']))
         do_celular = Banco(self.pasta / 'restaurado' / 'gestor.sqlite3')
         with BackupPreparado(arquivo, self.SENHA) as preparado:
-            self.assertEqual(preparado.resumo['registros'], 1)
+            self.assertEqual((preparado.resumo['registros'], preparado.resumo['documentos']), (2, 3))
             preparado.restaurar(do_celular, copia_de_seguranca=False)
         referencia = Banco(self.pasta / 'referencia' / 'gestor.sqlite3')
         conta_id = referencia.salvar_conta(self.CONTA)
@@ -491,6 +598,18 @@ class TestQuemUsaSoOCelular(unittest.TestCase):
 
         self.assertEqual(linha(do_celular, 'contas'), linha(referencia, 'contas'))
         self.assertEqual(linha(do_celular, 'rpvs'), linha(referencia, 'rpvs'))
+        # A segunda entrada: editada, com nova previsão no histórico e os três documentos legíveis no programa.
+        (segunda,) = [x for x in do_celular.listar() if x['nome'] == 'Segunda Entrada']
+        self.assertEqual((segunda['custo'], segunda['previsto'], segunda['previsao'], segunda['previsao_atual'],
+                          segunda['observacoes'], segunda['lixeira_em']),
+                         (100000, 300000, '2026-12-10', '2027-03-01', 'Editada no celular', None))
+        self.assertEqual([(h['anterior'], h['nova']) for h in do_celular.historico_previsoes(segunda['id'])],
+                         [('2026-12-10', '2027-03-01')])
+        documentos = {d['nome']: do_celular.caminho_documento(d['id']).read_bytes() for d in do_celular.documentos(segunda['id'])}
+        self.assertEqual(documentos.pop('Ofício.pdf'), self.PDF)
+        self.assertEqual(len(documentos), 2)
+        self.assertIn('Recibo.jpg', documentos)
+        self.assertTrue(all(b[:2] == b'\xff\xd8' for b in documentos.values()))
 
 
 class TestArquivosDoApp(unittest.TestCase):
