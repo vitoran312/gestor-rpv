@@ -58,6 +58,15 @@ def pdf_de_teste(textos, enchimento=0):
     return bytes(saida)
 
 
+def rodar_node(script, endereco, entrada):
+    """Roda um roteiro do navegador; se ele falhar, o erro do Node aparece na falha do teste."""
+    resultado = subprocess.run(['node', str(RAIZ / 'celular' / 'testes' / script), endereco, json.dumps(entrada)],
+                               capture_output=True, text=True, timeout=300)
+    if resultado.returncode:
+        raise AssertionError(f'{script} falhou no {NAVEGADOR}:\n{resultado.stderr[-4000:]}')
+    return resultado.stdout
+
+
 class Silencioso(SimpleHTTPRequestHandler):
     def log_message(self, *_):
         pass
@@ -76,15 +85,10 @@ class TestAppDoCelular(unittest.TestCase):
         servidor = ThreadingHTTPServer(('127.0.0.1', 0), functools.partial(Silencioso, directory=str(cls.site)))
         threading.Thread(target=servidor.serve_forever, daemon=True).start()
         try:
-            saida = subprocess.run(
-                ['node', str(RAIZ / 'celular' / 'testes' / 'navegador.cjs'),
-                 f'http://127.0.0.1:{servidor.server_address[1]}', json.dumps(entrada)],
-                capture_output=True, text=True, timeout=300, check=True).stdout
-            faceid = None if NAVEGADOR != 'chromium' else subprocess.run(
-                # Chave de acesso exige um nome de site (localhost), não um endereço IP.
-                ['node', str(RAIZ / 'celular' / 'testes' / 'faceid.cjs'),
-                 f'http://localhost:{servidor.server_address[1]}', json.dumps(cls.entrada_faceid)],
-                capture_output=True, text=True, timeout=300, check=True).stdout
+            saida = rodar_node('navegador.cjs', f'http://127.0.0.1:{servidor.server_address[1]}', entrada)
+            # Chave de acesso exige um nome de site (localhost), não um endereço IP.
+            faceid = None if NAVEGADOR != 'chromium' else rodar_node(
+                'faceid.cjs', f'http://localhost:{servidor.server_address[1]}', cls.entrada_faceid)
         finally:
             servidor.shutdown()
             servidor.server_close()
