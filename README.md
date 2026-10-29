@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.58.0
+# Gestor de RPV — 0.59.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -493,6 +493,17 @@ recebimento, Lixeira, Gráfico mensal e dados do backup aberto. "Fechar dados" a
 tudo da memória do celular. O endereço é https://vitoran312.github.io/gestor-rpv/; no Safari do iPhone,
 **Compartilhar → Adicionar à Tela de Início** instala o app com ícone e em tela cheia. O service worker
 (`celular/sw.js`) guarda só o código do app, para abrir também sem internet.
+
+**Visual do app (identidade Terracota).** Creme quente (`#F7F3EE`), superfícies `#FFFDF9`, ação principal em
+terracota (`#B95A3F`, texto branco com contraste AA), texto azul-marinho (`#20334D`), verde suave nas formas da
+abertura e nos valores realizados; tema escuro com os mesmos papéis. Títulos em serifa (New York), valores com
+algarismos de largura igual. Os tokens de cor, espaço, raio e movimento ficam no topo de `celular/estilo.css`.
+Abas numa barra clara com a pílula terracota que desliza até a aba escolhida; Início com "Seu panorama", o
+lucro previsto num cartão terracota e cartões com ícone; Operações com avatar de iniciais, faixa da situação e
+seta; Mais em três grupos (Ferramentas, Aplicativo e compartilhamento, Dados e segurança). Movimento discreto:
+entrada que sobe 8 px nas abas, empurrar/voltar nos detalhes, toque que encolhe para 0,98, troca de filtro em
+crossfade, detalhes que abrem suavemente, aviso passageiro depois de gravar no celular e esqueleto só nas
+novidades (carregadas da rede); com "Reduzir movimento" do iPhone, sobra só a opacidade.
 
 O último backup aberto fica guardado no aparelho (`celular/guarda.js`) exatamente como saiu do computador,
 trancado pela senha: nas próximas vezes não é preciso escolher o arquivo, e "Trocar por um backup mais novo"

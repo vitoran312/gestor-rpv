@@ -18,8 +18,8 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Gestor RPV">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="theme-color" content="#f4f2ec" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#0b0e14" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f7f3ee" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#121519" media="(prefers-color-scheme: dark)">
   <link rel="stylesheet" href="estilo.css">
 </head>
 <body>
@@ -33,11 +33,12 @@
   <main id="abertura" class="abertura">
     <img class="logo-abertura" src="icones/logo.png" alt="">
     <h1>GESTOR RPV</h1>
+    <p class="slogan">Seus dados sempre seguros e com você.</p>
     <div id="fonte" class="cartao" hidden>
       <div id="fonte-titulo" class="discreto pequeno"></div>
       <div id="fonte-detalhe" class="nome"></div>
     </div>
-    <button id="abrir-faceid" class="primario" type="button" hidden>Abrir com Face ID</button>
+    <button id="abrir-faceid" class="primario" type="button" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"/><path d="M9 9.5v1M15 9.5v1M12 9.5V13h-1M9.5 15.5c1.4 1 3.6 1 5 0"/></svg>Abrir com Face ID</button>
     <!-- Quem não usa o programa no computador: cria a própria senha e começa com os dados vazios. -->
     <button id="comecar" class="primario" type="button" hidden>Começar sem computador</button>
     <form id="formulario" class="cartao formulario" autocomplete="off">
@@ -72,9 +73,9 @@
     <button id="ver-demonstracao" class="link" type="button" hidden>Ver a demonstração (dados fictícios)</button>
     <p id="explicacao" class="discreto pequeno">O backup fica guardado neste aparelho como saiu do computador,
       trancado pela senha; nada é enviado para a internet.</p>
-    <p id="versao-app" class="discreto pequeno"></p>
     <p id="instalar" class="aviso pequeno" hidden>Para usar como app: no Safari, toque em <strong>Compartilhar</strong>
       e depois em <strong>Adicionar à Tela de Início</strong>. Abra sempre pelo ícone: o app guarda os dados lá.</p>
+    <p id="versao-app" class="discreto pequeno"></p>
   </main>
 
   <!-- Aplicativo: as telas são montadas por app.js conforme o endereço (#inicio, #operacoes...). -->
@@ -89,8 +90,9 @@
       </button>
     </header>
     <main id="tela" class="tela"></main>
-    <!-- Abas flutuantes: ícone de traço e o nome; a aba da tela à frente fica acesa. -->
+    <!-- Abas: ícone de traço e o nome; a pílula terracota desliza até a aba da tela à frente. -->
     <nav class="abas" aria-label="Telas">
+      <span class="indicador-aba" aria-hidden="true"></span>
       <a href="#inicio" data-aba="inicio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 10.5 12 3.5l8.5 7"/><path d="M5.5 9v11h13V9"/><path d="M10 20v-5.5h4V20"/></svg>Início</a>
       <a href="#operacoes" data-aba="operacoes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6.5h11M9 12h11M9 17.5h11"/><path d="M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01"/></svg>Operações</a>
       <a href="#contas" data-aba="contas"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 9 12 4.5 20.5 9z"/><path d="M6 11.5v5.5M10 11.5v5.5M14 11.5v5.5M18 11.5v5.5M3.5 20h17"/></svg>Contas</a>

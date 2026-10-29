@@ -1,5 +1,24 @@
 # Histórico de versões
 
+## 0.59.0
+
+Novo visual do app do celular, **Terracota** (só apresentação; dados, regras, backups, senha e Face ID iguais):
+- celular/estilo.css reescrito com tokens de cor, espaço (base 4), raio e movimento; claro em creme, terracota e
+  azul-marinho, escuro com os mesmos papéis; contrastes AA conferidos (terracota #B95A3F com texto branco).
+- Abertura em creme com formas orgânicas (SVG em data URI), slogan, cartão do backup com nuvem, Face ID com
+  ícone, links lado a lado e a versão no rodapé; splash em creme.
+- Abas: pílula terracota que desliza (mola amortecida) até a aba escolhida; olho do modo discreto num círculo.
+- Início: "Olá!" e "Seu panorama" (o título "Início" fica só para leitores de tela), lucro previsto num cartão
+  terracota, registros e capital com ícone, lucro realizado em verde suave, agenda com blocos coloridos.
+- Operações: avatar com as iniciais (por atributo, fora do texto da tela), valor em terracota, faixa da
+  situação, seta; filtros em pílulas; aviso de pendências com ícone.
+- Mais: grupos Ferramentas, Aplicativo e compartilhamento, Dados e segurança, com ícones e setas.
+- Movimento: entrada que sobe 8 px com cascata curta no Início; telas com Voltar entram da direita e, ao voltar,
+  da esquerda; toque em 0,98 (120/160 ms); crossfade só na lista ao trocar de filtro; detalhes que abrem
+  suavemente (altura animada onde há interpolate-size); aviso passageiro (toast) depois de gravar no celular;
+  esqueleto nas novidades. "Reduzir movimento" deixa só a opacidade.
+- Resumo em imagem recolorido em terracota; theme-color e manifesto em creme.
+
 ## 0.58.0
 
 - Celular (dados só no celular): Editar, Desativar/Reativar e Remover em cada conta de recebimento, com as mesmas

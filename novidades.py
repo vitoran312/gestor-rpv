@@ -10,6 +10,14 @@ from pathlib import Path
 MOSTRAR = 5  # Quantas versões aparecem no "Sobre".
 
 NOVIDADES = [
+    ('0.59.0', [
+        ('novidade', 'Celular: novo visual em creme, terracota e azul-marinho, com ícones, cartões mais claros e '
+                     'tema escuro combinando.'),
+        ('novidade', 'Celular: Início com "Seu panorama" e o lucro previsto em destaque; operações com as iniciais '
+                     'e a faixa da situação.'),
+        ('novidade', 'Celular: Mais organizado em grupos; abas com a aba escolhida em terracota.'),
+        ('novidade', 'Celular: transições suaves entre telas e um aviso rápido depois de gravar algo no celular.'),
+    ]),
     ('0.58.0', [
         ('novidade', 'Celular: editar, desativar, reativar e remover contas de recebimento, para quem usa só o '
                      'celular.'),

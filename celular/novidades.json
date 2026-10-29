@@ -1,6 +1,28 @@
 {
   "versoes": [
     {
+      "versao": "0.59.0",
+      "resumo": "4 novidades",
+      "itens": [
+        {
+          "tipo": "novidade",
+          "texto": "Celular: novo visual em creme, terracota e azul-marinho, com ícones, cartões mais claros e tema escuro combinando."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: Início com \"Seu panorama\" e o lucro previsto em destaque; operações com as iniciais e a faixa da situação."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: Mais organizado em grupos; abas com a aba escolhida em terracota."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: transições suaves entre telas e um aviso rápido depois de gravar algo no celular."
+        }
+      ]
+    },
+    {
       "versao": "0.58.0",
       "resumo": "1 novidade",
       "itens": [
@@ -49,28 +71,6 @@
         {
           "tipo": "novidade",
           "texto": "Celular: operações com filete colorido pela situação e selos em pílula; resumo em imagem com as novas cores."
-        }
-      ]
-    },
-    {
-      "versao": "0.54.0",
-      "resumo": "4 novidades",
-      "itens": [
-        {
-          "tipo": "novidade",
-          "texto": "Programa: nova identidade visual Ledger, em nanquim e champanhe, com títulos em serifa e cartões com sombra suave."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Programa: barra lateral sempre visível com Nova entrada, as páginas, backup, Excel, tema e Sobre; recolhe para ícones em janelas estreitas."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Programa: tela inicial com a data por extenso e o cartão de destaque em nanquim."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Programa: gráfico mensal com barras planas de topo arredondado."
         }
       ]
     }

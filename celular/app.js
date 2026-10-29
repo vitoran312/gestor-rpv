@@ -7,7 +7,7 @@
 (() => {
   // Igual a versao.py (test_celular confere): mostrada na abertura e em Mais, para saber se o aparelho já
   // carregou a última versão publicada.
-  const VERSAO_APP = '0.58.0';
+  const VERSAO_APP = '0.59.0';
   const D = GestorDados;
   const $ = (id) => document.getElementById(id);
   const SITUACOES = { pendente: 'Pendente', atrasada: 'Atrasada', recebida: 'Recebida' };
@@ -42,6 +42,57 @@
     }
     elemento.append(...filhos.flat(Infinity).filter((f) => f !== null && f !== undefined && f !== false));
     return elemento;
+  }
+
+  // Ícones de traço (24 × 24), desenhados aqui: nada de arquivos nem fontes de ícones.
+  const ICONES = {
+    tendencia: ['M4 17l5-5 4 4 7-7', 'M15 9h5v5'],
+    documento: ['M7 3.5h7l4 4v13H7z', 'M14 3.5V8h4', 'M10 12.5h5M10 16h5'],
+    moedas: ['M5 7c0-1.4 3.1-2.5 7-2.5s7 1.1 7 2.5-3.1 2.5-7 2.5S5 8.4 5 7z',
+      'M5 7v5c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V7', 'M5 12v5c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-5'],
+    dinheiro: ['M12 3.5v17', 'M16 7.5c-.7-1.3-2.2-2-4-2-2.3 0-4 1.1-4 3s1.8 2.6 4 3 4 1.2 4 3.1-1.8 3-4.1 3c-2 0-3.5-.8-4.2-2.2'],
+    calendario: ['M4.5 6.5h15v13h-15z', 'M4.5 10.5h15', 'M8.5 4v4M15.5 4v4'],
+    barras: ['M4 20.5h16', 'M6.5 17v-5M11 17V7M15.5 17v-7M20 17V9.5'],
+    lixeira: ['M4.5 7h15', 'M9.5 7V4.5h5V7', 'M6.5 7l1 13h9l1-13', 'M10.5 11v5.5M13.5 11v5.5'],
+    info: ['M12 3.5a8.5 8.5 0 1 1 0 17 8.5 8.5 0 0 1 0-17z', 'M12 11v5.5', 'M12 7.8v.01'],
+    megafone: ['M4 10v4h3l7 4V6l-7 4z', 'M17.5 9.5a3.5 3.5 0 0 1 0 5'],
+    convidar: ['M9 4.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7z', 'M3 19.5c.8-3.2 3.3-5 6-5s5.2 1.8 6 5', 'M18.5 8v6M15.5 11h6'],
+    escudo: ['M12 3.5l7 2.5v5.5c0 4.3-3 7.6-7 9-4-1.4-7-4.7-7-9V6z', 'M9 12l2 2 4-4'],
+    enviar: ['M12 15V4.5M8 8.5l4-4 4 4', 'M5 14.5v5h14v-5'],
+    rosto: ['M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16',
+      'M9 9.5v1M15 9.5v1M12 9.5V13h-1M9.5 15.5c1.4 1 3.6 1 5 0'],
+    cadeado: ['M6 10.5h12v10H6z', 'M8.5 10.5v-3a3.5 3.5 0 0 1 7 0v3'],
+    celular: ['M8 3.5h8v17H8z', 'M11 17.5h2'],
+    seta: ['M9 5.5l6.5 6.5L9 18.5'],
+  };
+
+  function icone(nome, classe = 'icone') {
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('class', classe);
+    svg.setAttribute('aria-hidden', 'true');
+    for (const d of ICONES[nome]) {
+      const traco = document.createElementNS(NS, 'path');
+      traco.setAttribute('d', d);
+      svg.append(traco);
+    }
+    return svg;
+  }
+
+  // Aviso passageiro acima das abas, depois de gravar algo no celular: um de cada vez (o novo substitui o atual).
+  let temporizadorAviso = null;
+  function avisar(texto) {
+    let toast = $('toast');
+    if (!toast) {
+      toast = el('div', { id: 'toast', class: 'toast', role: 'status', 'aria-live': 'polite' });
+      document.body.append(toast);
+    }
+    toast.textContent = texto;
+    void toast.offsetWidth;  // Garante a transição também quando o aviso anterior ainda some.
+    toast.classList.add('visivel');
+    clearTimeout(temporizadorAviso);
+    temporizadorAviso = setTimeout(() => toast.classList.remove('visivel'), 2600);
   }
 
   function campos(pares) {
@@ -478,8 +529,9 @@
     const totais = D.contarSituacoes(dados.operacoes);
     const dias = idadeDoBackup();
     const idade = dias === null ? '' : dias <= 0 ? ' (hoje)' : dias === 1 ? ' (ontem)' : ` (há ${dias} dias)`;
-    const indicador = (rotulo, valor, classe) => el('div', { class: 'indicador ' + (classe || '') },
-      el('div', { class: 'rotulo', texto: rotulo }), el('div', { class: 'valor', texto: valor }));
+    const indicador = (rotulo, valor, classe, simbolo) => el('div', { class: 'indicador ' + (classe || '') },
+      el('span', { class: 'icone-indicador' }, icone(simbolo)),
+      el('div', { class: 'textos' }, el('div', { class: 'rotulo', texto: rotulo }), el('div', { class: 'valor', texto: valor })));
     const situacao = (chave, rotulo, classe) => el('a', { class: 'cartao', href: '#operacoes', onclick: () => {
       estado.filtro = chave;
       estado.busca = '';
@@ -507,17 +559,17 @@
         el('div', { texto: '2. Cadastre suas entradas na aba Operações (+ Nova entrada).' }),
         el('div', { texto: '3. Quando receber, abra a operação e toque em "Registrar recebimento".' })),
       !info.independente && !info.demonstracao && dias !== null && dias > 7 && el('p', { class: 'aviso', texto: 'Este backup tem mais de uma semana. Faça um backup novo no computador para ver os dados atuais.' }),
-      // Painel de destaque (nanquim): a data, o título, de onde vêm os dados e os quatro indicadores.
-      el('section', { class: 'painel' },
-        el('div', { class: 'painel-data', texto: dataPorExtenso() }),
-        el('h2', { class: 'painel-titulo', texto: 'Seu panorama' }),
-        !info.demonstracao && el('p', { class: 'painel-fonte', texto: info.independente ? 'Seus dados, guardados neste celular.'
-          : `Dados do backup de ${D.dataHora(info.manifesto.criado_em)}${idade}.` }),
-        el('div', { class: 'indicadores' },
-          indicador('Lucro previsto', reais(ind.previsto), 'principal'),
-          indicador('Registros', String(ind.registros)),
-          indicador('Capital investido em aberto', reais(ind.aberto)),
-          indicador('Lucro realizado', reais(ind.realizado), 'verde'))),
+      // O título da página, de onde vêm os dados e os quatro indicadores: o lucro previsto em terracota.
+      el('section', { class: 'panorama' },
+        el('div', { class: 'saudacao', texto: 'Olá!' }),
+        el('h2', { class: 'panorama-titulo', texto: 'Seu panorama' }),
+        !info.demonstracao && el('p', { class: 'panorama-fonte', texto: info.independente ? 'Seus dados, guardados neste celular.'
+          : `Dados do backup de ${D.dataHora(info.manifesto.criado_em)}${idade}.` })),
+      el('div', { class: 'indicadores' },
+        indicador('Lucro previsto', reais(ind.previsto), 'principal', 'tendencia'),
+        indicador('Registros', String(ind.registros), '', 'documento'),
+        indicador('Capital investido em aberto', reais(ind.aberto), '', 'moedas'),
+        indicador('Lucro realizado', reais(ind.realizado), 'verde', 'dinheiro')),
       dados.operacoes.length > 0 && cartaoAgenda(),
       el('h2', { texto: 'Situação das operações' }),
       el('div', { class: 'situacoes' },
@@ -525,12 +577,6 @@
         situacao('atrasada', 'Atrasadas', totais.atrasada ? 'vermelho' : ''),
         situacao('recebida', 'Recebidas', 'verde')),
     ];
-  }
-
-  // "Quinta-feira, 29 de outubro": a data no alto do Início.
-  function dataPorExtenso(hoje = new Date()) {
-    const texto = hoje.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
-    return texto.charAt(0).toUpperCase() + texto.slice(1);
   }
 
   // ---- Agenda das previsões ------------------------------------------------------------------------------
@@ -547,7 +593,7 @@
   function cartaoAgenda() {
     const hoje = D.hojeIso();
     const ag = D.agenda(dados.operacoes, hoje);
-    const bloco = (rotulo, lista, classe) => el('div', { class: 'bloco-agenda' },
+    const bloco = (rotulo, lista, classe, tom) => el('div', { class: 'bloco-agenda ' + tom },
       el('div', { class: 'numero ' + (lista.length && classe ? classe : ''), texto: String(lista.length) }),
       el('div', { class: 'discreto pequeno', texto: rotulo }));
     const nomes = (rotulo, lista) => lista.length > 0 && el('div', { class: 'pequeno nomes-agenda' },
@@ -556,8 +602,9 @@
     return el('a', { class: 'cartao agenda-resumo', href: '#agenda' },
       el('div', { class: 'linha1' }, el('span', { class: 'nome', texto: 'Agenda das previsões' }),
         el('span', { class: 'mostrar pequeno', texto: 'Ver calendário ›' })),
-      el('div', { class: 'blocos-agenda' }, bloco('Atrasadas', ag.atrasadas, 'vermelho'), bloco('Hoje', ag.hoje, 'marca'),
-        bloco('Amanhã', ag.amanha, 'marca'), bloco('Próx. 7 dias', ag.semana)),
+      el('div', { class: 'blocos-agenda' }, bloco('Atrasadas', ag.atrasadas, 'vermelho', 'atrasadas'),
+        bloco('Hoje', ag.hoje, 'marca', 'hoje'), bloco('Amanhã', ag.amanha, 'marca', 'amanha'),
+        bloco('Próx. 7 dias', ag.semana, '', 'semana')),
       nomes('Hoje', ag.hoje), nomes('Amanhã', ag.amanha),
       !ag.atrasadas.length && !ag.hoje.length && !ag.amanha.length && !ag.semana.length
         && el('div', { class: 'discreto pequeno', texto: 'Nenhuma previsão para os próximos 7 dias.' }));
@@ -617,33 +664,50 @@
   function itemOperacao(r, destino) {
     const s = D.situacao(r);
     const adiada = r.previsao_atual > r.previsao;
-    return el('a', { class: `cartao item ${s}`, href: destino },
-      el('div', { class: 'linha1' }, el('span', { class: 'nome', texto: r.nome }),
-        el('span', { class: `selo ${s}`, texto: SITUACOES[s] })),
-      el('div', { class: 'linha2' },
-        el('span', { texto: reais(r.previsto) }),
-        el('span', { class: 'discreto', texto: r.recebimento ? `Recebida em ${D.dataBr(r.recebimento)}`
-          : `Previsão ${D.dataBr(r.previsao_atual)}${adiada ? ' (adiada)' : ''}` })),
-      el('div', { class: 'linha2 discreto' },
-        el('span', { texto: `Lucro ${reais(r.previsto - r.custo)}` }),
-        el('span', { texto: `Aquisição ${D.dataBr(r.aquisicao)}` })));
+    // As iniciais do avatar vêm de um atributo (desenhadas pelo CSS): não entram no texto lido da tela.
+    return el('a', { class: `cartao item operacao ${s}`, href: destino },
+      el('span', { class: 'avatar', 'data-iniciais': iniciais(r.nome), 'aria-hidden': 'true' }),
+      el('div', { class: 'corpo' },
+        el('div', { class: 'linha1' }, el('span', { class: 'nome', texto: r.nome }),
+          el('span', { class: `selo ${s}`, texto: SITUACOES[s] })),
+        el('div', { class: 'linha2' },
+          el('span', { class: 'valor-principal', texto: reais(r.previsto) }),
+          el('span', { class: 'discreto', texto: r.recebimento ? `Recebida em ${D.dataBr(r.recebimento)}`
+            : `Previsão ${D.dataBr(r.previsao_atual)}${adiada ? ' (adiada)' : ''}` })),
+        el('div', { class: 'linha2 discreto' },
+          el('span', { texto: `Lucro ${reais(r.previsto - r.custo)}` }),
+          el('span', { texto: `Aquisição ${D.dataBr(r.aquisicao)}` }))),
+      icone('seta', 'seta'));
+  }
+
+  // "Gabriel Henrique Timoteo" → "GT": a primeira e a última palavra (de, da, dos... não contam).
+  function iniciais(nome) {
+    const palavras = nome.split(/\s+/).filter((p) => p && !/^(d[aeo]s?|e)$/i.test(p));
+    const letras = palavras.length > 1 ? [palavras[0], palavras[palavras.length - 1]] : palavras;
+    return letras.map((p) => Array.from(p)[0].toUpperCase()).join('');
   }
 
   function telaOperacoes() {
     const lista = el('div', { class: 'lista' });
     const filtros = el('div', { class: 'filtros' });
-    const desenharLista = () => {
+    const desenharLista = ({ animar = false } = {}) => {
       const encontrados = D.filtrar(dados.operacoes, estado.busca);
       const totais = D.contarSituacoes(encontrados);
       filtros.replaceChildren(...FILTROS.map(([chave, rotulo]) => el('button', {
         type: 'button', class: chave === estado.filtro ? 'ativo' : '', texto: `${rotulo} ${totais[chave]}`,
         onclick: () => {
           estado.filtro = chave;
-          desenharLista();
+          desenharLista({ animar: true });
         } })));
       const visiveis = estado.filtro === 'todas' ? encontrados : encontrados.filter((r) => D.situacao(r) === estado.filtro);
       lista.replaceChildren(...(visiveis.length ? visiveis.map((r) => itemOperacao(r, `#operacao/${r.id}`))
         : [vazio(estado.busca ? 'Nenhuma operação encontrada.' : 'Nenhuma operação nesta situação.')]));
+      // Trocar de filtro: só a lista faz o crossfade (digitar na busca não anima, para não piscar a cada letra).
+      if (animar) {
+        lista.classList.remove('trocando');
+        void lista.offsetWidth;
+        lista.classList.add('trocando');
+      }
     };
     const busca = el('input', { class: 'busca', type: 'search', placeholder: 'Buscar nome, conta ou data',
       value: estado.busca, autocomplete: 'off', oninput: (e) => {
@@ -655,11 +719,12 @@
     const itens = listaPendentes.filter((p) => (p.tipo || 'entrada') !== 'conta');
     const quantas = itens.length;
     const soEntradas = itens.every((p) => (p.tipo || 'entrada') === 'entrada');
-    const pendentes = quantas > 0 && el('a', { class: 'aviso item', href: '#pendentes' },
+    const pendentes = quantas > 0 && el('a', { class: 'aviso item com-icone', href: '#pendentes' },
+      icone('celular'),
       el('div', { class: 'nome', texto: soEntradas
         ? (quantas === 1 ? '1 entrada feita no celular aguarda o computador' : `${quantas} entradas feitas no celular aguardam o computador`)
         : (quantas === 1 ? '1 mudança feita no celular aguarda o computador' : `${quantas} itens feitos no celular aguardam o computador`) }),
-      el('div', { class: 'discreto pequeno', texto: 'Toque para ver ou enviar de novo' }));
+      el('div', { class: 'discreto pequeno', texto: 'Toque para ver ou enviar de novo' }), icone('seta', 'seta'));
     const nova = el('a', { class: 'botao-link primario', href: '#nova', texto: '+ Nova entrada' });
     return [nova, pendentes, busca, filtros, lista];
   }
@@ -752,6 +817,7 @@
       observacoes: D.primeiraMaiuscula(entrada.observacoes), conta_id: conta.id, conta_snapshot: D.snapshotConta(conta),
     });
     await salvarLocal(registrarDocumentos(id, documentos));
+    avisar('Entrada salva.');
     return id;
   }
 
@@ -764,6 +830,7 @@
       D.primeiraMaiuscula(entrada.observacoes), mesma ? r.conta : conta.identificacao, mesma ? r.conta_id : conta.id,
       mesma ? r.conta_snapshot : D.snapshotConta(conta), r.id]);
     await salvarLocal();
+    avisar('Alterações salvas.');
   }
 
   // Como Banco.atualizar_previsao: a previsão anterior fica no histórico.
@@ -772,12 +839,14 @@
       [r.id, r.previsao_atual, nova, LeitorBackup.dataHoraLocal()]);
     bancoLocal.run('UPDATE rpvs SET previsao_atual_definida=? WHERE id=?', [nova, r.id]);
     await salvarLocal();
+    avisar('Previsão atualizada.');
   }
 
   // Excluir manda para a lixeira (como no computador); restaurar tira de lá.
   async function lixeiraLocal(r, excluir) {
     bancoLocal.run('UPDATE rpvs SET lixeira_em=? WHERE id=?', [excluir ? LeitorBackup.dataHoraLocal() : null, r.id]);
     await salvarLocal();
+    avisar(excluir ? 'Operação enviada à lixeira.' : 'Operação restaurada.');
   }
 
   // Como Banco.excluir_permanentemente: só sai de vez quem está na lixeira, com o histórico, as prorrogações e os
@@ -794,6 +863,7 @@
     }
     bancoLocal.run('DELETE FROM rpvs WHERE id=?', [r.id]);
     await salvarLocal({}, caminhos);
+    avisar('Operação excluída de vez.');
   }
 
   // Anexos como Banco.copiar_anexos grava ("12/<32 letras>.jpg"); devolve os arquivos para salvarLocal.
@@ -891,6 +961,7 @@
   async function gravarContaLocal(valores) {
     inserir('contas', D.linhaDaConta(valores));
     await salvarLocal();
+    avisar('Conta salva.');
   }
 
   // Como Banco.salvar_conta com identificador: as operações antigas continuam com a cópia dos dados que guardaram.
@@ -899,12 +970,14 @@
     const campos = Object.keys(linha);
     bancoLocal.run(`UPDATE contas SET ${campos.map((k) => k + '=?').join(',')} WHERE id=?`, [...campos.map((k) => linha[k]), id]);
     await salvarLocal();
+    avisar('Conta atualizada.');
   }
 
   // Banco.ativar_conta.
   async function ativarContaLocal(id, ativa) {
     bancoLocal.run('UPDATE contas SET ativa=? WHERE id=?', [ativa ? 1 : 0, id]);
     await salvarLocal();
+    avisar(ativa ? 'Conta reativada.' : 'Conta desativada.');
   }
 
   // Banco.remover_contas: as operações perdem o vínculo, mas guardam os dados bancários que copiaram.
@@ -912,6 +985,7 @@
     bancoLocal.run('UPDATE rpvs SET conta_id=NULL WHERE conta_id=?', [id]);
     bancoLocal.run('DELETE FROM contas WHERE id=?', [id]);
     await salvarLocal();
+    avisar('Conta removida.');
   }
 
   // Como Banco.registrar_recebimento (sem anexos, por enquanto).
@@ -925,6 +999,7 @@
     }
     bancoLocal.run('UPDATE rpvs SET recebimento=? WHERE id=? AND lixeira_em IS NULL', [data, registro.id]);
     await salvarLocal();
+    avisar('Recebimento registrado.');
   }
 
   // Cópia de segurança: o mesmo arquivo trancado, salvo onde a pessoa quiser (Arquivos, iCloud, Google Drive).
@@ -1572,8 +1647,8 @@
   // ---- Resumo da operação em imagem (para mandar no WhatsApp) -----------------------------------------------
   // Só o que não é sensível: titular, situação e datas. Sem CPF, conta, banco ou Pix; o Valor Total RPV só se a
   // pessoa marcar (e nunca no modo discreto).
-  // Identidade Ledger: nanquim, porcelana e champanhe; situação com as mesmas cores do app.
-  const CORES_SITUACAO = { pendente: ['#5f6571', '#f1ede4'], atrasada: ['#ad2e42', '#fbeced'], recebida: ['#1c6f4c', '#e8f3ec'] };
+  // Identidade Terracota: creme, terracota e azul-marinho; situação com as mesmas cores do app.
+  const CORES_SITUACAO = { pendente: ['#8a5d24', '#f7ead6'], atrasada: ['#b5444f', '#f8e3e3'], recebida: ['#2f7560', '#e4f0ea'] };
   const SERIFA = '"New York", ui-serif, Georgia, "Times New Roman", serif';
   const FONTE = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
   let logoCarregado = null;
@@ -1636,17 +1711,17 @@
     const fimDoCartao = 470 + nome.length * 80 + 104 + linhas.length * 168 + 70;
     const altura = fimDoCartao + 150;
     tela.height = altura;  // Mudar o tamanho limpa o desenho e as configurações do contexto.
-    g.fillStyle = '#f4f2ec';
+    g.fillStyle = '#f7f3ee';
     g.fillRect(0, 0, largura, altura);
-    // Faixa em nanquim com um brilho champanhe atrás do logo.
+    // Faixa em terracota com uma luz suave atrás do logo.
     const faixa = g.createLinearGradient(0, 0, largura, 330);
-    faixa.addColorStop(0, '#1b2436');
-    faixa.addColorStop(1, '#121926');
+    faixa.addColorStop(0, '#c96548');
+    faixa.addColorStop(1, '#b4553a');
     g.fillStyle = faixa;
     g.fillRect(0, 0, largura, 330);
     const brilho = g.createRadialGradient(largura / 2, 130, 10, largura / 2, 130, 360);
-    brilho.addColorStop(0, 'rgba(216, 184, 120, 0.28)');
-    brilho.addColorStop(1, 'rgba(216, 184, 120, 0)');
+    brilho.addColorStop(0, 'rgba(255, 255, 255, 0.2)');
+    brilho.addColorStop(1, 'rgba(255, 255, 255, 0)');
     g.fillStyle = brilho;
     g.fillRect(0, 0, largura, 330);
     const logo = await carregarLogo();
@@ -1657,20 +1732,20 @@
       g.drawImage(logo, largura / 2 - 64, 66, 128, 128);
     }
     g.textAlign = 'center';
-    g.fillStyle = '#d8b878';
+    g.fillStyle = '#ffffff';
     g.font = `700 50px ${SERIFA}`;
     g.fillText('Gestor RPV', largura / 2, 284);
 
-    g.fillStyle = '#ffffff';
+    g.fillStyle = '#fffdf9';
     retanguloArredondado(g, x, 380, larguraCartao, fimDoCartao - 380, 40);
     g.fill();
     g.textAlign = 'left';
     const margem = x + 60;
     let y = 470;
-    g.fillStyle = '#5f6571';
+    g.fillStyle = '#656b79';
     g.font = `600 34px ${FONTE}`;
     g.fillText('Resumo da operação', margem, y);
-    g.fillStyle = '#12161f';
+    g.fillStyle = '#20334d';
     g.font = `700 64px ${SERIFA}`;
     for (const linha of nome) {
       y += 80;
@@ -1690,23 +1765,23 @@
     y += 60;
     for (const [rotulo, valor] of linhas) {
       y += 40;
-      g.strokeStyle = '#e9e4da';
+      g.strokeStyle = '#ede7e0';
       g.lineWidth = 2;
       g.beginPath();
       g.moveTo(margem, y);
       g.lineTo(x + larguraCartao - 60, y);
       g.stroke();
       y += 62;
-      g.fillStyle = '#5f6571';
+      g.fillStyle = '#656b79';
       g.font = `500 34px ${FONTE}`;
       g.fillText(rotulo, margem, y);
       y += 66;
-      g.fillStyle = '#12161f';
+      g.fillStyle = '#20334d';
       g.font = `700 52px ${FONTE}`;
       g.fillText(valor, margem, y);
     }
     g.textAlign = 'center';
-    g.fillStyle = '#5f6571';
+    g.fillStyle = '#656b79';
     g.font = `500 30px ${FONTE}`;
     g.fillText(`Atualizado em ${D.dataBr(D.hojeIso())}`, largura / 2, altura - 70);
     return new Promise((ok, falha) => tela.toBlob((b) => (b ? ok(b) : falha(new Error('Não foi possível gerar a imagem.'))), 'image/png'));
@@ -1947,24 +2022,35 @@
     ];
   }
 
+  // Ícone num ladrilho colorido, o título com o detalhe e a seta: o desenho de cada opção de Mais.
+  function conteudoOpcao(simbolo, tom, titulo, detalhe) {
+    return [el('span', { class: 'icone-menu ' + (tom || '') }, icone(simbolo)),
+      el('div', { class: 'textos' }, el('div', { texto: titulo }), el('div', { class: 'discreto pequeno', texto: detalhe })),
+      icone('seta', 'seta')];
+  }
+
   function telaMais() {
-    const opcao = (href, titulo, detalhe) => el('a', { class: 'cartao', href },
-      el('div', { texto: titulo }), el('div', { class: 'discreto pequeno', texto: detalhe }));
-    return [el('div', { class: 'menu' },
-      opcao('#agenda', 'Agenda das previsões', 'Calendário com as datas previstas de recebimento'),
-      opcao('#grafico', 'Gráfico mensal', 'Entradas e recebimentos dos últimos 12 meses'),
-      opcao('#lixeira', `Lixeira (${dados.lixeira.length})`, info.independente ? 'Operações excluídas: restaurar ou excluir de vez'
-        : 'Operações excluídas, só para consulta'),
-      opcao('#backup', 'Sobre este backup', `Arquivo, data e versões · app ${VERSAO_APP}`),
-      opcao('#novidades', 'Novidades', 'O que mudou nas últimas versões'),
-      info.independente && opcao('#copia', 'Fazer cópia de segurança', 'Salvar seus dados (trancados) no iCloud ou no Google Drive'),
-      opcao('#convite', 'Convidar alguém', 'Mandar o app para outra pessoa usar com os dados dela'),
-      escolherBackup(),
-      senhaRecente && !faceIdAtivo && el('div', { class: 'cartao' },
-        el('div', { texto: 'Ativar o Face ID' }), el('div', { class: 'discreto pequeno', texto: 'Abrir o app com o rosto, sem digitar a senha' }),
-        el('div', { class: 'botoes' }, el('button', { type: 'button', class: 'primario', texto: 'Ativar',
-          onclick: (e) => ativarFaceId(e.target.closest('.cartao')) }))),
-      faceIdAtivo && el('a', { class: 'cartao', href: '#', onclick: async (e) => {
+    const opcao = (href, titulo, detalhe, simbolo, tom) => el('a', { class: 'cartao opcao-menu', href },
+      conteudoOpcao(simbolo, tom, titulo, detalhe));
+    const grupo = (titulo, ...itens) => [el('h3', { class: 'grupo-menu', texto: titulo }), el('div', { class: 'menu' }, itens)];
+    return [
+      grupo('Ferramentas',
+        opcao('#agenda', 'Agenda das previsões', 'Calendário com as datas previstas de recebimento', 'calendario'),
+        opcao('#grafico', 'Gráfico mensal', 'Entradas e recebimentos dos últimos 12 meses', 'barras', 'ambar'),
+        opcao('#lixeira', `Lixeira (${dados.lixeira.length})`, info.independente ? 'Operações excluídas: restaurar ou excluir de vez'
+          : 'Operações excluídas, só para consulta', 'lixeira')),
+      grupo('Aplicativo e compartilhamento',
+        opcao('#novidades', 'Novidades', 'O que mudou nas últimas versões', 'megafone'),
+        opcao('#convite', 'Convidar alguém', 'Mandar o app para outra pessoa usar com os dados dela', 'convidar', 'azul'),
+        opcao('#backup', 'Sobre este backup', `Arquivo, data e versões · app ${VERSAO_APP}`, 'info', 'azul')),
+      grupo('Dados e segurança',
+        info.independente && opcao('#copia', 'Fazer cópia de segurança', 'Salvar seus dados (trancados) no iCloud ou no Google Drive', 'escudo', 'verde'),
+        escolherBackup(),
+        senhaRecente && !faceIdAtivo && el('div', { class: 'cartao' },
+          el('div', { texto: 'Ativar o Face ID' }), el('div', { class: 'discreto pequeno', texto: 'Abrir o app com o rosto, sem digitar a senha' }),
+          el('div', { class: 'botoes' }, el('button', { type: 'button', class: 'primario', texto: 'Ativar',
+            onclick: (e) => ativarFaceId(e.target.closest('.cartao')) }))),
+        faceIdAtivo && el('a', { class: 'cartao opcao-menu', href: '#', onclick: async (e) => {
         e.preventDefault();
         if (confirm('Desativar o Face ID do app? A próxima abertura pedirá a senha dos backups.')) {
           await FaceId.desativar().catch(() => {});
@@ -1972,11 +2058,13 @@
           localStorageGravar('faceid_recusado', '1');
           desenhar();
         }
-      } }, el('div', { texto: 'Desativar o Face ID' }), el('div', { class: 'discreto pequeno', texto: 'Voltar a abrir só com a senha' })),
-      info.demonstracao ? el('button', { type: 'button', class: 'primario', texto: 'Sair da demonstração', onclick: sairDaDemonstracao })
-        : el('button', { type: 'button', class: 'primario', texto: 'Trancar agora', onclick: fecharDados }),
-      !info.demonstracao && el('p', { class: 'discreto pequeno', texto: 'Trancar apaga os dados da memória; o backup guardado continua trancado no aparelho. O app também tranca sozinho depois de 5 minutos em segundo plano.' }),
-      !info.demonstracao && el('button', { type: 'button', class: 'secundario', texto: 'Apagar o backup guardado neste aparelho', onclick: esquecerBackup }))];
+        } }, conteudoOpcao('cadeado', 'ambar', 'Desativar o Face ID', 'Voltar a abrir só com a senha'))),
+      el('div', { class: 'menu-acoes' },
+        info.demonstracao ? el('button', { type: 'button', class: 'primario', texto: 'Sair da demonstração', onclick: sairDaDemonstracao })
+          : el('button', { type: 'button', class: 'primario', texto: 'Trancar agora', onclick: fecharDados }),
+        !info.demonstracao && el('p', { class: 'discreto pequeno', texto: 'Trancar apaga os dados da memória; o backup guardado continua trancado no aparelho. O app também tranca sozinho depois de 5 minutos em segundo plano.' }),
+        !info.demonstracao && el('button', { type: 'button', class: 'secundario', texto: 'Apagar o backup guardado neste aparelho', onclick: esquecerBackup })),
+    ];
   }
 
   function escolherBackup() {
@@ -1989,13 +2077,13 @@
           trocarPorArquivo(entrada.files[0]);
         }
       } });
-    return el('label', { class: 'cartao escolher-backup' }, el('div', { texto: titulo }),
-      el('div', { class: 'discreto pequeno', texto: detalhe }), entrada);
+    return el('label', { class: 'cartao opcao-menu escolher-backup' }, conteudoOpcao('enviar', 'verde', titulo, detalhe), entrada);
   }
 
   // O que mudou nas últimas versões (novidades.json, gerado de novidades.py: o mesmo texto do "Sobre" do programa).
   function telaNovidades() {
-    const area = el('div', { class: 'menu' }, el('p', { class: 'discreto', texto: 'Carregando…' }));
+    const area = el('div', { class: 'menu' }, el('div', { class: 'esqueleto' },
+      el('span', { class: 'so-leitor', texto: 'Carregando…' }), [1, 2, 3].map(() => el('div', { class: 'bloco' }))));
     fetch('novidades.json').then((r) => r.json()).then(({ versoes }) => {
       area.replaceChildren(...versoes.map((v) => cartao(
         el('div', { class: 'linha1' }, el('span', { class: 'nome', texto: `Versão ${v.versao}` }),
@@ -2088,6 +2176,25 @@
   }
 
   let telaAnimada = null;  // Endereço da última tela que entrou com animação.
+  let telaAnterior = null; // A tela mostrada antes desta (para saber se a navegação foi para dentro ou para fora).
+  const caminho = [];      // Endereços visitados, para reconhecer o Voltar.
+  const ABAS = ['inicio', 'operacoes', 'contas', 'mais'];
+
+  // Detalhes (telas com Voltar) entram da direita; ao voltar, a tela chega da esquerda; entre as abas, o conteúdo
+  // só sobe e aparece (abas não deslizam de lado, como no iOS).
+  function tipoDeEntrada(tela) {
+    const voltou = caminho.length > 1 && caminho[caminho.length - 2] === location.hash;
+    if (voltou) {
+      caminho.pop();
+    } else {
+      caminho.push(location.hash);
+      caminho.splice(0, Math.max(0, caminho.length - 30));
+    }
+    if (voltou || (telaAnterior && telaAnterior.voltar && !tela.voltar)) {
+      return 'voltando';
+    }
+    return tela.voltar ? 'empurrando' : 'entrando';
+  }
 
   function desenhar() {
     if (!dados) {
@@ -2102,13 +2209,16 @@
     document.documentElement.style.setProperty('--altura-topo', `${document.querySelector('.topo').offsetHeight}px`);
     $('voltar').hidden = !tela.voltar;
     document.querySelectorAll('.abas a').forEach((a) => a.classList.toggle('ativa', a.dataset.aba === tela.aba));
+    document.querySelector('.abas').style.setProperty('--aba', String(Math.max(0, ABAS.indexOf(tela.aba))));
+    document.body.dataset.tela = TELAS[nome] ? nome : 'inicio';
     $('tela').replaceChildren(...[info.demonstracao && avisoDemonstracao(), tela.montar(id)].flat(2).filter(Boolean));
     // Entrada sutil só ao trocar de tela; redesenhar a mesma (modo discreto, depois de salvar) não anima.
     if (location.hash !== telaAnimada) {
       telaAnimada = location.hash;
-      $('tela').classList.remove('entrando');
+      $('tela').classList.remove('entrando', 'empurrando', 'voltando');
       void $('tela').offsetWidth;  // Reinicia a animação.
-      $('tela').classList.add('entrando');
+      $('tela').classList.add(tipoDeEntrada(tela));
+      telaAnterior = tela;
     }
     if (tela === TELAS.operacao && dados.operacoes.concat(dados.lixeira).some((r) => r.id === id)) {
       const r = dados.operacoes.find((o) => o.id === id) || dados.lixeira.find((o) => o.id === id);
