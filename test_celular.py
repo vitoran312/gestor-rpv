@@ -560,7 +560,7 @@ class TestQuemUsaSoOCelular(unittest.TestCase):
                'novo_previsto': '300000', 'nova_previsao': '2027-03-01', 'mes_previsao': 'março de 2027'}
     PDF = pdf_de_teste(['Oficio do tribunal'])
     NOMES = ["joão d'ávila", 'MARIA-JOSÉ', '3rd ávila', 'ana  beatriz', "o'neill mcdonald"]
-    SENHAS = ['123456789', 'abcdefghij', ' com espaço ', 'senha@12345', 'cavalo azul bebe cafe', 'Mar1aJ0se!x']
+    SENHAS = ['123456789', 'abcdefghij', ' com espaço ', 'senha@12345', 'cavalo azul bebe cafe', 'Mar1aJ0se!x', 'k7#pQ2', '123456', 'aaaaab']
 
     @classmethod
     def setUpClass(cls):
@@ -604,7 +604,7 @@ class TestQuemUsaSoOCelular(unittest.TestCase):
 
     def test_senha_nova_com_as_regras_do_programa(self):
         erros = self.r['erros_senha']
-        self.assertIn('de 10 a 256 caracteres', erros[0])
+        self.assertIn('de 6 a 256 caracteres', erros[0])
         self.assertIn('fácil demais', erros[1])
         self.assertIn('não são iguais', erros[2])
         import cifra

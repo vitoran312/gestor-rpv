@@ -275,7 +275,7 @@ const GestorDados = (() => {
 
   // cifra.validar_senha.
   const BASES_OBVIAS = new Set(["", "senha", "minhasenha", "password", "passw", "qwerty", "qwertyuiop", "asdf", "asdfgh", "abc", "abcd", "abcdef", "abcabc", "abcabcab", "iloveyou", "teamo", "brasil", "admin", "teste", "mudar", "mudarsenha", "gestor", "gestorrpv", "rpv", "vitoran", "backup", "dragon", "monkey", "letmein", "welcome"]);
-  const SENHA_MINIMA = 10;
+  const SENHA_MINIMA = 6;
   const SENHA_MAXIMA = 256;
 
   function validarSenha(senha) {

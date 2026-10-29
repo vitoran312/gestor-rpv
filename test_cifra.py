@@ -55,7 +55,7 @@ class TestCifra(unittest.TestCase):
                         self.decifrar(cifrado)
 
     def test_regras_da_senha(self):
-        for senha, trecho in (('123456789', '10 a 256'), ('x' * 257, '10 a 256'), (' cofre azul 7', 'espaço'),
+        for senha, trecho in (('k7#pQ', '6 a 256'), ('x' * 257, '6 a 256'), (' cofre azul 7', 'espaço'),
                               ('cofre azul 7 ', 'espaço'), ('          ', 'espaço'), ('aaaaaaaaaa', 'fácil'),
                               ('1234567890', 'fácil'), ('Password123', 'fácil'), ('senha@12345', 'fácil'),
                               ('qwerty12345', 'fácil'), ('brasil2026!', 'fácil'), ('abcabcab12', 'fácil'),
@@ -63,6 +63,7 @@ class TestCifra(unittest.TestCase):
             with self.subTest(senha=senha), self.assertRaisesRegex(ValueError, trecho):
                 cifra.validar_senha(senha)
         self.assertEqual(cifra.validar_senha('cavalo bateria'), 'cavalo bateria')
+        self.assertEqual(cifra.validar_senha('k7#pQ2'), 'k7#pQ2')  # Seis caracteres bastam.
 
     def test_senha_atual_compara_acentos_compostos_de_jeitos_diferentes(self):
         import unicodedata

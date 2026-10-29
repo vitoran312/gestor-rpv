@@ -10,6 +10,10 @@ from pathlib import Path
 MOSTRAR = 5  # Quantas versões aparecem no "Sobre".
 
 NOVIDADES = [
+    ('0.56.0', [
+        ('novidade', 'Programa e celular: senha nova com no mínimo 6 caracteres (antes 10), misturando letras, números '
+                     'e símbolos.'),
+    ]),
     ('0.55.0', [
         ('novidade', 'Celular: nova identidade visual Ledger, igual à do programa: porcelana e nanquim no claro, '
                      'nanquim e marfim no escuro, acento champanhe e títulos em serifa.'),

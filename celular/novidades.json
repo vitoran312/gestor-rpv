@@ -1,6 +1,16 @@
 {
   "versoes": [
     {
+      "versao": "0.56.0",
+      "resumo": "1 novidade",
+      "itens": [
+        {
+          "tipo": "novidade",
+          "texto": "Programa e celular: senha nova com no mínimo 6 caracteres (antes 10), misturando letras, números e símbolos."
+        }
+      ]
+    },
+    {
       "versao": "0.55.0",
       "resumo": "4 novidades",
       "itens": [
@@ -81,16 +91,6 @@
         {
           "tipo": "novidade",
           "texto": "Celular: na primeira abertura, uma demonstração com dados fictícios mostra como o app fica."
-        }
-      ]
-    },
-    {
-      "versao": "0.51.1",
-      "resumo": "1 correção",
-      "itens": [
-        {
-          "tipo": "correcao",
-          "texto": "Celular: no iPhone, a tela da operação voltava sozinha para cima e escondia os botões do fim (anexar, alterar previsão, editar e excluir)."
         }
       ]
     }

@@ -21,7 +21,7 @@ TAMANHO_PREFIXO = 7   # Mais 4 bytes do número do bloco e 1 do marcador de últ
 CABECALHO = len(MAGICO) + TAMANHO_SAL + TAMANHO_PREFIXO
 BLOCO = 1024 * 1024
 ETIQUETA = 16
-SENHA_MINIMA, SENHA_MAXIMA = 10, 256
+SENHA_MINIMA, SENHA_MAXIMA = 6, 256
 # Palavras que, com números ou símbolos em volta, formam as senhas do topo das listas de vazamentos
 # ("senha@123", "password1", "brasil2026"): a força bruta começa por elas.
 BASES_OBVIAS = {'', 'senha', 'minhasenha', 'password', 'passw', 'qwerty', 'qwertyuiop', 'asdf', 'asdfgh', 'abc', 'abcd',

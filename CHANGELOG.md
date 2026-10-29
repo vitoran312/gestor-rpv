@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## 0.56.0
+
+- Senha mínima de 6 caracteres (antes 10) no programa (cifra.SENHA_MINIMA) e no celular (dados.js), para a senha
+  dos backups e a dos dados criados no celular. As demais regras (sem espaço nas pontas, nada óbvio) continuam;
+  senhas existentes não mudam.
+
 ## 0.55.0
 
 Identidade **Ledger** também no app do celular (só a camada de apresentação; regras, dados e fluxos iguais):

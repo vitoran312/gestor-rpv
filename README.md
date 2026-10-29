@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.55.0
+# Gestor de RPV — 0.56.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -277,7 +277,7 @@ Clique no aviso para escolher a pasta e fazer um backup. Ele desaparece após a
 gravação bem-sucedida; cancelar ou ocorrer uma falha mantém o lembrete.
 O prazo é recalculado ao abrir ou voltar às janelas principais, sem interromper o uso.
 
-1. Clique em **Arquivo → Fazer backup**. Na primeira vez, crie a **senha dos backups** (de 10 a 256
+1. Clique em **Arquivo → Fazer backup**. Na primeira vez, crie a **senha dos backups** (de 6 a 256
    caracteres, sem espaço nas pontas e nada óbvio como "senha@123"; uma frase funciona bem) e anote-a: sem ela, não há como abrir
    os backups.
 2. Escolha uma pasta do Windows. O programa salva um arquivo `GestorRPV-data-hora.rpvbackup`.
