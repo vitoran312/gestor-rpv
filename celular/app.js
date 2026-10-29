@@ -7,7 +7,7 @@
 (() => {
   // Igual a versao.py (test_celular confere): mostrada na abertura e em Mais, para saber se o aparelho já
   // carregou a última versão publicada.
-  const VERSAO_APP = '0.54.0';
+  const VERSAO_APP = '0.55.0';
   const D = GestorDados;
   const $ = (id) => document.getElementById(id);
   const SITUACOES = { pendente: 'Pendente', atrasada: 'Atrasada', recebida: 'Recebida' };
@@ -478,8 +478,8 @@
     const totais = D.contarSituacoes(dados.operacoes);
     const dias = idadeDoBackup();
     const idade = dias === null ? '' : dias <= 0 ? ' (hoje)' : dias === 1 ? ' (ontem)' : ` (há ${dias} dias)`;
-    const indicador = (rotulo, valor, classe) => el('div', { class: 'cartao indicador' },
-      el('div', { class: 'rotulo', texto: rotulo }), el('div', { class: 'valor ' + (classe || ''), texto: valor }));
+    const indicador = (rotulo, valor, classe) => el('div', { class: 'indicador ' + (classe || '') },
+      el('div', { class: 'rotulo', texto: rotulo }), el('div', { class: 'valor', texto: valor }));
     const situacao = (chave, rotulo, classe) => el('a', { class: 'cartao', href: '#operacoes', onclick: () => {
       estado.filtro = chave;
       estado.busca = '';
@@ -501,26 +501,36 @@
         el('div', { class: 'nome', texto: 'Faça uma cópia de segurança' }),
         el('div', { class: 'discreto pequeno', texto: 'Há mudanças só neste celular. Toque para salvar uma cópia trancada no iCloud ou no Google Drive.' })),
       dados.demonstracao && !info.demonstracao && el('p', { class: 'aviso', texto: 'Este backup tem dados de demonstração, com nomes e valores fictícios.' }),
-      !info.demonstracao && el('p', { class: 'discreto pequeno', texto: info.independente ? 'Seus dados, guardados neste celular.'
-        : `Dados do backup de ${D.dataHora(info.manifesto.criado_em)}${idade}.` }),
       info.independente && !dados.operacoes.length && el('div', { class: 'aviso' },
         el('div', { class: 'nome', texto: 'Por onde começar' }),
         el('div', { texto: '1. Cadastre a conta onde você recebe, na aba Contas.' }),
         el('div', { texto: '2. Cadastre suas entradas na aba Operações (+ Nova entrada).' }),
         el('div', { texto: '3. Quando receber, abra a operação e toque em "Registrar recebimento".' })),
       !info.independente && !info.demonstracao && dias !== null && dias > 7 && el('p', { class: 'aviso', texto: 'Este backup tem mais de uma semana. Faça um backup novo no computador para ver os dados atuais.' }),
+      // Painel de destaque (nanquim): a data, o título, de onde vêm os dados e os quatro indicadores.
+      el('section', { class: 'painel' },
+        el('div', { class: 'painel-data', texto: dataPorExtenso() }),
+        el('h2', { class: 'painel-titulo', texto: 'Seu panorama' }),
+        !info.demonstracao && el('p', { class: 'painel-fonte', texto: info.independente ? 'Seus dados, guardados neste celular.'
+          : `Dados do backup de ${D.dataHora(info.manifesto.criado_em)}${idade}.` }),
+        el('div', { class: 'indicadores' },
+          indicador('Lucro previsto', reais(ind.previsto), 'principal'),
+          indicador('Registros', String(ind.registros)),
+          indicador('Capital investido em aberto', reais(ind.aberto)),
+          indicador('Lucro realizado', reais(ind.realizado), 'verde'))),
       dados.operacoes.length > 0 && cartaoAgenda(),
-      el('div', { class: 'indicadores' },
-        indicador('Registros', String(ind.registros)),
-        indicador('Lucro previsto', reais(ind.previsto)),
-        indicador('Capital investido em aberto', reais(ind.aberto)),
-        indicador('Lucro realizado', reais(ind.realizado), 'verde')),
       el('h2', { texto: 'Situação das operações' }),
       el('div', { class: 'situacoes' },
         situacao('pendente', 'Pendentes'),
         situacao('atrasada', 'Atrasadas', totais.atrasada ? 'vermelho' : ''),
         situacao('recebida', 'Recebidas', 'verde')),
     ];
+  }
+
+  // "Quinta-feira, 29 de outubro": a data no alto do Início.
+  function dataPorExtenso(hoje = new Date()) {
+    const texto = hoje.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+    return texto.charAt(0).toUpperCase() + texto.slice(1);
   }
 
   // ---- Agenda das previsões ------------------------------------------------------------------------------
@@ -1487,7 +1497,9 @@
   // ---- Resumo da operação em imagem (para mandar no WhatsApp) -----------------------------------------------
   // Só o que não é sensível: titular, situação e datas. Sem CPF, conta, banco ou Pix; o Valor Total RPV só se a
   // pessoa marcar (e nunca no modo discreto).
-  const CORES_SITUACAO = { pendente: ['#5c6576', '#eef0f4'], atrasada: ['#c02a3b', '#fde8eb'], recebida: ['#1d7a4c', '#e5f4ea'] };
+  // Identidade Ledger: nanquim, porcelana e champanhe; situação com as mesmas cores do app.
+  const CORES_SITUACAO = { pendente: ['#5f6571', '#f1ede4'], atrasada: ['#ad2e42', '#fbeced'], recebida: ['#1c6f4c', '#e8f3ec'] };
+  const SERIFA = '"New York", ui-serif, Georgia, "Times New Roman", serif';
   const FONTE = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
   let logoCarregado = null;
 
@@ -1544,14 +1556,23 @@
     // A altura acompanha o conteúdo (nome em até duas linhas, de duas a quatro informações).
     const tela = el('canvas', { width: largura, height: 10 });
     const g = tela.getContext('2d');
-    g.font = `700 64px ${FONTE}`;
+    g.font = `700 64px ${SERIFA}`;
     const nome = quebrarLinhas(g, r.nome, larguraCartao - 120, 2);
     const fimDoCartao = 470 + nome.length * 80 + 104 + linhas.length * 168 + 70;
     const altura = fimDoCartao + 150;
     tela.height = altura;  // Mudar o tamanho limpa o desenho e as configurações do contexto.
-    g.fillStyle = '#f5f6f8';
+    g.fillStyle = '#f4f2ec';
     g.fillRect(0, 0, largura, altura);
-    g.fillStyle = '#8c1d34';
+    // Faixa em nanquim com um brilho champanhe atrás do logo.
+    const faixa = g.createLinearGradient(0, 0, largura, 330);
+    faixa.addColorStop(0, '#1b2436');
+    faixa.addColorStop(1, '#121926');
+    g.fillStyle = faixa;
+    g.fillRect(0, 0, largura, 330);
+    const brilho = g.createRadialGradient(largura / 2, 130, 10, largura / 2, 130, 360);
+    brilho.addColorStop(0, 'rgba(216, 184, 120, 0.28)');
+    brilho.addColorStop(1, 'rgba(216, 184, 120, 0)');
+    g.fillStyle = brilho;
     g.fillRect(0, 0, largura, 330);
     const logo = await carregarLogo();
     if (logo) {
@@ -1561,9 +1582,9 @@
       g.drawImage(logo, largura / 2 - 64, 66, 128, 128);
     }
     g.textAlign = 'center';
-    g.fillStyle = '#ffffff';
-    g.font = `700 48px ${FONTE}`;
-    g.fillText('GESTOR RPV', largura / 2, 280);
+    g.fillStyle = '#d8b878';
+    g.font = `700 50px ${SERIFA}`;
+    g.fillText('Gestor RPV', largura / 2, 284);
 
     g.fillStyle = '#ffffff';
     retanguloArredondado(g, x, 380, larguraCartao, fimDoCartao - 380, 40);
@@ -1571,11 +1592,11 @@
     g.textAlign = 'left';
     const margem = x + 60;
     let y = 470;
-    g.fillStyle = '#5c6576';
+    g.fillStyle = '#5f6571';
     g.font = `600 34px ${FONTE}`;
     g.fillText('Resumo da operação', margem, y);
-    g.fillStyle = '#14171f';
-    g.font = `700 64px ${FONTE}`;
+    g.fillStyle = '#12161f';
+    g.font = `700 64px ${SERIFA}`;
     for (const linha of nome) {
       y += 80;
       g.fillText(linha, margem, y);
@@ -1594,23 +1615,23 @@
     y += 60;
     for (const [rotulo, valor] of linhas) {
       y += 40;
-      g.strokeStyle = '#e3e6ec';
+      g.strokeStyle = '#e9e4da';
       g.lineWidth = 2;
       g.beginPath();
       g.moveTo(margem, y);
       g.lineTo(x + larguraCartao - 60, y);
       g.stroke();
       y += 62;
-      g.fillStyle = '#5c6576';
+      g.fillStyle = '#5f6571';
       g.font = `500 34px ${FONTE}`;
       g.fillText(rotulo, margem, y);
       y += 66;
-      g.fillStyle = '#14171f';
+      g.fillStyle = '#12161f';
       g.font = `700 52px ${FONTE}`;
       g.fillText(valor, margem, y);
     }
     g.textAlign = 'center';
-    g.fillStyle = '#5c6576';
+    g.fillStyle = '#5f6571';
     g.font = `500 30px ${FONTE}`;
     g.fillText(`Atualizado em ${D.dataBr(D.hojeIso())}`, largura / 2, altura - 70);
     return new Promise((ok, falha) => tela.toBlob((b) => (b ? ok(b) : falha(new Error('Não foi possível gerar a imagem.'))), 'image/png'));

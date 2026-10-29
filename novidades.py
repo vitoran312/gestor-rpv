@@ -10,6 +10,15 @@ from pathlib import Path
 MOSTRAR = 5  # Quantas versões aparecem no "Sobre".
 
 NOVIDADES = [
+    ('0.55.0', [
+        ('novidade', 'Celular: nova identidade visual Ledger, igual à do programa: porcelana e nanquim no claro, '
+                     'nanquim e marfim no escuro, acento champanhe e títulos em serifa.'),
+        ('novidade', 'Celular: Início com a data por extenso e o panorama num cartão em nanquim, com o lucro '
+                     'previsto em destaque.'),
+        ('novidade', 'Celular: barra de abas flutuante, translúcida e com ícones; cabeçalho translúcido.'),
+        ('novidade', 'Celular: operações com filete colorido pela situação e selos em pílula; resumo em imagem '
+                     'com as novas cores.'),
+    ]),
     ('0.54.0', [
         ('novidade', 'Programa: nova identidade visual Ledger, em nanquim e champanhe, com títulos em serifa e cartões '
                      'com sombra suave.'),

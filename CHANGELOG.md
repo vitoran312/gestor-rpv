@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## 0.55.0
+
+Identidade **Ledger** também no app do celular (só a camada de apresentação; regras, dados e fluxos iguais):
+- celular/estilo.css reescrito: paletas porcelana/nanquim (claro) e nanquim/marfim (escuro), acento champanhe,
+  títulos em serifa, números tabulares; abertura e splash em nanquim com brilho champanhe.
+- Cabeçalho fixo translúcido; abas numa pílula flutuante translúcida com ícones de linha (index.html).
+- Início: data por extenso e "Seu panorama" num cartão em nanquim com o lucro previsto em serifa.
+- Operações com filete da situação e selos em pílula; detalhes em linhas com divisórias.
+- Resumo em imagem com as novas cores; theme-color e manifesto atualizados.
+
 ## 0.54.0
 
 Nova identidade visual do programa, **Ledger** (só a camada de apresentação; regras, dados e fluxos iguais):

@@ -1,6 +1,28 @@
 {
   "versoes": [
     {
+      "versao": "0.55.0",
+      "resumo": "4 novidades",
+      "itens": [
+        {
+          "tipo": "novidade",
+          "texto": "Celular: nova identidade visual Ledger, igual à do programa: porcelana e nanquim no claro, nanquim e marfim no escuro, acento champanhe e títulos em serifa."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: Início com a data por extenso e o panorama num cartão em nanquim, com o lucro previsto em destaque."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: barra de abas flutuante, translúcida e com ícones; cabeçalho translúcido."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: operações com filete colorido pela situação e selos em pílula; resumo em imagem com as novas cores."
+        }
+      ]
+    },
+    {
       "versao": "0.54.0",
       "resumo": "4 novidades",
       "itens": [
@@ -69,24 +91,6 @@
         {
           "tipo": "correcao",
           "texto": "Celular: no iPhone, a tela da operação voltava sozinha para cima e escondia os botões do fim (anexar, alterar previsão, editar e excluir)."
-        }
-      ]
-    },
-    {
-      "versao": "0.51.0",
-      "resumo": "3 novidades",
-      "itens": [
-        {
-          "tipo": "novidade",
-          "texto": "Celular: modo discreto — o olho no topo esconde todos os valores em reais (R$ •••••)."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Celular: \"Colar e preencher\" na entrada nova — cole a mensagem do cliente e o app preenche nome, valores e datas."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Celular: resumo da operação em imagem, com o logo, para mandar no WhatsApp sem dados sensíveis."
         }
       ]
     }
