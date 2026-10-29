@@ -107,6 +107,52 @@ class TestEntradasDoCelular(unittest.TestCase):
         self.assertIn('incompleto', mensagens[tipo.name])
         self.assertIn('não é uma entrada', mensagens[solto.name])
 
+    def conta_do_celular(self, **valores):
+        dados = dict(dados_conta(identificacao='nubank da lilian', nome='Lilian Teste', cpf='529.982.247-25',
+                                 numero='999-1', pix='lilian@example.com'), id=str(uuid.uuid4()),
+                     criada_em='2026-10-28T10:00:00-03:00')
+        dados.update(valores)
+        return dados
+
+    def pacote_conta(self, conta):
+        return self.arquivo(conta, nome=f'conta-{conta["id"][:8]}.rpvcelular',
+                            pacote={'formato': 'gestor-rpv-celular', 'versao_formato': 1, 'conta': conta})
+
+    def test_conta_e_entrada_com_a_conta_nova_no_mesmo_lote(self):
+        conta = self.conta_do_celular()
+        # A entrada só conhece a conta pelo nome (ela ainda não existia no computador quando foi feita).
+        entrada_nova = entrada(conta_id=-1, conta='nubank da lilian', nome='Com Conta Nova')
+        arquivos = [self.arquivo(entrada_nova), self.pacote_conta(conta)]  # Entrada antes, de propósito.
+        encontradas, problemas = entradas_celular.conferir(self.banco, arquivos)
+        self.assertEqual(problemas, [])
+        self.assertEqual(entradas_celular.contar(encontradas), '1 entrada e 1 conta de recebimento')
+        self.assertEqual(entradas_celular.importar(self.banco, encontradas), (2, []))
+        nova = next(c for c in self.banco.contas() if c['identificacao'] == 'Nubank da lilian')
+        self.assertEqual((nova['nome'], nova['cpf'], nova['pix']), ('Lilian Teste', '52998224725', 'lilian@example.com'))
+        self.assertEqual(self.banco.listar()[0]['conta_id'], nova['id'])
+        self.assertEqual(entradas_celular.importadas(self.banco), {conta['id'], entrada_nova['id']})
+
+    def test_regras_da_conta_valem_para_o_celular(self):
+        self.banco.salvar_conta(dados_conta(identificacao='Já existe', pix='repetido@example.com'))
+        casos = [self.conta_do_celular(cpf='111.111.111-11'),
+                 self.conta_do_celular(identificacao='já EXISTE', numero='1'),
+                 self.conta_do_celular(identificacao='Outra', numero='2', pix='repetido@example.com')]
+        encontradas, _ = entradas_celular.conferir(self.banco, [self.pacote_conta(c) for c in casos])
+        gravadas, recusadas = entradas_celular.importar(self.banco, encontradas)
+        self.assertEqual(gravadas, 0)
+        mensagens = '\n'.join(m for _, m in recusadas)
+        for trecho in ('CPF inválido', 'com essa identificação', 'chave Pix'):
+            self.assertIn(trecho, mensagens)
+
+    def test_pacote_com_dois_tipos_ou_campo_a_mais_e_recusado(self):
+        conta = self.conta_do_celular()
+        dois = self.arquivo(conta, nome='dois.rpvcelular', pacote={'formato': 'gestor-rpv-celular', 'versao_formato': 1,
+                                                                  'conta': conta, 'entrada': entrada()})
+        a_mais = self.arquivo(conta, nome='mais.rpvcelular', pacote={'formato': 'gestor-rpv-celular', 'versao_formato': 1,
+                                                                    'conta': dict(conta, ativa=True)})
+        _, problemas = entradas_celular.conferir(self.banco, [dois, a_mais])
+        self.assertEqual([m for _, m in problemas], ['O arquivo do celular está incompleto.'] * 2)
+
     def test_sem_pasta_do_backup_automatico_nao_procura(self):
         self.banco.remover_configuracao(PASTA_AUTOMATICA)
         self.arquivo(entrada(conta_id=self.vitor))

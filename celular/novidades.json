@@ -1,6 +1,24 @@
 {
   "versoes": [
     {
+      "versao": "0.47.0",
+      "resumo": "3 novidades",
+      "itens": [
+        {
+          "tipo": "novidade",
+          "texto": "Celular: cadastrar novas contas de recebimento pelo app (aba Contas)."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: a conta nova já pode ser usada numa entrada, antes mesmo de chegar ao computador."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Programa: importa também as contas feitas no celular, junto com as entradas."
+        }
+      ]
+    },
+    {
       "versao": "0.46.0",
       "resumo": "1 correção",
       "itens": [
@@ -53,24 +71,6 @@
         {
           "tipo": "novidade",
           "texto": "Programa: importar as entradas feitas no celular, que chegam pela pasta do backup no Google Drive."
-        }
-      ]
-    },
-    {
-      "versao": "0.42.0",
-      "resumo": "1 novidade · 2 correções",
-      "itens": [
-        {
-          "tipo": "novidade",
-          "texto": "Programa: ao fechar, faz um backup se algo mudou — o celular sempre encontra os dados do último uso."
-        },
-        {
-          "tipo": "correcao",
-          "texto": "Celular: \"Sobre este backup\" mostrava a versão do programa como se fosse a do app."
-        },
-        {
-          "tipo": "correcao",
-          "texto": "Celular: PDFs com certas fontes podiam aparecer sem o texto no iPhone."
         }
       ]
     }

@@ -101,21 +101,24 @@ class ArquivosMixin:
         lista = '\n'.join('• ' + entradas_celular.resumo(e) for _, e in encontradas[:15])
         if len(encontradas) > 15:
             lista += f'\n… e mais {len(encontradas) - 15}.'
-        if not messagebox.askyesno('Entradas do celular', f'Chegaram {len(encontradas)} entrada(s) cadastrada(s) no '
-                                   f'app do celular:\n\n{lista}{aviso}\n\nImportar agora?', parent=pai):
+        if not messagebox.askyesno('Entradas do celular', f'Chegaram do app do celular: '
+                                   f'{entradas_celular.contar(encontradas)}.\n\n{lista}{aviso}\n\nImportar agora?',
+                                   parent=pai):
             return
         try:
             gravadas, recusadas = entradas_celular.importar(self.banco, encontradas)
         except (OSError, sqlite3.Error) as erro:
             messagebox.showerror('Entradas do celular', 'Não foi possível importar. ' + descrever_erro(erro), parent=pai)
             return
-        texto = f'{gravadas} entrada(s) importada(s).'
+        texto = f'{gravadas} item(ns) importado(s) do celular.'
         if recusadas:
             texto += '\n\nNão importadas (corrija no celular e envie de novo, ou cadastre aqui):' + ''.join(
                 f'\n• {nome}: {mensagem}' for nome, mensagem in recusadas)
         messagebox.showinfo('Entradas do celular', texto, parent=pai)
         self.atualizar()
         self.atualizar_aviso_atrasadas()
+        if self.janela_contas is not None and self.janela_contas.tela.winfo_exists():
+            self.janela_contas.atualizar()  # Contas novas vindas do celular já aparecem na lista aberta.
 
     def fechar_programa(self):
         """Fecha o programa. Com o backup automático ativo, antes grava um backup se algo mudou desde o último:

@@ -7,7 +7,7 @@
 (() => {
   // Igual a versao.py (test_celular confere): mostrada na abertura e em Mais, para saber se o aparelho já
   // carregou a última versão publicada.
-  const VERSAO_APP = '0.46.0';
+  const VERSAO_APP = '0.47.0';
   const D = GestorDados;
   const $ = (id) => document.getElementById(id);
   const SITUACOES = { pendente: 'Pendente', atrasada: 'Atrasada', recebida: 'Recebida' };
@@ -401,9 +401,10 @@
         desenharLista();
       } });
     desenharLista();
-    const pendentes = listaPendentes.length > 0 && el('a', { class: 'aviso item', href: '#pendentes' },
-      el('div', { class: 'nome', texto: listaPendentes.length === 1 ? '1 entrada feita no celular aguarda o computador'
-        : `${listaPendentes.length} entradas feitas no celular aguardam o computador` }),
+    const quantas = listaPendentes.filter((p) => (p.tipo || 'entrada') === 'entrada').length;
+    const pendentes = quantas > 0 && el('a', { class: 'aviso item', href: '#pendentes' },
+      el('div', { class: 'nome', texto: quantas === 1 ? '1 entrada feita no celular aguarda o computador'
+        : `${quantas} entradas feitas no celular aguardam o computador` }),
       el('div', { class: 'discreto pequeno', texto: 'Toque para ver ou enviar de novo' }));
     const nova = el('a', { class: 'botao-link primario', href: '#nova', texto: '+ Nova entrada' });
     return [nova, pendentes, busca, filtros, lista];
@@ -414,7 +415,7 @@
   // senha dos backups). O arquivo fica guardado aqui até um backup mais novo mostrar que o computador já o
   // importou (configuração entradas_celular_importadas); até lá, pode ser enviado de novo.
   let listaPendentes = [];          // [{id, arquivo, criada_em, bytes}] como guardadas no aparelho.
-  const abertasPendentes = new Map();  // id → entrada, para as que a chave do backup aberto consegue ler.
+  const abertasPendentes = new Map();  // id → {tipo, ...dados}, para as que a chave do backup aberto consegue ler.
 
   async function carregarPendentes() {
     const guardadas = await Guarda.ler('pendentes').catch(() => null) || [];
@@ -426,7 +427,8 @@
     for (const p of listaPendentes) {
       try {
         const { conteudo } = await LeitorBackup.decifrar(new Uint8Array(p.bytes), { chave: info.chave });
-        abertasPendentes.set(p.id, JSON.parse(new TextDecoder().decode(conteudo)).entrada);
+        const pacote = JSON.parse(new TextDecoder().decode(conteudo));
+        abertasPendentes.set(p.id, pacote.conta ? { ...pacote.conta, tipo: 'conta' } : { ...pacote.entrada, tipo: 'entrada' });
       } catch (erro) {
         // Feita com um backup de outra chave: continua guardada e pode ser enviada, só não é mostrada.
       }
@@ -460,6 +462,26 @@
     return campo;
   }
 
+  // Cifra e guarda no aparelho uma entrada ou conta feita aqui, e abre a tela de envio ao computador.
+  async function guardarPendente(tipo, dados) {
+    const completa = { id: crypto.randomUUID(), ...dados, criada_em: new Date().toISOString() };
+    const pacote = { formato: 'gestor-rpv-celular', versao_formato: 1, versao_app: VERSAO_APP, [tipo]: completa };
+    const bytes = await LeitorBackup.cifrar(new TextEncoder().encode(JSON.stringify(pacote)), info.chave);
+    const agora = new Date();
+    const marca = `${D.hojeIso(agora).replaceAll('-', '')}-${String(agora.getHours()).padStart(2, '0')}${String(agora.getMinutes()).padStart(2, '0')}`;
+    const registro = { id: completa.id, tipo, criada_em: completa.criada_em, bytes,
+      arquivo: `GestorRPV-celular-${tipo}-${marca}-${completa.id.slice(0, 8)}.rpvcelular` };
+    listaPendentes = [...listaPendentes, registro];
+    await Guarda.gravar('pendentes', listaPendentes);
+    abertasPendentes.set(completa.id, { ...completa, tipo });
+    location.replace(`#enviar/${completa.id}`);
+  }
+
+  // Contas feitas no celular que o computador ainda não importou: já podem ser usadas em entradas novas.
+  function contasPendentes() {
+    return [...abertasPendentes.values()].filter((p) => p.tipo === 'conta');
+  }
+
   function campoFormulario(rotulo, controle, ajuda) {
     return el('label', { class: 'campo' }, el('span', { texto: rotulo }), controle,
       ajuda && el('span', { class: 'discreto pequeno', texto: ajuda }));
@@ -469,9 +491,10 @@
     if (!info.chave) {
       return [el('p', { class: 'aviso', texto: 'Para cadastrar entradas no celular, abra um backup com senha (feito pelo programa a partir da versão 0.30).' })];
     }
-    const contas = dados.contas.filter((c) => c.ativa);
+    const contas = [...dados.contas.filter((c) => c.ativa),
+      ...contasPendentes().map((c) => ({ id: `p:${c.id}`, conta_id: -1, identificacao: c.identificacao, pendente: true }))];
     if (!contas.length) {
-      return [el('p', { class: 'aviso', texto: 'Cadastre uma conta de recebimento no computador antes de cadastrar entradas no celular.' })];
+      return [el('p', { class: 'aviso', texto: 'Cadastre uma conta de recebimento (aba Contas) antes de cadastrar entradas.' })];
     }
     const valor = campoMoeda;
     const c = {
@@ -480,7 +503,8 @@
       custo: valor('custo'),
       previsto: valor('previsto'),
       conta: el('select', { name: 'conta' }, el('option', { value: '', texto: 'Escolha a conta' }),
-        contas.map((conta) => el('option', { value: String(conta.id), texto: conta.identificacao }))),
+        contas.map((conta) => el('option', { value: String(conta.id),
+          texto: conta.identificacao + (conta.pendente ? ' (aguardando o computador)' : '') }))),
       previsao: el('input', { name: 'previsao', type: 'date' }),
       comissao: valor('comissao'),
       observacoes: el('textarea', { name: 'observacoes', rows: '3', maxlength: '5000' }),
@@ -535,18 +559,8 @@
       }
       salvar.disabled = true;
       try {
-        const completa = { id: crypto.randomUUID(), ...entrada, conta_id: conta.id, conta: conta.identificacao,
-          criada_em: new Date().toISOString() };
-        const pacote = { formato: 'gestor-rpv-celular', versao_formato: 1, versao_app: VERSAO_APP, entrada: completa };
-        const bytes = await LeitorBackup.cifrar(new TextEncoder().encode(JSON.stringify(pacote)), info.chave);
-        const agora = new Date();
-        const marca = `${D.hojeIso(agora).replaceAll('-', '')}-${String(agora.getHours()).padStart(2, '0')}${String(agora.getMinutes()).padStart(2, '0')}`;
-        const registro = { id: completa.id, arquivo: `GestorRPV-celular-${marca}-${completa.id.slice(0, 8)}.rpvcelular`,
-          criada_em: completa.criada_em, bytes };
-        listaPendentes = [...listaPendentes, registro];
-        await Guarda.gravar('pendentes', listaPendentes);
-        abertasPendentes.set(completa.id, completa);
-        location.replace(`#enviar/${completa.id}`);
+        // Conta ainda não importada: o computador a encontra pelo nome (conta_id -1), importando-a antes.
+        await guardarPendente('entrada', { ...entrada, conta_id: conta.pendente ? -1 : conta.id, conta: conta.identificacao });
       } catch (erro) {
         erros.replaceChildren(el('div', { texto: 'Não foi possível guardar a entrada neste aparelho: ' + (erro && erro.message ? erro.message : erro) }));
         salvar.disabled = false;
@@ -568,13 +582,65 @@
 
   function resumoPendente(p) {
     const e = abertasPendentes.get(p.id);
+    if (e && e.tipo === 'conta') {
+      return [`Conta: ${e.identificacao}`, `${e.banco} · titular ${e.nome}`];
+    }
     return e ? [e.nome, `${D.reais(e.previsto)} · previsão ${D.dataBr(e.previsao)} · ${e.conta}`]
-      : ['Entrada feita com um backup anterior', `Criada em ${D.dataHora(p.criada_em)}`];
+      : ['Feita com um backup anterior', `Criada em ${D.dataHora(p.criada_em)}`];
+  }
+
+  // Conta de recebimento nova: mesmas regras do computador, inclusive não repetir apelido, conta ou Pix.
+  function telaNovaConta() {
+    if (!info.chave) {
+      return [el('p', { class: 'aviso', texto: 'Para cadastrar contas no celular, abra um backup com senha (feito pelo programa a partir da versão 0.30).' })];
+    }
+    const campo = (nome, extra = {}) => el('input', { name: nome, autocomplete: 'off', ...extra });
+    const c = {
+      identificacao: campo('identificacao', { placeholder: 'Ex.: Nubank da Lilian' }),
+      nome: campo('nome', { autocapitalize: 'words' }),
+      cpf: campo('cpf', { inputmode: 'numeric', placeholder: '000.000.000-00' }),
+      endereco: campo('endereco'),
+      numero_endereco: campo('numero_endereco', { inputmode: 'numeric' }),
+      cidade: campo('cidade'),
+      estado: el('select', { name: 'estado' }, el('option', { value: '', texto: 'Escolha' }),
+        D.ESTADOS.map((uf) => el('option', { value: uf, texto: uf }))),
+      banco: campo('banco'),
+      agencia: campo('agencia', { inputmode: 'numeric' }),
+      numero: campo('numero', { inputmode: 'numeric' }),
+      pix: campo('pix', { autocapitalize: 'off', spellcheck: 'false' }),
+    };
+    c.cpf.addEventListener('input', () => {
+      const d = c.cpf.value.replace(/\D/g, '').slice(0, 11);
+      c.cpf.value = [d.slice(0, 3), d.slice(3, 6), d.slice(6, 9)].filter(Boolean).join('.') + (d.length > 9 ? '-' + d.slice(9) : '');
+    });
+    const erros = el('div', { class: 'erro', role: 'alert' });
+    const salvar = el('button', { type: 'submit', class: 'primario', texto: 'Salvar conta' });
+    const formulario = el('form', { class: 'cartao formulario', autocomplete: 'off', onsubmit: async (evento) => {
+      evento.preventDefault();
+      const valores = Object.fromEntries(Object.entries(c).map(([k, controle]) => [k, controle.value.trim()]));
+      const problemas = D.problemasDaConta(valores, [...dados.contas, ...contasPendentes()]);
+      if (problemas.length) {
+        erros.replaceChildren(...problemas.map((p) => el('div', { texto: p })));
+        erros.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      salvar.disabled = true;
+      try {
+        await guardarPendente('conta', valores);
+      } catch (erro) {
+        erros.replaceChildren(el('div', { texto: 'Não foi possível guardar a conta neste aparelho: ' + (erro && erro.message ? erro.message : erro) }));
+        salvar.disabled = false;
+      }
+    } },
+    ...Object.entries(D.TITULOS_CONTA).map(([chave, rotulo]) => campoFormulario(
+      chave === 'agencia' ? 'Agência (opcional)' : rotulo, c[chave])),
+    erros, salvar);
+    return [el('p', { class: 'discreto pequeno', texto: 'A conta fica guardada neste celular e já pode ser escolhida numa entrada nova. Ela vai para o computador do mesmo jeito que as entradas.' }), formulario];
   }
 
   function telaPendentes() {
     if (!listaPendentes.length) {
-      return [vazio('Nenhuma entrada aguardando o computador.')];
+      return [vazio('Nada aguardando o computador.')];
     }
     return [el('p', { class: 'discreto pequeno', texto: 'Somem daqui sozinhas quando um backup mais novo, feito depois da importação no computador, for aberto no celular.' }),
       el('div', { class: 'menu' }, listaPendentes.map((p) => {
@@ -587,7 +653,7 @@
   function telaEnviar(id) {
     const p = listaPendentes.find((x) => x.id === id);
     if (!p) {
-      return [vazio('Esta entrada já foi importada pelo computador ou apagada.')];
+      return [vazio('Isto já foi importado pelo computador ou apagado.')];
     }
     const [titulo, detalhe] = resumoPendente(p);
     const arquivo = new File([new Uint8Array(p.bytes)], p.arquivo, { type: 'application/octet-stream' });
@@ -715,10 +781,14 @@
   }
 
   function telaContas() {
+    const nova = el('a', { class: 'botao-link primario', href: '#nova-conta', texto: '+ Nova conta' });
+    const pendentes = contasPendentes().map((c) => el('a', { class: 'aviso item', href: `#enviar/${c.id}` },
+      el('div', { class: 'nome', texto: c.identificacao }),
+      el('div', { class: 'discreto pequeno', texto: 'Feita no celular · aguarda o computador · toque para enviar' })));
     if (!dados.contas.length) {
-      return [vazio('Nenhuma conta cadastrada.')];
+      return [nova, pendentes, vazio('Nenhuma conta cadastrada.')];
     }
-    return [el('div', { class: 'lista' }, dados.contas.map((c) => {
+    return [nova, pendentes, el('div', { class: 'lista' }, dados.contas.map((c) => {
       const usos = dados.operacoes.filter((r) => r.conta_id === c.id).length;
       return el('div', {},
         el('div', { class: 'linha1 rotulo-conta' }, el('span', { class: 'discreto pequeno', texto: usos === 1
@@ -894,6 +964,7 @@
     backup: { titulo: 'Sobre este backup', aba: 'mais', montar: telaBackup, voltar: true },
     novidades: { titulo: 'Novidades', aba: 'mais', montar: telaNovidades, voltar: true },
     nova: { titulo: 'Nova entrada', aba: 'operacoes', montar: telaNovaEntrada, voltar: true },
+    'nova-conta': { titulo: 'Nova conta', aba: 'contas', montar: telaNovaConta, voltar: true },
     pendentes: { titulo: 'Aguardando o computador', aba: 'operacoes', montar: telaPendentes, voltar: true },
     enviar: { titulo: 'Enviar ao computador', aba: 'operacoes', montar: telaEnviar, voltar: true, textual: true },
   };

@@ -31,6 +31,13 @@ TERMOS = ['', 'ana', 'jose', 'maria jose', 'ria jo', 'lva', 'silva c', 'lva c', 
           'x y z', '  bruno  ']
 VALORES = [0, 5, 99, 100, 123456, 100000000, -800050, 99999999999999]
 TEXTOS = ["Ana Júlia D'Ávila", 'Maria-José  Souza', 'João_da Silva', '  ', 'ÇÃO ção', 'O’Neill', 'x1 y2']
+CPFS = ['529.982.247-25', '52998224725', '529.982.247-24', '111.111.111-11', '', '  ', '529.982.247-2a',
+        '1234567890']
+CONTA_VALIDA = {'identificacao': 'Conta Nova', 'nome': 'Fulana De Tal', 'cpf': '529.982.247-25', 'endereco': 'Rua A',
+                'numero_endereco': '10', 'cidade': 'Campinas', 'estado': 'SP', 'banco': 'Banco Novo', 'agencia': '',
+                'numero': '777-1', 'pix': 'fulana@example.com'}
+CASOS_CONTA = [CONTA_VALIDA, dict(CONTA_VALIDA, nome='', banco=''), dict(CONTA_VALIDA, estado='XX'),
+               dict(CONTA_VALIDA, cpf='111.111.111-11'), dict(CONTA_VALIDA, identificacao='vitor')]
 TELAS = ['#inicio', '#operacoes', '#contas', '#mais', '#grafico', '#lixeira', '#backup', '#novidades']
 
 
@@ -140,7 +147,7 @@ class TestAppDoCelular(unittest.TestCase):
             {'nome': 'cortado', 'arquivo': endereco(cortado), 'senha': SENHA_TESTE},
         ]
         regras = {'arquivo': endereco(cifrado), 'senha': SENHA_TESTE, 'hoje': HOJE.isoformat(), 'termos': TERMOS,
-                  'valores': VALORES, 'textos': TEXTOS}
+                  'valores': VALORES, 'textos': TEXTOS, 'textos_cpf': CPFS, 'casos_conta': CASOS_CONTA}
         documentos = {d['nome']: d['id'] for r in (cls.ana, cls.maria) for t in ('entrada', 'recebimento')
                       for d in banco.documentos(r, t)}
         cls.endereco_pdf, cls.endereco_png = (f'#documento/{documentos[n]}' for n in ('contrato.pdf', 'comprovante.png'))
@@ -158,6 +165,7 @@ class TestAppDoCelular(unittest.TestCase):
                          'previsto': '800000', 'conta_id': cls.conta_vitor, 'previsao': '2026-12-15', 'comissao': '10000',
                          'observacoes': 'veio do celular', 'ja_importada': cls.ja_importada,
                          'backup_com_importada': str(com_importada)}
+        telas['conta'] = dict(CONTA_VALIDA, identificacao='Conta Do Celular', cpf='52998224725', pix='celular@example.com')
         outro = banco_com_contas(cls.pasta / 'outro' / 'gestor.sqlite3')
         outro.salvar(dados_rpv(nome='Só No Segundo Backup'))
         segundo = criar_backup(outro, cls.pasta / 'segundo')
@@ -295,7 +303,7 @@ class TestAppDoCelular(unittest.TestCase):
         import base64
         import entradas_celular
         from backup import PASTA_AUTOMATICA
-        (feita,) = [a for a in self.resultados['nova_arquivos'] if a['id'] != self.ja_importada]
+        (feita,) = [a for a in self.resultados['nova_arquivos'] if a['tipo'] == 'entrada']
         self.assertTrue(feita['arquivo'].startswith('GestorRPV-celular-') and feita['arquivo'].endswith('.rpvcelular'))
         copia = self.pasta / 'copia-para-importar.sqlite3'
         shutil.copy(self.banco.caminho, copia)
@@ -314,8 +322,49 @@ class TestAppDoCelular(unittest.TestCase):
         self.assertIn(feita['id'], entradas_celular.importadas(destino))
 
     def test_entrada_ja_importada_some_do_celular(self):
-        feita = next(a['id'] for a in self.resultados['nova_arquivos'] if a['id'] != self.ja_importada)
-        self.assertEqual(self.resultados['pendentes_depois'], [feita])
+        feitas = [a['id'] for a in self.resultados['nova_arquivos'] if a['id'] != self.ja_importada]
+        self.assertEqual(self.resultados['pendentes_depois'], feitas)
+
+    # ---- Conta feita no celular -------------------------------------------------------------------------------
+    def test_regras_de_cpf_e_de_conta_iguais_as_do_programa(self):
+        from dados import validar_cpf
+        esperado = []
+        for texto in CPFS:
+            try:
+                esperado.append(validar_cpf(texto))
+            except ValueError as erro:
+                esperado.append(f'ERRO: {erro}')
+        self.assertEqual(self.resultados['regras']['cpfs'], esperado)
+        for caso, problemas in zip(CASOS_CONTA, self.resultados['regras']['contas_regras']):
+            with self.subTest(caso=caso):
+                copia = self.pasta / f'conta-{len(problemas)}-{caso["identificacao"]}.sqlite3'
+                shutil.copy(self.banco.caminho, copia)
+                try:
+                    Banco(copia).salvar_conta(caso)
+                    self.assertEqual(problemas, [])
+                except ValueError as erro:
+                    self.assertEqual('\n'.join(problemas), str(erro))
+
+    def test_conta_feita_no_celular(self):
+        # Como no computador: primeiro os campos mal preenchidos; a duplicidade é conferida depois deles.
+        self.assertEqual(self.resultados['conta_erro'], 'CPF inválido.')
+        self.assertEqual(self.resultados['cpf_mascara'], '529.982.247-25')
+        self.assertIn('Conta Do Celular (aguardando o computador)', self.resultados['opcoes_conta'])
+
+    def test_conta_feita_no_celular_e_importada_pelo_programa(self):
+        import base64
+        import entradas_celular
+        (feita,) = [a for a in self.resultados['nova_arquivos'] if a['tipo'] == 'conta']
+        copia = self.pasta / 'copia-conta.sqlite3'
+        shutil.copy(self.banco.caminho, copia)
+        destino = Banco(copia)
+        arquivo = self.pasta / feita['arquivo']
+        arquivo.write_bytes(base64.b64decode(feita['bytes']))
+        encontradas, problemas = entradas_celular.conferir(destino, [arquivo])
+        self.assertEqual(problemas, [])
+        self.assertEqual(entradas_celular.importar(destino, encontradas), (1, []))
+        conta = next(c for c in destino.contas() if c['identificacao'] == 'Conta Do Celular')
+        self.assertEqual((conta['cpf'], conta['pix'], conta['estado']), ('52998224725', 'celular@example.com', 'SP'))
 
     # ---- Backup guardado e Face ID (autenticador virtual com PRF) --------------------------------------------
     def setUp(self):

@@ -39,7 +39,7 @@ class TestArquivos(TesteDeInterface):
         self.root.update()
         with patch.object(messagebox, 'askyesno', return_value=True), patch.object(messagebox, 'showinfo') as aviso:
             self.programa.menus['Arquivo'].invoke('Entradas do celular…')
-        self.assertIn('1 entrada(s) importada(s)', aviso.call_args.args[1])
+        self.assertIn('1 item(ns) importado(s)', aviso.call_args.args[1])
         self.assertEqual([r['nome'] for r in self.banco.listar()], ['Do Celular'])
         self.assertEqual(len(self.programa.tabela.get_children()), 1)
         # Sem nada novo: ao abrir não aparece nada; pelo menu, oferece escolher arquivos.

@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.46.0
+# Gestor de RPV — 0.47.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -479,7 +479,9 @@ Google Drive. Ao abrir, o Gestor no computador (`entradas_celular.py`) procura e
 dos backups, mostra as entradas e pergunta se quer importá-las (também em **Arquivo → Entradas do celular…**,
 que permite escolher os arquivos à mão). Importadas, elas são gravadas pelas regras de sempre, o arquivo vai
 para `importados-do-celular` e o identificador da entrada fica anotado: nunca entra duas vezes. O próximo
-backup leva essa anotação ao celular, que então apaga a cópia que guardava.
+backup leva essa anotação ao celular, que então apaga a cópia que guardava. Contas de recebimento novas são
+feitas do mesmo jeito (aba Contas → "+ Nova conta", com as regras de `Banco.salvar_conta`), podem ser usadas em
+entradas antes de chegarem ao computador e são importadas antes das entradas, que as encontram pelo nome.
 
 `celular/leitor.js` abre o backup e `celular/dados.js` repete as regras de `dados.py` e `grafico.py`
 (situação, valores, busca, indicadores e resumo mensal). `test_celular.py` grava backups com o Python, abre-os

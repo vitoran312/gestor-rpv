@@ -42,7 +42,7 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
     }
 
     // Regras de dados.js sobre o backup principal, com a mesma data de "hoje" usada no Python.
-    resultados.regras = await pagina.evaluate(async ({ arquivo, senha, hoje, termos, valores, textos }) => {
+    resultados.regras = await pagina.evaluate(async ({ arquivo, senha, hoje, termos, valores, textos, textos_cpf, casos_conta }) => {
       const D = GestorDados;
       const bytes = new Uint8Array(await (await fetch(arquivo)).arrayBuffer());
       const { db, extrair } = await LeitorBackup.ler(bytes, senha);
@@ -76,6 +76,8 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
         buscas: Object.fromEntries(termos.map((t) => [t, D.filtrar(dados.operacoes, t).map((r) => r.id)])),
         resumo: D.resumoMensal(dados.operacoes, 12, new Date(ano, mes - 1, dia)),
         moedas: valores.map(D.moeda),
+        cpfs: textos_cpf.map((t) => { try { return D.validarCpf(t); } catch (erro) { return 'ERRO: ' + erro.message; } }),
+        contas_regras: casos_conta.map((c) => D.problemasDaConta(c, dados.contas)),
         chaves: textos.map(D.chaveTexto),
         historico: Object.fromEntries([...dados.historico].map(([id, lista]) => [id, lista.length])),
         prorrogacoes: Object.fromEntries([...dados.prorrogacoes].map(([id, lista]) => [id, lista.length])),
@@ -172,8 +174,32 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
       await pagina.click('text=Salvar entrada');
       await pagina.waitForFunction(() => location.hash.startsWith('#enviar/'));
       resultados.nova_tela = await pagina.evaluate(() => document.getElementById('tela').innerText);
+      // Conta nova no celular: primeiro com erros (apelido repetido, CPF inválido), depois certa.
+      const contaNova = telas.conta;
+      await pagina.evaluate(() => { location.hash = '#nova-conta'; });
+      await pagina.waitForSelector('form [name="identificacao"]');
+      for (const [campo, valor] of Object.entries({ ...contaNova, identificacao: 'vitor', cpf: '11111111111' })) {
+        if (campo === 'estado') {
+          await pagina.selectOption('[name="estado"]', valor);
+        } else {
+          await pagina.fill(`[name="${campo}"]`, valor);
+        }
+      }
+      await pagina.click('text=Salvar conta');
+      await pagina.waitForFunction(() => document.querySelector('form .erro').textContent.length > 0);
+      resultados.conta_erro = await pagina.evaluate(() => document.querySelector('form .erro').innerText);
+      await pagina.fill('[name="identificacao"]', contaNova.identificacao);
+      await pagina.fill('[name="cpf"]', contaNova.cpf);
+      resultados.cpf_mascara = await pagina.inputValue('[name="cpf"]');
+      await pagina.click('text=Salvar conta');
+      await pagina.waitForFunction(() => location.hash.startsWith('#enviar/'));
+      await pagina.evaluate(() => { location.hash = '#nova'; });
+      await pagina.waitForSelector('form [name="conta"]');
+      resultados.opcoes_conta = await pagina.evaluate(() => Array.from(document.querySelectorAll('[name="conta"] option'), (o) => o.textContent));
+      await pagina.evaluate(() => { location.hash = '#contas'; });
+      await pagina.waitForSelector('text=aguarda o computador');
       resultados.nova_arquivos = await pagina.evaluate(async () => (await Guarda.ler('pendentes')).map((p) => ({
-        id: p.id, arquivo: p.arquivo, bytes: btoa(String.fromCharCode(...new Uint8Array(p.bytes))) })));
+        id: p.id, tipo: p.tipo, arquivo: p.arquivo, bytes: btoa(String.fromCharCode(...new Uint8Array(p.bytes))) })));
       await pagina.evaluate(() => { location.hash = '#operacoes'; });
       await pagina.waitForSelector('text=aguarda o computador');
       // Entrada já importada no computador (o backup novo traz a lista): some do celular ao abrir esse backup.

@@ -10,6 +10,11 @@ from pathlib import Path
 MOSTRAR = 5  # Quantas versões aparecem no "Sobre".
 
 NOVIDADES = [
+    ('0.47.0', [
+        ('novidade', 'Celular: cadastrar novas contas de recebimento pelo app (aba Contas).'),
+        ('novidade', 'Celular: a conta nova já pode ser usada numa entrada, antes mesmo de chegar ao computador.'),
+        ('novidade', 'Programa: importa também as contas feitas no celular, junto com as entradas.'),
+    ]),
     ('0.46.0', [
         ('correcao', 'Celular: o logo da abertura ficava atrás da janela do Face ID; agora fica mais alto, à vista.'),
     ]),

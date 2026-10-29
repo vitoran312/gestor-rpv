@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## 0.47.0
+
+- App do celular: "+ Nova conta" na aba Contas, com as mesmas regras do programa (campos obrigatórios, CPF,
+  estado, e sem repetir apelido, conta bancária ou chave Pix). A conta fica guardada no celular, aparece em
+  Contas como "aguarda o computador" e já pode ser escolhida numa entrada nova.
+- Programa: as entradas do celular passam a trazer também contas de recebimento; as contas são importadas antes
+  das entradas, que as encontram pelo nome.
+
 ## 0.46.0
 
 - App do celular: o logo da abertura fica cerca de 2,5 cm acima do centro, fora da área coberta pela janela de

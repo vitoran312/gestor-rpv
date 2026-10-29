@@ -147,6 +147,89 @@ const GestorDados = (() => {
     return problemas;
   }
 
+  // ---- Conta de recebimento digitada no celular (Banco.salvar_conta, validar_cpf e chave_pix) -----------
+  const ESTADOS = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR',
+    'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
+
+  function validarCpf(texto) {
+    if (!texto.trim()) {
+      throw new Error('Informe o CPF.');
+    }
+    if (/[^0-9.\-\s]/.test(texto)) {
+      throw new Error('CPF inválido.');
+    }
+    const cpf = texto.replace(/\D/g, '');
+    if (cpf.length !== 11 || new Set(cpf).size === 1) {
+      throw new Error('CPF inválido.');
+    }
+    for (const tamanho of [9, 10]) {
+      let soma = 0;
+      for (let i = 0; i < tamanho; i += 1) {
+        soma += Number(cpf[i]) * (tamanho + 1 - i);
+      }
+      const resto = (soma * 10) % 11;
+      if (Number(cpf[tamanho]) !== (resto === 10 ? 0 : resto)) {
+        throw new Error('CPF inválido.');
+      }
+    }
+    return cpf;
+  }
+
+  function chavePix(texto) {
+    const t = texto.trim().toLowerCase();
+    if (!/^[0-9+ ().\-/]+$/.test(t)) {
+      return ['texto', t];
+    }
+    let digitos = t.replace(/\D/g, '');
+    const tipo = /[./]/.test(t) ? 'documento' : /[()+ ]/.test(t) ? 'telefone' : 'numero';
+    if (tipo !== 'documento' && (digitos.length === 12 || digitos.length === 13) && digitos.startsWith('55')) {
+      digitos = digitos.slice(2);
+    }
+    return [tipo, digitos];
+  }
+
+  function mesmaChavePix(uma, outra) {
+    const [[tipoA, valorA], [tipoB, valorB]] = [chavePix(uma), chavePix(outra)];
+    if (!valorA || valorA !== valorB) {
+      return false;
+    }
+    // CPF e celular podem ter os mesmos 11 dígitos sem serem a mesma chave.
+    return tipoA === tipoB || tipoA === 'numero' || tipoB === 'numero';
+  }
+
+  const semZeros = (texto) => normalizar(texto).replace(/^0+/, '') || '0';
+
+  // Mesmas regras de Banco.salvar_conta, inclusive as de duplicidade contra as contas já conhecidas.
+  function problemasDaConta(c, existentes) {
+    const d = Object.fromEntries(Object.keys(TITULOS_CONTA).map((k) => [k, (c[k] || '').trim()]));
+    const faltando = Object.keys(TITULOS_CONTA).filter((k) => k !== 'agencia' && !d[k]).map((k) => TITULOS_CONTA[k]);
+    const problemas = faltando.length ? [`Preencha: ${faltando.join(', ')}.`] : [];
+    if (d.estado && !ESTADOS.includes(d.estado.toUpperCase())) {
+      problemas.push('Selecione um estado brasileiro válido.');
+    }
+    if (d.cpf) {
+      try {
+        validarCpf(d.cpf);
+      } catch (erro) {
+        problemas.push(erro.message);
+      }
+    }
+    if (problemas.length) {
+      return problemas;
+    }
+    for (const outra of existentes) {
+      if (normalizar(outra.identificacao) === normalizar(d.identificacao)) {
+        problemas.push('Já existe uma conta com essa identificação, inclusive entre as desativadas.');
+      } else if (normalizar(outra.banco) === normalizar(d.banco) && semZeros(outra.numero) === semZeros(d.numero)
+        && (!outra.agencia || !d.agencia || semZeros(outra.agencia) === semZeros(d.agencia))) {
+        problemas.push('Essa conta bancária já está cadastrada.');
+      } else if (mesmaChavePix(outra.pix || '', d.pix)) {
+        problemas.push('Essa chave Pix já está cadastrada em outra conta.');
+      }
+    }
+    return [...new Set(problemas)];
+  }
+
   // ---- Situação e indicadores (dados.situacao e Minhas operações) -------------------------------------
   function situacao(registro, hoje = hojeIso()) {
     if (registro.recebimento) {
@@ -315,6 +398,6 @@ const GestorDados = (() => {
 
   return {
     TITULOS_CONTA, moeda, reais, dataBr, dataHora, hojeIso, cpf, situacao, contarSituacoes, indicadores,
-    centavos, problemasDaEntrada, nomeFormatado, normalizar, chaveTexto, encontra, filtrar, resumoMensal, escala, valoresDoMes, quantidade, rotuloMes, carregar, contaDaOperacao,
+    centavos, problemasDaEntrada, nomeFormatado, ESTADOS, validarCpf, mesmaChavePix, problemasDaConta, normalizar, chaveTexto, encontra, filtrar, resumoMensal, escala, valoresDoMes, quantidade, rotuloMes, carregar, contaDaOperacao,
   };
 })();
