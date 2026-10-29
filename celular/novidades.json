@@ -1,0 +1,86 @@
+{
+  "versoes": [
+    {
+      "versao": "0.44.0",
+      "resumo": "4 novidades",
+      "itens": [
+        {
+          "tipo": "novidade",
+          "texto": "Celular: os valores ganham a pontuação sozinhos enquanto você digita (1.500,00)."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: abertura com o logo do app."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: com o backup guardado, o app abre direto no Face ID ou na senha, sem a tela de escolher arquivo."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Lista do que mudou nas últimas versões, no \"Sobre\" do programa e no app."
+        }
+      ]
+    },
+    {
+      "versao": "0.43.0",
+      "resumo": "2 novidades",
+      "itens": [
+        {
+          "tipo": "novidade",
+          "texto": "Celular: cadastrar novas entradas pelo app."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Programa: importar as entradas feitas no celular, que chegam pela pasta do backup no Google Drive."
+        }
+      ]
+    },
+    {
+      "versao": "0.42.0",
+      "resumo": "1 novidade · 2 correções",
+      "itens": [
+        {
+          "tipo": "novidade",
+          "texto": "Programa: ao fechar, faz um backup se algo mudou — o celular sempre encontra os dados do último uso."
+        },
+        {
+          "tipo": "correcao",
+          "texto": "Celular: \"Sobre este backup\" mostrava a versão do programa como se fosse a do app."
+        },
+        {
+          "tipo": "correcao",
+          "texto": "Celular: PDFs com certas fontes podiam aparecer sem o texto no iPhone."
+        }
+      ]
+    },
+    {
+      "versao": "0.41.0",
+      "resumo": "1 novidade · 1 correção",
+      "itens": [
+        {
+          "tipo": "novidade",
+          "texto": "Celular: a versão do app aparece na tela de abertura."
+        },
+        {
+          "tipo": "correcao",
+          "texto": "Celular: em alguns iPhones o PDF não abria no app."
+        }
+      ]
+    },
+    {
+      "versao": "0.40.0",
+      "resumo": "1 novidade · 1 correção",
+      "itens": [
+        {
+          "tipo": "novidade",
+          "texto": "Celular: zoom nos PDFs e nas imagens dos anexos."
+        },
+        {
+          "tipo": "correcao",
+          "texto": "Celular: o PDF abria ampliado, sem caber na tela."
+        }
+      ]
+    }
+  ]
+}

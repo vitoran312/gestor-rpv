@@ -8,6 +8,7 @@ from tkinter import messagebox, ttk
 
 import cifra
 import demonstracao
+import novidades
 import instancia
 from backup import limpar_temporarios, recuperar_interrompidas
 from recuperacao import abrir_banco
@@ -169,6 +170,7 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
         ttk.Label(corpo, text='Vitoran Tech', font=(self.fonte, 13, 'bold')).pack()
         ttk.Label(corpo, text='Desenvolvido por Vitor Alves Nascimento').pack(pady=(6, 0))
         ttk.Label(corpo, text=f'Versão {VERSAO}', style='Discreto.TLabel').pack(pady=(8, 16))
+        self.criar_novidades(corpo)
         ttk.Label(corpo, text='Sugestões ou dúvidas:', style='Discreto.TLabel').pack()
         contato = ttk.Label(corpo, text=CONTATO, style='Contato.TLabel', cursor='hand2')
         contato.pack(pady=(2, 20))
@@ -179,6 +181,29 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
         centralizar(tela, 550)
         tela.deiconify()
         tela.focus_set()
+
+    def criar_novidades(self, corpo):
+        """O que mudou nas últimas versões (novidades.py), com a contagem de novidades e correções de cada uma."""
+        ttk.Label(corpo, text='O que mudou nas últimas versões', font=(self.fonte, 11, 'bold')).pack(anchor='w')
+        quadro = ttk.Frame(corpo)
+        quadro.pack(fill='both', pady=(6, 18))
+        c = cores()
+        texto = tk.Text(quadro, height=11, width=58, wrap='word', relief='flat', borderwidth=0, padx=10, pady=8,
+                        font=(self.fonte, 10), bg=c['campo'], fg=c['texto'], cursor='arrow')
+        rolagem = ttk.Scrollbar(quadro, orient='vertical', command=texto.yview)
+        texto.configure(yscrollcommand=rolagem.set)
+        texto.pack(side='left', fill='both', expand=True)
+        rolagem.pack(side='right', fill='y')
+        texto.tag_configure('versao', font=(self.fonte, 10, 'bold'), spacing1=6)
+        texto.tag_configure('resumo', foreground=c['secundario'])
+        texto.tag_configure('item', lmargin1=12, lmargin2=26, spacing1=2)
+        for versao, itens in novidades.ultimas():
+            texto.insert('end', f'Versão {versao}', 'versao')
+            texto.insert('end', f'  ·  {novidades.contagem(itens)}\n', 'resumo')
+            for tipo, frase in itens:
+                texto.insert('end', ('Novidade: ' if tipo == 'novidade' else 'Correção: ') + frase + '\n', 'item')
+        texto.configure(state='disabled')  # Só leitura; ainda dá para selecionar e copiar.
+        return texto
 
     def tematizar_novo_widget(self, evento):
         if isinstance(evento.widget, (tk.Toplevel, tk.Text, tk.Menu)):

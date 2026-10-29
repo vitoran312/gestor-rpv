@@ -31,7 +31,7 @@ TERMOS = ['', 'ana', 'jose', 'maria jose', 'ria jo', 'lva', 'silva c', 'lva c', 
           'x y z', '  bruno  ']
 VALORES = [0, 5, 99, 100, 123456, 100000000, -800050, 99999999999999]
 TEXTOS = ["Ana Júlia D'Ávila", 'Maria-José  Souza', 'João_da Silva', '  ', 'ÇÃO ção', 'O’Neill', 'x1 y2']
-TELAS = ['#inicio', '#operacoes', '#contas', '#mais', '#grafico', '#lixeira', '#backup']
+TELAS = ['#inicio', '#operacoes', '#contas', '#mais', '#grafico', '#lixeira', '#backup', '#novidades']
 
 
 def pdf_de_teste(textos, enchimento=0):
@@ -153,8 +153,9 @@ class TestAppDoCelular(unittest.TestCase):
         com_importada = criar_backup(banco, cls.pasta / 'com-importada')
         banco.remover_configuracao('entradas_celular_importadas')
         cls.conta_vitor = next(c['id'] for c in banco.contas() if c['identificacao'] == 'Vitor')
-        telas['nova'] = {'nome': '  entrada   do celular ', 'aquisicao': '2026-10-20', 'custo': '5.000,00',
-                         'previsto': '8000', 'conta_id': cls.conta_vitor, 'previsao': '2026-12-15', 'comissao': '100',
+        # Valores digitados como no celular: só números, que entram pelos centavos (800000 = R$ 8.000,00).
+        telas['nova'] = {'nome': '  entrada   do celular ', 'aquisicao': '2026-10-20', 'custo': '500000',
+                         'previsto': '800000', 'conta_id': cls.conta_vitor, 'previsao': '2026-12-15', 'comissao': '10000',
                          'observacoes': 'veio do celular', 'ja_importada': cls.ja_importada,
                          'backup_com_importada': str(com_importada)}
         outro = banco_com_contas(cls.pasta / 'outro' / 'gestor.sqlite3')
@@ -260,6 +261,10 @@ class TestAppDoCelular(unittest.TestCase):
         self.assertNotIn('Na Lixeira', telas['#operacoes'])
         self.assertIn('Gráfico mensal', telas['#mais'])
         self.assertIn('Protegido por senha', telas['#backup'])
+        import novidades
+        versao, itens = novidades.NOVIDADES[0]
+        self.assertIn(f'Versão {versao}', telas['#novidades'])
+        self.assertIn(itens[0][1], telas['#novidades'])
 
     def test_detalhe_mostra_texto_do_backup_como_texto(self):
         detalhe = self.resultados['telas'][f'#operacao/{self.antiga}']
@@ -276,6 +281,10 @@ class TestAppDoCelular(unittest.TestCase):
             self.assertTrue(self.resultados['sem_internet'])
 
     # ---- Entrada feita no celular ----------------------------------------------------------------------------
+    def test_valor_ganha_pontuacao_enquanto_e_digitado(self):
+        self.assertEqual(self.resultados['mascara'], ['0,01', '0,12', '1,23', '12,34', '123,45', '1.234,56', '12.345,67',
+                                                      '1.234,56'])
+
     def test_nova_entrada_confere_as_regras_e_mostra_o_lucro(self):
         self.assertIn('O valor de aquisição não pode superar o Valor Total RPV.', self.resultados['nova_erro'])
         self.assertEqual(self.resultados['nova_lucro'], 'Lucro previsto: R$ 3.000,00')
@@ -355,6 +364,14 @@ class TestArquivosDoApp(unittest.TestCase):
         publicados = {str(c.relative_to(RAIZ / 'celular')).replace(os.sep, '/') for c in (RAIZ / 'celular').rglob('*')
                       if c.is_file() and 'testes' not in c.parts and c.name != 'sw.js' and not c.name.startswith('LICEN')}
         self.assertEqual(publicados - set(arquivos), set())
+
+    @unittest.skipUnless(shutil.which('node'), 'Requer Node.js')
+    def test_codigo_do_app_sem_erro_de_sintaxe(self):
+        # Um parêntese a mais derruba o app inteiro no celular: confere cada arquivo antes de publicar.
+        for arquivo in sorted((RAIZ / 'celular').glob('*.js')):
+            with self.subTest(arquivo.name):
+                resultado = subprocess.run(['node', '--check', str(arquivo)], capture_output=True, text=True)
+                self.assertEqual(resultado.returncode, 0, resultado.stderr)
 
     def test_versao_mostrada_no_app_e_a_do_programa(self):
         import re

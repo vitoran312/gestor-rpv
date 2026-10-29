@@ -158,6 +158,13 @@ class TestInicio(TesteDeInterface):
         textos = [w.cget('text') for w in filhos(tela) if isinstance(w, ttk.Label)]
         for texto in ('Gestor de RPV', 'Vitoran Tech', 'Desenvolvido por Vitor Alves Nascimento', f'Versão {app.VERSAO}', 'Sugestões ou dúvidas:', 'vitoran312@gmail.com'):
             self.assertIn(texto, textos)
+        # O que mudou nas últimas versões, com a contagem de novidades e correções.
+        import novidades
+        (quadro,) = [w for w in filhos(tela) if isinstance(w, tk.Text)]
+        conteudo = quadro.get('1.0', 'end')
+        for versao, itens in novidades.ultimas():
+            self.assertIn(f'Versão {versao}  ·  {novidades.contagem(itens)}', conteudo)
+        self.assertEqual(quadro.cget('state'), 'disabled')
         fechar = botao(tela, 'Fechar')
         self.assertTrue(fechar.winfo_ismapped())
         self.assertLessEqual(fechar.winfo_rooty() + fechar.winfo_height(), tela.winfo_rooty() + tela.winfo_height())

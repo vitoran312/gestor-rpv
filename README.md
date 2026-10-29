@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.43.0
+# Gestor de RPV — 0.44.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -485,6 +485,13 @@ backup leva essa anotação ao celular, que então apaga a cópia que guardava.
 (situação, valores, busca, indicadores e resumo mensal). `test_celular.py` grava backups com o Python, abre-os
 num navegador e confere que o app chega aos mesmos resultados do programa (requer Node.js com Playwright:
 `GESTOR_RPV_TESTE_CELULAR=1 python -m unittest test_celular`).
+
+## Novidades para quem usa
+
+`novidades.py` guarda, em linguagem simples, o que mudou em cada versão (novidades e correções). As últimas
+cinco aparecem em **Ajuda → Sobre o Gestor de RPV** e no app, em **Mais → Novidades** (`celular/novidades.json`,
+gerado por `python novidades.py`). `test_novidades.py` exige que a versão de `versao.py` esteja na lista e que o
+arquivo do app esteja atualizado.
 
 ## Versões
 

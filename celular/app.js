@@ -7,7 +7,7 @@
 (() => {
   // Igual a versao.py (test_celular confere): mostrada na abertura e em Mais, para saber se o aparelho já
   // carregou a última versão publicada.
-  const VERSAO_APP = '0.43.0';
+  const VERSAO_APP = '0.44.0';
   const D = GestorDados;
   const $ = (id) => document.getElementById(id);
   const SITUACOES = { pendente: 'Pendente', atrasada: 'Atrasada', recebida: 'Recebida' };
@@ -95,12 +95,32 @@
       $('fonte-titulo').textContent = fonte.novo ? 'Backup escolhido agora' : 'Backup guardado neste aparelho';
       $('fonte-detalhe').textContent = fonte.criado_em ? `De ${D.dataHora(fonte.criado_em)}` : fonte.nome;
     }
-    $('rotulo-arquivo').textContent = guardado ? 'Trocar por um backup mais novo (opcional)' : 'Backup (.rpvbackup)';
+    $('rotulo-arquivo').textContent = guardado ? 'Backup mais novo (.rpvbackup)' : 'Backup (.rpvbackup)';
     faceIdAtivo = Boolean(faceId);
     $('abrir-faceid').hidden = !faceId;
     $('abrir').textContent = faceId ? 'Abrir com a senha' : 'Abrir';
+    // Com um backup guardado, a tela é só de desbloqueio: escolher arquivo e (com Face ID) digitar a senha ficam
+    // atrás de um toque. Sem backup guardado (primeira vez), aparece tudo.
+    const desbloqueio = Boolean(guardado);
+    $('grupo-arquivo').hidden = desbloqueio && !mostrarArquivo && !(fonte && fonte.novo);
+    $('grupo-senha').hidden = Boolean(faceId) && !mostrarSenha;
+    $('formulario').hidden = $('grupo-arquivo').hidden && $('grupo-senha').hidden;
+    $('trocar-backup').hidden = !desbloqueio || !$('grupo-arquivo').hidden;
+    $('usar-senha').hidden = !faceId || !$('grupo-senha').hidden;
+    $('explicacao').hidden = desbloqueio;
     return faceId;
   }
+
+  let mostrarArquivo = false;  // A pessoa tocou em "Trocar por um backup mais novo".
+  let mostrarSenha = false;    // A pessoa tocou em "Usar a senha" (com Face ID ativo).
+  $('trocar-backup').addEventListener('click', () => {
+    mostrarArquivo = true;
+    prepararAbertura();
+  });
+  $('usar-senha').addEventListener('click', () => {
+    mostrarSenha = true;
+    prepararAbertura().then(() => $('senha').focus());
+  });
 
   let faceIdAtivo = false;
 
@@ -259,6 +279,8 @@
     info = null;
     senhaRecente = null;
     abertasPendentes.clear();
+    mostrarArquivo = false;
+    mostrarSenha = false;
     estado.busca = '';
     estado.filtro = 'todas';
     $('tela').replaceChildren();
@@ -411,6 +433,33 @@
     }
   }
 
+  // Valor em reais digitado como no programa do computador: os números entram pelos centavos e a pontuação
+  // aparece sozinha (1 → 0,01; 150000 → 1.500,00). Colar troca o valor inteiro ("1.500,00" vale mil e quinhentos).
+  function campoMoeda(nome) {
+    const campo = el('input', { name: nome, inputmode: 'numeric', autocomplete: 'off', placeholder: '0,00',
+      enterkeyhint: 'next' });
+    const formatar = () => {
+      const digitos = campo.value.replace(/\D/g, '').replace(/^0+/, '').slice(0, 14);
+      campo.value = digitos ? D.moeda(Number(digitos)) : '';
+    };
+    campo.addEventListener('input', (evento) => {
+      if (evento.inputType !== 'insertFromPaste') {
+        formatar();
+      }
+    });
+    campo.addEventListener('paste', (evento) => {
+      evento.preventDefault();
+      const texto = (evento.clipboardData || window.clipboardData).getData('text');
+      try {
+        campo.value = D.moeda(D.centavos(texto.trim()));
+      } catch (erro) {
+        // Texto que não é um valor: o campo fica como estava.
+      }
+      campo.dispatchEvent(new Event('input'));
+    });
+    return campo;
+  }
+
   function campoFormulario(rotulo, controle, ajuda) {
     return el('label', { class: 'campo' }, el('span', { texto: rotulo }), controle,
       ajuda && el('span', { class: 'discreto pequeno', texto: ajuda }));
@@ -424,7 +473,7 @@
     if (!contas.length) {
       return [el('p', { class: 'aviso', texto: 'Cadastre uma conta de recebimento no computador antes de cadastrar entradas no celular.' })];
     }
-    const valor = (nome) => el('input', { name: nome, inputmode: 'decimal', autocomplete: 'off', placeholder: '0,00' });
+    const valor = campoMoeda;
     const c = {
       nome: el('input', { name: 'nome', autocomplete: 'off', autocapitalize: 'words', maxlength: '150' }),
       aquisicao: el('input', { name: 'aquisicao', type: 'date', value: D.hojeIso() }),
@@ -785,6 +834,7 @@
       opcao('#grafico', 'Gráfico mensal', 'Entradas e recebimentos dos últimos 12 meses'),
       opcao('#lixeira', `Lixeira (${dados.lixeira.length})`, 'Operações excluídas, só para consulta'),
       opcao('#backup', 'Sobre este backup', `Arquivo, data e versões · app ${VERSAO_APP}`),
+      opcao('#novidades', 'Novidades', 'O que mudou nas últimas versões'),
       senhaRecente && !faceIdAtivo && el('div', { class: 'cartao' },
         el('div', { texto: 'Ativar o Face ID' }), el('div', { class: 'discreto pequeno', texto: 'Abrir o app com o rosto, sem digitar a senha' }),
         el('div', { class: 'botoes' }, el('button', { type: 'button', class: 'primario', texto: 'Ativar',
@@ -801,6 +851,22 @@
       el('button', { type: 'button', class: 'primario', texto: 'Trancar agora', onclick: fecharDados }),
       el('p', { class: 'discreto pequeno', texto: 'Trancar apaga os dados da memória; o backup guardado continua trancado no aparelho. O app também tranca sozinho depois de 5 minutos em segundo plano.' }),
       el('button', { type: 'button', class: 'secundario', texto: 'Apagar o backup guardado neste aparelho', onclick: esquecerBackup }))];
+  }
+
+  // O que mudou nas últimas versões (novidades.json, gerado de novidades.py: o mesmo texto do "Sobre" do programa).
+  function telaNovidades() {
+    const area = el('div', { class: 'menu' }, el('p', { class: 'discreto', texto: 'Carregando…' }));
+    fetch('novidades.json').then((r) => r.json()).then(({ versoes }) => {
+      area.replaceChildren(...versoes.map((v) => cartao(
+        el('div', { class: 'linha1' }, el('span', { class: 'nome', texto: `Versão ${v.versao}` }),
+          el('span', { class: 'discreto pequeno', texto: v.resumo })),
+        el('ul', { class: 'novidades' }, v.itens.map((item) => el('li', { class: item.tipo },
+          el('span', { class: 'selo ' + (item.tipo === 'novidade' ? 'recebida' : 'atrasada'),
+            texto: item.tipo === 'novidade' ? 'Novidade' : 'Correção' }), ' ', item.texto))))));
+    }).catch(() => {
+      area.replaceChildren(el('p', { class: 'discreto', texto: 'Não foi possível carregar as novidades agora.' }));
+    });
+    return [area];
   }
 
   function telaBackup() {
@@ -826,6 +892,7 @@
     lixeira: { titulo: 'Lixeira', aba: 'mais', montar: telaLixeira, voltar: true },
     grafico: { titulo: 'Gráfico mensal', aba: 'mais', montar: telaGrafico, voltar: true },
     backup: { titulo: 'Sobre este backup', aba: 'mais', montar: telaBackup, voltar: true },
+    novidades: { titulo: 'Novidades', aba: 'mais', montar: telaNovidades, voltar: true },
     nova: { titulo: 'Nova entrada', aba: 'operacoes', montar: telaNovaEntrada, voltar: true },
     pendentes: { titulo: 'Aguardando o computador', aba: 'operacoes', montar: telaPendentes, voltar: true },
     enviar: { titulo: 'Enviar ao computador', aba: 'operacoes', montar: telaEnviar, voltar: true, textual: true },
@@ -859,6 +926,11 @@
   window.addEventListener('hashchange', desenhar);
 
   $('versao-app').textContent = `Versão ${VERSAO_APP}`;
+  $('splash').addEventListener('animationend', (evento) => {
+    if (evento.target === $('splash')) {
+      $('splash').remove();
+    }
+  });
 
   // ---- Abertura do app: com Face ID ativo, já pede o rosto ------------------------------------------------
   prepararAbertura().then((faceId) => {

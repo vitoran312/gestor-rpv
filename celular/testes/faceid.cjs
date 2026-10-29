@@ -76,6 +76,7 @@ const { chromium } = require('playwright');
     await pagina.evaluate(() => { location.hash = '#mais'; });
     await pagina.click('text=Trancar agora');
     await pagina.waitForSelector('#abertura:not([hidden])');
+    await pagina.click('#usar-senha');  // Com Face ID ativo, a senha fica atrás de um toque.
     await pagina.fill('#senha', senha + 'x');
     await pagina.click('#abrir');
     await pagina.waitForSelector('#erro:not([hidden])');

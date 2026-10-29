@@ -23,8 +23,15 @@
   <link rel="stylesheet" href="estilo.css">
 </head>
 <body>
-  <!-- Tela de abertura: o backup guardado neste aparelho (ou um escolhido agora), aberto com Face ID ou senha. -->
+  <!-- Abertura do app: o logo aparece e vai ficando transparente (cerca de 1,5 s) enquanto o app se prepara. -->
+  <div id="splash" class="splash" aria-hidden="true">
+    <img src="icones/logo.png" alt="">
+    <div class="splash-nome">Gestor de RPV</div>
+  </div>
+
+  <!-- Desbloqueio: com um backup guardado, só Face ID ou senha; sem backup, escolher o arquivo e a senha. -->
   <main id="abertura" class="abertura">
+    <img class="logo-abertura" src="icones/logo.png" alt="">
     <h1>Gestor de RPV</h1>
     <div id="fonte" class="cartao" hidden>
       <div id="fonte-titulo" class="discreto pequeno"></div>
@@ -32,19 +39,27 @@
     </div>
     <button id="abrir-faceid" class="primario" type="button" hidden>Abrir com Face ID</button>
     <form id="formulario" class="cartao formulario" autocomplete="off">
-      <label id="rotulo-arquivo" for="arquivo">Backup (.rpvbackup)</label>
-      <input id="arquivo" type="file">
-      <label for="senha">Senha dos backups</label>
-      <input id="senha" type="password" autocomplete="off" autocapitalize="off" spellcheck="false">
-      <button id="abrir" class="primario" type="submit">Abrir com a senha</button>
+      <div id="grupo-arquivo" class="formulario">
+        <label id="rotulo-arquivo" for="arquivo">Backup (.rpvbackup)</label>
+        <input id="arquivo" type="file">
+      </div>
+      <div id="grupo-senha" class="formulario">
+        <label for="senha">Senha dos backups</label>
+        <input id="senha" type="password" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <button id="abrir" class="primario" type="submit">Abrir com a senha</button>
+      </div>
     </form>
+    <div class="links">
+      <button id="usar-senha" class="link" type="button" hidden>Usar a senha</button>
+      <button id="trocar-backup" class="link" type="button" hidden>Trocar por um backup mais novo</button>
+    </div>
     <div id="andamento" class="andamento" hidden>
       <p id="andamento-texto" aria-live="polite"></p>
       <div class="barra"><div id="andamento-barra"></div></div>
     </div>
     <p id="erro" class="erro" role="alert" hidden></p>
-    <p class="discreto pequeno">O backup fica guardado neste aparelho como saiu do computador, trancado pela senha;
-      nada é enviado para a internet.</p>
+    <p id="explicacao" class="discreto pequeno">O backup fica guardado neste aparelho como saiu do computador,
+      trancado pela senha; nada é enviado para a internet.</p>
     <p id="versao-app" class="discreto pequeno"></p>
     <p id="instalar" class="aviso pequeno" hidden>Para usar como app: no Safari, toque em <strong>Compartilhar</strong>
       e depois em <strong>Adicionar à Tela de Início</strong>.</p>

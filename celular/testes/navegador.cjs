@@ -93,7 +93,8 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
     resultados.telas = {};
     for (const endereco of telas.enderecos) {
       await pagina.evaluate((h) => { location.hash = h; }, endereco);
-      await pagina.waitForFunction(() => document.getElementById('tela').childElementCount > 0);
+      await pagina.waitForFunction(() => document.getElementById('tela').childElementCount > 0
+        && !document.getElementById('tela').innerText.includes('Carregando…'));
       resultados.telas[endereco] = await pagina.evaluate(() => document.getElementById('aplicativo').innerText);
     }
     // Cada anexo aberto na tela: PDF desenhado pelo pdf.js na largura da tela, com zoom; imagem como imagem.
@@ -147,7 +148,17 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
       await pagina.waitForSelector('form [name="nome"]');
       await pagina.fill('[name="nome"]', n.nome);
       await pagina.fill('[name="aquisicao"]', n.aquisicao);
-      await pagina.fill('[name="custo"]', '9.000,00');
+      // Máscara de valor: os números entram pelos centavos e a pontuação aparece sozinha.
+      await pagina.click('[name="custo"]');
+      resultados.mascara = [];
+      for (const tecla of '1234567') {
+        await pagina.keyboard.type(tecla);
+        resultados.mascara.push(await pagina.inputValue('[name="custo"]'));
+      }
+      await pagina.keyboard.press('Backspace');
+      resultados.mascara.push(await pagina.inputValue('[name="custo"]'));
+      await pagina.fill('[name="custo"]', '');
+      await pagina.keyboard.type('900000');
       await pagina.fill('[name="previsto"]', n.previsto);
       await pagina.selectOption('[name="conta"]', String(n.conta_id));
       await pagina.fill('[name="previsao"]', n.previsao);

@@ -9,6 +9,7 @@ const VERSAO = '__VERSAO__';  // Trocada pelo fluxo de publicação a cada vers�
 const CACHE = 'gestor-rpv-' + VERSAO;
 const ARQUIVOS = [
   './', 'index.html', 'estilo.css', 'app.js', 'dados.js', 'leitor.js', 'guarda.js', 'faceid.js', 'manifest.webmanifest',
+  'novidades.json',
   'vendor/scrypt.js', 'vendor/fflate.js', 'vendor/sql-wasm.js', 'vendor/sql-wasm.wasm', 'visualizador.js',
   'vendor/pdfjs/pdf.min.mjs', 'vendor/pdfjs/pdf.worker.min.mjs',
   'vendor/pdfjs/standard_fonts/FoxitDingbats.pfb', 'vendor/pdfjs/standard_fonts/FoxitFixed.pfb',
@@ -18,7 +19,7 @@ const ARQUIVOS = [
   'vendor/pdfjs/standard_fonts/FoxitSerifItalic.pfb', 'vendor/pdfjs/standard_fonts/FoxitSymbol.pfb',
   'vendor/pdfjs/standard_fonts/LiberationSans-Bold.ttf', 'vendor/pdfjs/standard_fonts/LiberationSans-BoldItalic.ttf',
   'vendor/pdfjs/standard_fonts/LiberationSans-Italic.ttf', 'vendor/pdfjs/standard_fonts/LiberationSans-Regular.ttf',
-  'icones/apple-touch-icon.png', 'icones/icone-192.png', 'icones/icone-512.png', 'icones/icone-mascara-512.png',
+  'icones/logo.png', 'icones/apple-touch-icon.png', 'icones/icone-192.png', 'icones/icone-512.png', 'icones/icone-mascara-512.png',
 ];
 const PERMITIDOS = new Set(ARQUIVOS.map((arquivo) => new URL(arquivo, self.registration.scope).href));
 

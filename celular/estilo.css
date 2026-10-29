@@ -38,6 +38,8 @@
 }
 
 * { box-sizing: border-box; }
+/* "hidden" sempre esconde, mesmo em elementos com display próprio (grid, flex). */
+[hidden] { display: none !important; }
 
 body {
   margin: 0;
@@ -278,3 +280,41 @@ a.botao-link {
 }
 a.botao-link.primario { background: var(--marca); color: var(--marca-texto); }
 .passos { padding-left: 20px; margin: 0 0 16px; display: grid; gap: 6px; }
+
+/* ---- Abertura com o logo ---- */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+  background: var(--fundo);
+  pointer-events: none;  /* Só visual: nunca segura um toque. */
+  animation: sumir-splash 1.5s ease-in forwards;
+}
+.splash img { width: 112px; height: 112px; animation: chegar-logo 1.5s ease-out forwards; }
+.splash-nome { font-size: 1.3rem; font-weight: 700; letter-spacing: 0.01em; }
+@keyframes sumir-splash { 0%, 55% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
+@keyframes chegar-logo { 0% { transform: scale(0.92); } 55% { transform: scale(1); } 100% { transform: scale(1.04); } }
+@media (prefers-reduced-motion: reduce) {
+  .splash, .splash img { animation-duration: 0.6s; }
+}
+
+/* ---- Desbloqueio ---- */
+.logo-abertura { display: block; width: 64px; height: 64px; margin: 8px auto 0; }
+.abertura h1 { text-align: center; }
+.abertura #fonte { text-align: center; }
+.links { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; margin: 6px 0; }
+button.link {
+  width: auto;
+  border: 0;
+  background: none;
+  color: var(--marca);
+  font-weight: 600;
+  padding: 8px 4px;
+}
+
+ul.novidades { margin: 10px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+ul.novidades .selo { margin-right: 4px; }
