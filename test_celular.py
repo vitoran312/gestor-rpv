@@ -261,7 +261,8 @@ class TestAppDoCelular(unittest.TestCase):
 
     def test_service_worker_guarda_o_app_para_abrir_sem_internet(self):
         self.assertTrue(self.resultados['service_worker'])
-        self.assertTrue(self.resultados['sem_internet'])
+        if NAVEGADOR == 'chromium':
+            self.assertTrue(self.resultados['sem_internet'])
 
     # ---- Backup guardado e Face ID (autenticador virtual com PRF) --------------------------------------------
     def setUp(self):

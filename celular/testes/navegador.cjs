@@ -153,11 +153,15 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
       navigator.serviceWorker.ready.then(() => true),
       new Promise((ok) => setTimeout(() => ok(false), 15000)),
     ]));
-    await pagina.context().setOffline(true);
-    await pagina.reload();
-    resultados.sem_internet = await pagina.evaluate(() => Boolean(document.getElementById('formulario'))
-      && typeof GestorDados === 'object' && typeof LeitorBackup === 'object' && typeof initSqlJs === 'function');
-    await pagina.context().setOffline(false);
+    // O modo sem internet do Playwright não funciona junto com service worker no WebKit: lá, fica só o registro.
+    resultados.sem_internet = null;
+    if (NAVEGADOR === 'chromium') {
+      await pagina.context().setOffline(true);
+      await pagina.reload();
+      resultados.sem_internet = await pagina.evaluate(() => Boolean(document.getElementById('formulario'))
+        && typeof GestorDados === 'object' && typeof LeitorBackup === 'object' && typeof initSqlJs === 'function');
+      await pagina.context().setOffline(false);
+    }
     resultados.erros = erros;
     process.stdout.write(JSON.stringify(resultados));
   } finally {
