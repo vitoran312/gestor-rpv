@@ -10,6 +10,12 @@ from pathlib import Path
 MOSTRAR = 5  # Quantas versões aparecem no "Sobre".
 
 NOVIDADES = [
+    ('0.51.0', [
+        ('novidade', 'Celular: modo discreto — o olho no topo esconde todos os valores em reais (R$ •••••).'),
+        ('novidade', 'Celular: "Colar e preencher" na entrada nova — cole a mensagem do cliente e o app preenche nome, '
+                     'valores e datas.'),
+        ('novidade', 'Celular: resumo da operação em imagem, com o logo, para mandar no WhatsApp sem dados sensíveis.'),
+    ]),
     ('0.50.0', [
         ('novidade', 'Celular: editar os dados de uma entrada, alterar a previsão e excluir operações pelo app.'),
         ('novidade', 'Celular: anexar fotos (direto da câmera) e PDFs às operações e às entradas novas.'),

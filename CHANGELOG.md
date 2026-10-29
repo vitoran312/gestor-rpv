@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## 0.51.0
+
+App do celular:
+- Modo discreto: o botão de olho no topo troca todos os valores em reais por "R$ •••••"; fica ligado entre
+  aberturas. Os campos dos formulários continuam mostrando o que se digita.
+- "Colar e preencher" na entrada nova: lê uma mensagem (WhatsApp, e-mail, processo) e preenche titular,
+  valores (Valor Total RPV, aquisição, comissão) e datas (aquisição, previsão) pelo que vem escrito antes de
+  cada um; CPF e número do processo (padrão CNJ) vão para as observações.
+- "Compartilhar resumo em imagem" na operação: imagem com o logo, o titular, a situação e as datas, sem CPF,
+  conta, banco ou Pix; o Valor Total RPV só se a pessoa marcar.
+
 ## 0.50.0
 
 App do celular:

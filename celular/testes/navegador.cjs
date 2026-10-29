@@ -42,7 +42,7 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
     }
 
     // Regras de dados.js sobre o backup principal, com a mesma data de "hoje" usada no Python.
-    resultados.regras = await pagina.evaluate(async ({ arquivo, senha, hoje, termos, valores, textos, textos_cpf, casos_conta }) => {
+    resultados.regras = await pagina.evaluate(async ({ arquivo, senha, hoje, termos, valores, textos, textos_cpf, casos_conta, mensagens }) => {
       const D = GestorDados;
       const bytes = new Uint8Array(await (await fetch(arquivo)).arrayBuffer());
       const { db, extrair } = await LeitorBackup.ler(bytes, senha);
@@ -90,6 +90,7 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
           return { atrasadas: ids(a.atrasadas), hoje: ids(a.hoje), amanha: ids(a.amanha), semana: ids(a.semana),
             dias: Object.fromEntries([...a.porDia].map(([dia, lista]) => [dia, ids(lista)])) };
         })(),
+        mensagens: mensagens.map((m) => D.extrairDaMensagem(m)),
         semanas: Object.fromEntries(['2026-02', '2026-10', '2027-08', '2028-02'].map((m) => [m, D.semanasDoMes(m)])),
         previsoes: dados.operacoes.map((r) => D.problemasDaPrevisao(r, '2026-01-01').concat(D.problemasDaPrevisao(r, r.previsao_atual))),
       };
@@ -300,6 +301,76 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
       });
       await pagina.click('[aria-label="Próximo mês"]');
       resultados.agenda_proximo_mes = await pagina.evaluate(() => document.querySelector('.mes-agenda .nome').textContent);
+    }
+
+    // Modo discreto, colar e preencher e o resumo em imagem.
+    if (telas.extras) {
+      const x = telas.extras;
+      const textoTela = () => pagina.evaluate(() => document.getElementById('tela').innerText);
+      const ir = async (hash, seletor) => {
+        await pagina.evaluate((h) => { location.hash = h; }, hash);
+        await pagina.waitForSelector(seletor);
+      };
+      await ir('#inicio', '.indicadores');
+      resultados.discreto_antes = await textoTela();
+      await pagina.click('#discreto');
+      resultados.discreto_inicio = await textoTela();
+      if (process.env.GESTOR_RPV_PASTA_IMAGENS) {
+        await pagina.screenshot({ path: `${process.env.GESTOR_RPV_PASTA_IMAGENS}/tela-discreto.png` });
+      }
+      await ir(`#operacao/${x.operacao}`, 'dl.campos');
+      resultados.discreto_operacao = await textoTela();
+      resultados.discreto_guardado = await pagina.evaluate(() => [localStorage.getItem('discreto'),
+        document.getElementById('discreto').getAttribute('aria-pressed')]);
+      await pagina.click('#discreto');
+      resultados.discreto_depois = await textoTela();
+
+      await ir('#nova', 'details.colar');
+      await pagina.click('details.colar summary');
+      await pagina.fill('[name="texto_colado"]', x.mensagem);
+      await pagina.click('details.colar button.secundario');
+      resultados.colar = await pagina.evaluate(() => ({
+        ...Object.fromEntries(['nome', 'aquisicao', 'custo', 'previsto', 'previsao', 'comissao', 'observacoes']
+          .map((n) => [n, document.querySelector(`[name="${n}"]`).value])),
+        aviso: document.querySelector('details.colar [role="status"]').textContent,
+        lucro: document.querySelector('#tela form p.discreto').textContent,
+      }));
+      if (process.env.GESTOR_RPV_PASTA_IMAGENS) {
+        await pagina.screenshot({ path: `${process.env.GESTOR_RPV_PASTA_IMAGENS}/tela-colar.png`, fullPage: true });
+      }
+      await pagina.fill('[name="texto_colado"]', 'oi, tudo bem?');
+      await pagina.click('details.colar button.secundario');
+      resultados.colar_nada = await pagina.textContent('details.colar [role="status"]');
+
+      await ir(`#resumo/${x.operacao}`, 'img.resumo-imagem');
+      const imagem = () => pagina.waitForFunction(() => {
+        const img = document.querySelector('img.resumo-imagem');
+        return img.complete && img.naturalWidth > 0 && img.src;
+      }, null, { timeout: 20000 }).then((h) => h.jsonValue());
+      const primeira = await imagem();
+      // Para conferir o visual: GESTOR_RPV_PASTA_IMAGENS=/pasta guarda a imagem e capturas de tela.
+      if (process.env.GESTOR_RPV_PASTA_IMAGENS) {
+        const pasta = process.env.GESTOR_RPV_PASTA_IMAGENS;
+        // A página não busca endereços blob: (política de segurança): a imagem é copiada por um canvas.
+        const base64 = await pagina.evaluate(() => {
+          const img = document.querySelector('img.resumo-imagem');
+          const tela = document.createElement('canvas');
+          tela.width = img.naturalWidth;
+          tela.height = img.naturalHeight;
+          tela.getContext('2d').drawImage(img, 0, 0);
+          return tela.toDataURL('image/png').split(',')[1];
+        });
+        require('fs').writeFileSync(`${pasta}/resumo.png`, Buffer.from(base64, 'base64'));
+        await pagina.screenshot({ path: `${pasta}/tela-resumo.png`, fullPage: true });
+      }
+      resultados.resumo = await pagina.evaluate(() => {
+        const img = document.querySelector('img.resumo-imagem');
+        return { largura: img.naturalWidth, altura: img.naturalHeight, texto: document.getElementById('tela').innerText,
+          titulo: document.getElementById('titulo').textContent };
+      });
+      await pagina.check('[name="com_valor"]');
+      await pagina.waitForFunction((antes) => document.querySelector('img.resumo-imagem').src !== antes, primeira);
+      resultados.resumo_trocou = (await imagem()) !== primeira;
     }
 
     await pagina.evaluate(() => { location.hash = '#mais'; });

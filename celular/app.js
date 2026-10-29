@@ -7,7 +7,7 @@
 (() => {
   // Igual a versao.py (test_celular confere): mostrada na abertura e em Mais, para saber se o aparelho já
   // carregou a última versão publicada.
-  const VERSAO_APP = '0.50.0';
+  const VERSAO_APP = '0.51.0';
   const D = GestorDados;
   const $ = (id) => document.getElementById(id);
   const SITUACOES = { pendente: 'Pendente', atrasada: 'Atrasada', recebida: 'Recebida' };
@@ -19,7 +19,11 @@
   let enderecoAberto = null;  // Anexo exibido agora (blob:), liberado ao sair da tela.
   const TIPOS = { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp',
     gif: 'image/gif', bmp: 'image/bmp', tif: 'image/tiff', tiff: 'image/tiff' };
-  const estado = { busca: '', filtro: 'todas', mes: null, dia: null };  // mes e dia: os escolhidos na agenda.
+  const estado = { busca: '', filtro: 'todas', mes: null, dia: null };
+  // Modo discreto: os valores em reais aparecem como "R$ •••••" (para usar o app em público ou mostrar a tela a
+  // alguém). Fica ligado entre aberturas; os campos dos formulários continuam mostrando o que se digita.
+  let discreto = false;
+  const reais = (valor) => (discreto ? 'R$ •••••' : D.reais(valor));  // mes e dia: os escolhidos na agenda.
 
   // ---- Montagem de elementos ---------------------------------------------------------------------------
   function el(tag, atributos = {}, ...filhos) {
@@ -445,9 +449,9 @@
       dados.operacoes.length > 0 && cartaoAgenda(),
       el('div', { class: 'indicadores' },
         indicador('Registros', String(ind.registros)),
-        indicador('Lucro previsto', D.reais(ind.previsto)),
-        indicador('Capital investido em aberto', D.reais(ind.aberto)),
-        indicador('Lucro realizado', D.reais(ind.realizado), 'verde')),
+        indicador('Lucro previsto', reais(ind.previsto)),
+        indicador('Capital investido em aberto', reais(ind.aberto)),
+        indicador('Lucro realizado', reais(ind.realizado), 'verde')),
       el('h2', { texto: 'Situação das operações' }),
       el('div', { class: 'situacoes' },
         situacao('pendente', 'Pendentes'),
@@ -544,11 +548,11 @@
       el('div', { class: 'linha1' }, el('span', { class: 'nome', texto: r.nome }),
         el('span', { class: `selo ${s}`, texto: SITUACOES[s] })),
       el('div', { class: 'linha2' },
-        el('span', { texto: D.reais(r.previsto) }),
+        el('span', { texto: reais(r.previsto) }),
         el('span', { class: 'discreto', texto: r.recebimento ? `Recebida em ${D.dataBr(r.recebimento)}`
           : `Previsão ${D.dataBr(r.previsao_atual)}${adiada ? ' (adiada)' : ''}` })),
       el('div', { class: 'linha2 discreto' },
-        el('span', { texto: `Lucro ${D.reais(r.previsto - r.custo)}` }),
+        el('span', { texto: `Lucro ${reais(r.previsto - r.custo)}` }),
         el('span', { texto: `Aquisição ${D.dataBr(r.aquisicao)}` })));
   }
 
@@ -923,6 +927,7 @@
       documentos: !r && el('input', { name: 'documentos', type: 'file', accept: 'image/*,application/pdf', multiple: true }),
     };
     c.observacoes.value = r ? r.observacoes : '';
+    const colar = !r && preencherPorTexto(c);
     if (r) {
       c.conta.value = r.conta_id === null || !dados.contas.some((x) => x.id === r.conta_id) ? 'manter' : String(r.conta_id);
     } else if (contas.length === 1) {
@@ -1010,10 +1015,73 @@
     const explicacao = info.independente ? (r ? 'As alterações são gravadas nos seus dados deste celular.' : 'A entrada é gravada nos seus dados deste celular.')
       : r ? 'A alteração vai para o computador como as entradas feitas aqui. Lá, só os campos que você mudou são gravados; se a operação tiver mudado no computador depois deste backup, ele avisa e não grava.'
         : 'A entrada fica guardada neste celular e vai para o computador por um arquivo que você salva na pasta do backup no Google Drive. Ao abrir, o Gestor no computador pergunta se quer importá-la.';
-    return [el('p', { class: 'discreto pequeno', texto: explicacao }), formulario];
+    return [el('p', { class: 'discreto pequeno', texto: explicacao }), colar, formulario];
   }
 
   class AvisoEdicao extends Error {}
+
+  // Colar e preencher: um texto com os dados do cliente (WhatsApp, e-mail, processo) preenche o formulário.
+  // CPF e número do processo não têm campo próprio: vão para as observações.
+  function preencherPorTexto(c) {
+    const texto = el('textarea', { name: 'texto_colado', rows: '4', placeholder: 'Cole aqui a mensagem com os dados do cliente' });
+    const resultado = el('p', { class: 'discreto pequeno', role: 'status' });
+    const preencher = () => {
+      const achado = D.extrairDaMensagem(texto.value);
+      const preenchidos = [];
+      const valor = (campo, centavos, rotulo) => {
+        if (centavos !== undefined) {
+          campo.value = D.moeda(centavos);
+          campo.dispatchEvent(new Event('input'));
+          preenchidos.push(rotulo);
+        }
+      };
+      if (achado.nome) {
+        c.nome.value = D.nomeTitulo(achado.nome);
+        preenchidos.push('titular');
+      }
+      valor(c.custo, achado.custo, 'valor de aquisição');
+      valor(c.previsto, achado.previsto, 'Valor Total RPV');
+      valor(c.comissao, achado.comissao, 'comissão');
+      if (achado.aquisicao) {
+        c.aquisicao.value = achado.aquisicao;
+        preenchidos.push('data de aquisição');
+      }
+      if (achado.previsao) {
+        c.previsao.value = achado.previsao;
+        preenchidos.push('previsão');
+      }
+      const notas = [achado.processo && `Processo nº ${achado.processo}`, achado.cpf && `CPF do titular: ${achado.cpf}`]
+        .filter((n) => n && !c.observacoes.value.includes(n));
+      if (notas.length) {
+        c.observacoes.value = [c.observacoes.value.trim(), ...notas].filter(Boolean).join('\n');
+        preenchidos.push(achado.processo && achado.cpf ? 'processo e CPF (nas observações)'
+          : achado.processo ? 'processo (nas observações)' : 'CPF (nas observações)');
+      }
+      resultado.className = preenchidos.length ? 'discreto pequeno' : 'erro';
+      resultado.textContent = preenchidos.length ? `Preenchido: ${preenchidos.join(', ')}. Confira antes de salvar.`
+        : 'Nada reconhecido no texto. Os dados precisam estar escritos, como "Valor da RPV: R$ 10.000,00".';
+    };
+    const caixa = el('details', { class: 'cartao acao colar' },
+      el('summary', {}, el('span', { class: 'nome', texto: 'Colar e preencher' }),
+        el('span', { class: 'discreto pequeno', texto: 'Dados de uma mensagem' })),
+      el('div', { class: 'formulario' },
+        el('p', { class: 'discreto pequeno', texto: 'Copie a mensagem do WhatsApp ou do e-mail com os dados do cliente e cole abaixo. O app encontra o nome, os valores, as datas, o CPF e o número do processo.' }),
+        navigator.clipboard && navigator.clipboard.readText && el('button', { type: 'button', class: 'primario', texto: 'Colar e preencher',
+          onclick: async () => {
+            try {
+              texto.value = await navigator.clipboard.readText();
+              preencher();
+            } catch (erro) {
+              resultado.className = 'discreto pequeno';
+              resultado.textContent = 'Toque na caixa abaixo e escolha Colar; depois toque em "Preencher".';
+              texto.focus();
+            }
+          } }),
+        texto,
+        el('button', { type: 'button', class: 'secundario', texto: 'Preencher', onclick: preencher }),
+        resultado));
+    return caixa;
+  }
 
   async function salvarEdicao(r, entrada, conta) {
     if (info.independente) {
@@ -1054,7 +1122,7 @@
         return [`Documento: ${e.nome}`, e.arquivo];
       default: {
         const anexos = (e.anexos || []).length;
-        return [e.nome, `${D.reais(e.previsto)} · previsão ${D.dataBr(e.previsao)} · ${e.conta}`
+        return [e.nome, `${reais(e.previsto)} · previsão ${D.dataBr(e.previsao)} · ${e.conta}`
           + (anexos ? ` · ${D.quantidade(anexos, 'documento', 'documentos')}` : '')];
       }
     }
@@ -1221,14 +1289,15 @@
         ['Situação', SITUACOES[s], s === 'atrasada' ? 'vermelho' : s === 'recebida' ? 'verde' : ''],
         ['Titular original', r.nome],
         ['Data de aquisição', D.dataBr(r.aquisicao)],
-        ['Valor de aquisição', D.reais(r.custo)],
-        ['Comissão', D.reais(r.comissao || 0)],
-        ['Valor total RPV', D.reais(r.previsto)],
-        ['Lucro previsto', D.reais(r.previsto - r.custo)],
+        ['Valor de aquisição', reais(r.custo)],
+        ['Comissão', reais(r.comissao || 0)],
+        ['Valor total RPV', reais(r.previsto)],
+        ['Lucro previsto', reais(r.previsto - r.custo)],
         ['Previsão inicial', D.dataBr(r.previsao)],
         ['Previsão atual', D.dataBr(r.previsao_atual)],
         ['Recebido em', r.recebimento ? D.dataBr(r.recebimento) : 'Não recebido'],
       ])),
+      !r.lixeira_em && el('a', { class: 'botao-link secundario', href: `#resumo/${r.id}`, texto: 'Compartilhar resumo em imagem' }),
       info.independente && !r.recebimento && !r.lixeira_em && formularioRecebimento(r),
       el('h2', { texto: 'Conta de destino' }),
       contaRecolhida(r.conta, conta),
@@ -1348,6 +1417,173 @@
           botao.disabled = false;
         }
       } }, campoFormulario('Nova previsão de recebimento', data, 'A previsão anterior fica no histórico.'), erro, botao));
+  }
+
+  // ---- Resumo da operação em imagem (para mandar no WhatsApp) -----------------------------------------------
+  // Só o que não é sensível: titular, situação e datas. Sem CPF, conta, banco ou Pix; o Valor Total RPV só se a
+  // pessoa marcar (e nunca no modo discreto).
+  const CORES_SITUACAO = { pendente: ['#5c6576', '#eef0f4'], atrasada: ['#c02a3b', '#fde8eb'], recebida: ['#1d7a4c', '#e5f4ea'] };
+  const FONTE = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  let logoCarregado = null;
+
+  function carregarLogo() {
+    logoCarregado = logoCarregado || new Promise((ok) => {
+      const imagem = new Image();
+      imagem.onload = () => ok(imagem);
+      imagem.onerror = () => ok(null);  // Sem o logo, a imagem sai só com o nome.
+      imagem.src = 'icones/logo.png';
+    });
+    return logoCarregado;
+  }
+
+  function quebrarLinhas(contexto, texto, largura, maximo) {
+    const linhas = [];
+    let atual = '';
+    for (const palavra of texto.split(' ')) {
+      const tentativa = atual ? `${atual} ${palavra}` : palavra;
+      if (contexto.measureText(tentativa).width <= largura || !atual) {
+        atual = tentativa;
+      } else {
+        linhas.push(atual);
+        atual = palavra;
+      }
+    }
+    linhas.push(atual);
+    if (linhas.length > maximo) {
+      linhas.length = maximo;
+      linhas[maximo - 1] += '…';
+    }
+    return linhas;
+  }
+
+  function retanguloArredondado(contexto, x, y, largura, altura, raio) {
+    contexto.beginPath();
+    contexto.moveTo(x + raio, y);
+    contexto.arcTo(x + largura, y, x + largura, y + altura, raio);
+    contexto.arcTo(x + largura, y + altura, x, y + altura, raio);
+    contexto.arcTo(x, y + altura, x, y, raio);
+    contexto.arcTo(x, y, x + largura, y, raio);
+    contexto.closePath();
+  }
+
+  async function desenharResumo(r, { comValor }) {
+    const largura = 1080;
+    const x = 80;
+    const larguraCartao = largura - 2 * x;
+    const linhas = [
+      r.recebimento ? ['Recebida em', D.dataBr(r.recebimento)] : ['Previsão de recebimento', D.dataBr(r.previsao_atual)],
+      !r.recebimento && r.previsao_atual !== r.previsao && ['Previsão inicial', D.dataBr(r.previsao)],
+      ['Data de aquisição', D.dataBr(r.aquisicao)],
+      comValor && !discreto && ['Valor Total RPV', D.reais(r.previsto)],
+    ].filter(Boolean);
+    // A altura acompanha o conteúdo (nome em até duas linhas, de duas a quatro informações).
+    const tela = el('canvas', { width: largura, height: 10 });
+    const g = tela.getContext('2d');
+    g.font = `700 64px ${FONTE}`;
+    const nome = quebrarLinhas(g, r.nome, larguraCartao - 120, 2);
+    const fimDoCartao = 470 + nome.length * 80 + 104 + linhas.length * 168 + 70;
+    const altura = fimDoCartao + 150;
+    tela.height = altura;  // Mudar o tamanho limpa o desenho e as configurações do contexto.
+    g.fillStyle = '#f5f6f8';
+    g.fillRect(0, 0, largura, altura);
+    g.fillStyle = '#8c1d34';
+    g.fillRect(0, 0, largura, 330);
+    const logo = await carregarLogo();
+    if (logo) {
+      g.fillStyle = '#ffffff';
+      retanguloArredondado(g, largura / 2 - 80, 50, 160, 160, 36);
+      g.fill();
+      g.drawImage(logo, largura / 2 - 64, 66, 128, 128);
+    }
+    g.textAlign = 'center';
+    g.fillStyle = '#ffffff';
+    g.font = `700 48px ${FONTE}`;
+    g.fillText('GESTOR RPV', largura / 2, 280);
+
+    g.fillStyle = '#ffffff';
+    retanguloArredondado(g, x, 380, larguraCartao, fimDoCartao - 380, 40);
+    g.fill();
+    g.textAlign = 'left';
+    const margem = x + 60;
+    let y = 470;
+    g.fillStyle = '#5c6576';
+    g.font = `600 34px ${FONTE}`;
+    g.fillText('Resumo da operação', margem, y);
+    g.fillStyle = '#14171f';
+    g.font = `700 64px ${FONTE}`;
+    for (const linha of nome) {
+      y += 80;
+      g.fillText(linha, margem, y);
+    }
+    const s = D.situacao(r);
+    const [cor, fundo] = CORES_SITUACAO[s];
+    g.font = `700 32px ${FONTE}`;
+    const selo = SITUACOES[s].toUpperCase();
+    const larguraSelo = g.measureText(selo).width + 56;
+    y += 44;
+    g.fillStyle = fundo;
+    retanguloArredondado(g, margem, y, larguraSelo, 60, 30);
+    g.fill();
+    g.fillStyle = cor;
+    g.fillText(selo, margem + 28, y + 42);
+    y += 60;
+    for (const [rotulo, valor] of linhas) {
+      y += 40;
+      g.strokeStyle = '#e3e6ec';
+      g.lineWidth = 2;
+      g.beginPath();
+      g.moveTo(margem, y);
+      g.lineTo(x + larguraCartao - 60, y);
+      g.stroke();
+      y += 62;
+      g.fillStyle = '#5c6576';
+      g.font = `500 34px ${FONTE}`;
+      g.fillText(rotulo, margem, y);
+      y += 66;
+      g.fillStyle = '#14171f';
+      g.font = `700 52px ${FONTE}`;
+      g.fillText(valor, margem, y);
+    }
+    g.textAlign = 'center';
+    g.fillStyle = '#5c6576';
+    g.font = `500 30px ${FONTE}`;
+    g.fillText(`Atualizado em ${D.dataBr(D.hojeIso())}`, largura / 2, altura - 70);
+    return new Promise((ok, falha) => tela.toBlob((b) => (b ? ok(b) : falha(new Error('Não foi possível gerar a imagem.'))), 'image/png'));
+  }
+
+  function telaResumo(id) {
+    const r = dados.operacoes.find((o) => o.id === id);
+    if (!r) {
+      return [vazio('Operação não encontrada.')];
+    }
+    const imagem = el('img', { class: 'resumo-imagem', alt: `Resumo da operação de ${r.nome}` });
+    const acoes = el('div');
+    const comValor = el('input', { type: 'checkbox', name: 'com_valor' });
+    const atualizar = async () => {
+      const blob = await desenharResumo(r, { comValor: comValor.checked });
+      if (location.hash !== `#resumo/${id}`) {
+        return;  // A pessoa já saiu da tela.
+      }
+      const nome = `Resumo ${D.nomeTitulo(r.nome)}.png`.replace(/[<>:"/\\|?*]/g, '');
+      const arquivo = new File([blob], nome, { type: 'image/png' });
+      liberarDocumento();
+      enderecoAberto = URL.createObjectURL(arquivo);
+      imagem.src = enderecoAberto;
+      const podeCompartilhar = navigator.canShare && navigator.canShare({ files: [arquivo] });
+      acoes.replaceChildren(podeCompartilhar
+        ? el('button', { type: 'button', class: 'primario', texto: 'Compartilhar imagem', onclick: () => {
+          navigator.share({ files: [arquivo] }).catch(() => {});  // Cancelar o menu não é erro.
+        } })
+        : el('a', { class: 'botao-link primario', href: enderecoAberto, download: nome, texto: 'Baixar imagem' }));
+    };
+    comValor.addEventListener('change', atualizar);
+    atualizar();
+    return [
+      el('p', { class: 'discreto pequeno', texto: 'Imagem para mandar no WhatsApp: titular, situação e datas. Não leva CPF, conta, banco nem Pix.' }),
+      imagem,
+      !discreto && el('label', { class: 'opcao' }, comValor, el('span', { texto: 'Mostrar o Valor Total RPV' })),
+      acoes,
+    ];
   }
 
   function documentoPorId(id) {
@@ -1492,10 +1728,10 @@
       area.replaceChildren(grafico(resumo, escolher, chave));
       detalhe.replaceChildren(el('div', { class: 'nome', texto: D.rotuloMes(chave) }), campos([
         ['Entradas', D.quantidade(e, 'operação', 'operações')],
-        ['Investido', D.reais(valores.investido)],
+        ['Investido', reais(valores.investido)],
         ['Recebidas', D.quantidade(r, 'operação', 'operações')],
-        ['Recebido', D.reais(valores.recebido), 'verde'],
-        ['Lucro realizado', D.reais(valores.lucro), 'verde'],
+        ['Recebido', reais(valores.recebido), 'verde'],
+        ['Lucro realizado', reais(valores.lucro), 'verde'],
       ]));
     };
     escolher(resumo[resumo.length - 1][0]);
@@ -1625,6 +1861,7 @@
     nova: { titulo: 'Nova entrada', aba: 'operacoes', montar: telaNovaEntrada, voltar: true },
     editar: { titulo: 'Editar entrada', aba: 'operacoes', montar: telaEditar, voltar: true },
     agenda: { titulo: 'Agenda', aba: 'inicio', montar: telaAgenda, voltar: true },
+    resumo: { titulo: 'Resumo em imagem', aba: 'operacoes', montar: telaResumo, voltar: true },
     copia: { titulo: 'Cópia de segurança', aba: 'mais', montar: telaCopia, voltar: true },
     convite: { titulo: 'Convidar alguém', aba: 'mais', montar: telaConvite, voltar: true },
     'nova-conta': { titulo: 'Nova conta', aba: 'contas', montar: telaNovaConta, voltar: true },
@@ -1657,6 +1894,23 @@
   }
 
   $('voltar').addEventListener('click', () => history.back());
+
+  function mostrarDiscreto() {
+    $('discreto').setAttribute('aria-pressed', String(discreto));
+    $('discreto').setAttribute('aria-label', discreto ? 'Mostrar valores' : 'Esconder valores');
+    $('discreto').classList.toggle('ligado', discreto);
+  }
+
+  discreto = localStorageLer('discreto') === '1';
+  mostrarDiscreto();
+  $('discreto').addEventListener('click', () => {
+    discreto = !discreto;
+    localStorageGravar('discreto', discreto ? '1' : '0');
+    mostrarDiscreto();
+    const rolagem = window.scrollY;
+    desenhar();
+    window.scrollTo(0, rolagem);
+  });
   window.addEventListener('hashchange', desenhar);
 
   $('versao-app').textContent = `Versão ${VERSAO_APP}`;

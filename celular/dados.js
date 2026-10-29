@@ -333,6 +333,95 @@ const GestorDados = (() => {
     return nova === registro.previsao_atual ? ['A nova previsão é igual à atual.'] : [];
   }
 
+  // ---- Colar e preencher -------------------------------------------------------------------------------
+  // Lê um texto colado (WhatsApp, e-mail, cópia do processo) e encontra titular, CPF, número do processo, valores
+  // e datas. Valores e datas são reconhecidos pelo que vem antes deles na mesma linha ("Valor da RPV: R$ ...").
+  // Devolve só o que encontrou; a pessoa confere no formulário antes de salvar.
+  const ROTULO_NOME = /(?:\bnome(?:\s+completo)?|\btitular(?:\s+original)?|\bbenefici[áa]ri[oa]|\brequerente|\bautora?|\bcredora?|\bcliente|\bexequente|\bcedente|\bparte)(?:\s*[:\-–]\s*|\s+)([A-Za-zÀ-ÖØ-öø-ÿ'’. -]+)/gi;
+  const FIM_DO_NOME = /\s+(?:cpf|rg|portador|portadora|inscrit[oa]|processo|valor|nascid[oa]|residente|brasileir[oa])\b.*$/i;
+  const DINHEIRO = /R\$\s*(\d{1,3}(?:\.\d{3})+(?:,\d{2})?|\d+(?:,\d{2})?)|(\d{1,3}(?:\.\d{3})+,\d{2}|\d+,\d{2})(?![\d,])/g;
+  const ROTULOS_VALOR = [
+    ['comissao', /comiss/],
+    ['custo', /aquisic|compra|proposta|oferta|pagar|pago|paguei|pagamos|cessao|negociad|investid/],
+    ['previsto', /total|rpv|requisi|bruto|credito|face|precatori|valor/],
+  ];
+  const ROTULOS_DATA = [
+    ['aquisicao', /aquisic|compra|cessao|negociad|fechad|assinad/],
+    ['previsao', /previs|pagament|pagto|deposit|liberac|receb|vencim|prazo|pago em|sai em/],
+  ];
+
+  function semAcentos(texto) {
+    return texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  }
+
+  function nomeDaMensagem(texto) {
+    for (const [, achado] of texto.matchAll(ROTULO_NOME)) {
+      const nome = nomeFormatado(achado.replace(FIM_DO_NOME, '').replace(/[.\-–\s]+$/, ''));
+      if (nome.split(' ').length >= 2 && /^[A-Za-zÀ-ÖØ-öø-ÿ]/.test(nome)) {
+        return nome;
+      }
+    }
+    // Sem rótulo: uma linha só com o nome em maiúsculas, como nos documentos do processo.
+    const linha = texto.split('\n').map((l) => nomeFormatado(l)).find((l) => /^[A-ZÀ-ÖØ-Þ'’. -]+$/.test(l)
+      && l.split(' ').length >= 2 && l.length >= 8 && l.length <= LIMITE_NOME);
+    return linha || null;
+  }
+
+  function extrairDaMensagem(texto) {
+    const t = String(texto || '').replace(/\r/g, '');
+    const achado = {};
+    const nome = nomeDaMensagem(t);
+    if (nome) {
+      achado.nome = nome;
+    }
+    const processo = t.match(/(?<![\d.-])(\d{7})-?(\d{2})\.?(\d{4})\.?(\d)\.?(\d{2})\.?(\d{4})(?![\d.-])/);
+    if (processo) {
+      achado.processo = `${processo[1]}-${processo[2]}.${processo[3]}.${processo[4]}.${processo[5]}.${processo[6]}`;
+    }
+    for (const [candidato] of t.matchAll(/(?<![\d.-])\d{3}\.?\d{3}\.?\d{3}-?\d{2}(?![\d.-])/g)) {
+      try {
+        achado.cpf = cpf(validarCpf(candidato));
+        break;
+      } catch (erro) {
+        // Não é um CPF válido (ou é parte de outro número): segue procurando.
+      }
+    }
+    for (const linha of t.split('\n')) {
+      let inicio = 0;
+      for (const m of linha.matchAll(DINHEIRO)) {
+        const antes = semAcentos(linha.slice(inicio, m.index)).slice(-60);
+        inicio = m.index + m[0].length;
+        let valor;
+        try {
+          valor = centavos(m[1] || m[2]);
+        } catch (erro) {
+          continue;
+        }
+        const rotulo = ROTULOS_VALOR.find(([, padrao]) => padrao.test(antes));
+        const campo = rotulo ? rotulo[0] : 'previsto';
+        if (valor > 0 && achado[campo] === undefined) {
+          achado[campo] = valor;
+        }
+      }
+      inicio = 0;
+      for (const m of linha.matchAll(/(?<!\d)(\d{1,2})\/(\d{1,2})\/(\d{4})(?!\d)/g)) {
+        const antes = semAcentos(linha.slice(inicio, m.index)).slice(-60);
+        inicio = m.index + m[0].length;
+        const iso = `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+        const rotulo = ROTULOS_DATA.find(([, padrao]) => padrao.test(antes));
+        try {
+          validarDataIso(iso, 'Data');
+        } catch (erro) {
+          continue;
+        }
+        if (rotulo && achado[rotulo[0]] === undefined) {
+          achado[rotulo[0]] = iso;
+        }
+      }
+    }
+    return achado;
+  }
+
   // ---- Agenda das previsões ---------------------------------------------------------------------------
   function somarDias(iso, dias) {
     const [ano, mes, dia] = iso.split('-').map(Number);
@@ -547,6 +636,6 @@ const GestorDados = (() => {
   return {
     TITULOS_CONTA, moeda, reais, dataBr, dataHora, hojeIso, cpf, situacao, contarSituacoes, indicadores,
     centavos, problemasDaEntrada, validarDataIso, nomeFormatado, nomeTitulo, linhaDaConta, snapshotConta, validarSenha, primeiraMaiuscula, ESTADOS, validarCpf, mesmaChavePix, problemasDaConta, normalizar, chaveTexto, encontra, filtrar, resumoMensal, escala, valoresDoMes, quantidade, rotuloMes, carregar, contaDaOperacao,
-    problemasDaEdicao, problemasDaPrevisao, somarDias, agenda, semanasDoMes, mesVizinho, nomeDoMes,
+    problemasDaEdicao, problemasDaPrevisao, extrairDaMensagem, somarDias, agenda, semanasDoMes, mesVizinho, nomeDoMes,
   };
 })();

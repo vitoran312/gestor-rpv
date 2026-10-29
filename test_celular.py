@@ -40,6 +40,15 @@ CONTA_VALIDA = {'identificacao': 'Conta Nova', 'nome': 'Fulana De Tal', 'cpf': '
                 'numero': '777-1', 'pix': 'fulana@example.com'}
 CASOS_CONTA = [CONTA_VALIDA, dict(CONTA_VALIDA, nome='', banco=''), dict(CONTA_VALIDA, estado='XX'),
                dict(CONTA_VALIDA, cpf='111.111.111-11'), dict(CONTA_VALIDA, identificacao='vitor')]
+MENSAGENS = [
+    'Nome: MARIA DA SILVA SOUZA\nCPF: 529.982.247-25\nProcesso nº 0001234-56.2024.4.03.6301\nValor da RPV: R$ 15.432,10\n'
+    'Previsão de pagamento: 15/12/2026',
+    'Bom dia! Segue cliente José Carlos de Almeida, cpf 52998224725, valor 8.500,00. Vou pagar 5.000,00 pela cessão. '
+    'Processo 50012345620234047000',
+    'oi tudo bem?',
+    'Titular: Ana Paula Ribeiro CPF 111.111.111-11\nComissão: R$ 300,00\nData da compra: 20/10/2026\nTotal R$ 12000',
+    "JOAO PEDRO D'AVILA\nRPV 20.000,00 aquisição 14.000,00",
+]
 TELAS = ['#inicio', '#operacoes', '#contas', '#mais', '#grafico', '#lixeira', '#backup', '#novidades', '#agenda']
 
 
@@ -149,6 +158,7 @@ class TestAppDoCelular(unittest.TestCase):
             {'nome': 'cortado', 'arquivo': endereco(cortado), 'senha': SENHA_TESTE},
         ]
         regras = {'arquivo': endereco(cifrado), 'senha': SENHA_TESTE, 'hoje': HOJE.isoformat(), 'termos': TERMOS,
+                  'mensagens': MENSAGENS,
                   'valores': VALORES, 'textos': TEXTOS, 'textos_cpf': CPFS, 'casos_conta': CASOS_CONTA}
         documentos = {d['nome']: d['id'] for r in (cls.ana, cls.maria) for t in ('entrada', 'recebimento')
                       for d in banco.documentos(r, t)}
@@ -168,6 +178,7 @@ class TestAppDoCelular(unittest.TestCase):
                          'observacoes': 'veio do celular', 'ja_importada': cls.ja_importada,
                          'backup_com_importada': str(com_importada)}
         telas['conta'] = dict(CONTA_VALIDA, identificacao='Conta Do Celular', cpf='52998224725', pix='celular@example.com')
+        telas['extras'] = {'operacao': cls.bruno, 'mensagem': MENSAGENS[1]}
         telas['mudancas'] = {'editar': cls.bruno, 'previsao': cls.carlos, 'nova_previsao': '2027-01-30',
                              'excluir': cls.antiga, 'anexar': cls.ana, 'png': base64.b64encode(PNG_1X1).decode()}
         outro = banco_com_contas(cls.pasta / 'outro' / 'gestor.sqlite3')
@@ -405,6 +416,46 @@ class TestAppDoCelular(unittest.TestCase):
                  'novembro', 'dezembro']
         proximo = date(hoje.year + hoje.month // 12, hoje.month % 12 + 1, 1)
         self.assertEqual(self.resultados['agenda_proximo_mes'], f'{meses[proximo.month - 1]} de {proximo.year}')
+
+    # ---- Modo discreto, colar e preencher e resumo em imagem ----------------------------------------------
+    def test_modo_discreto_esconde_os_valores(self):
+        r = self.resultados
+        self.assertRegex(r['discreto_antes'], r'R\$ \d')
+        for texto in (r['discreto_inicio'], r['discreto_operacao']):
+            self.assertIn('R$ •••••', texto)
+            self.assertNotRegex(texto, r'R\$ \d')
+        self.assertIn('Bruno Lima', r['discreto_operacao'])  # Só os valores somem.
+        self.assertEqual(r['discreto_guardado'], ['1', 'true'])
+        self.assertRegex(r['discreto_depois'], r'R\$ \d')
+
+    def test_ler_mensagens_coladas(self):
+        self.assertEqual(self.resultados['regras']['mensagens'], [
+            {'nome': 'MARIA DA SILVA SOUZA', 'processo': '0001234-56.2024.4.03.6301', 'cpf': '529.982.247-25',
+             'previsto': 1543210, 'previsao': '2026-12-15'},
+            {'nome': 'José Carlos de Almeida', 'processo': '5001234-56.2023.4.04.7000', 'cpf': '529.982.247-25',
+             'previsto': 850000, 'custo': 500000},
+            {},
+            {'nome': 'Ana Paula Ribeiro', 'comissao': 30000, 'aquisicao': '2026-10-20', 'previsto': 1200000},
+            {'nome': "JOAO PEDRO D'AVILA", 'previsto': 2000000, 'custo': 1400000},
+        ])
+
+    def test_colar_e_preencher_o_formulario(self):
+        colar = self.resultados['colar']
+        self.assertEqual({k: colar[k] for k in ('nome', 'custo', 'previsto', 'comissao')},
+                         {'nome': 'José Carlos De Almeida', 'custo': '5.000,00', 'previsto': '8.500,00', 'comissao': ''})
+        self.assertEqual(colar['observacoes'], 'Processo nº 5001234-56.2023.4.04.7000\nCPF do titular: 529.982.247-25')
+        self.assertEqual(colar['lucro'], 'Lucro previsto: R$ 3.500,00')
+        self.assertIn('Preenchido: titular, valor de aquisição, Valor Total RPV, processo e CPF', colar['aviso'])
+        self.assertIn('Nada reconhecido', self.resultados['colar_nada'])
+
+    def test_resumo_em_imagem_sem_dados_sensiveis(self):
+        resumo = self.resultados['resumo']
+        # Uma linha de nome, previsão e aquisição: a altura acompanha o conteúdo.
+        self.assertEqual((resumo['largura'], resumo['altura']), (1080, 1210))
+        self.assertEqual(resumo['titulo'], 'Resumo em imagem')
+        self.assertIn('Não leva CPF', resumo['texto'])
+        self.assertIn('Mostrar o Valor Total RPV', resumo['texto'])
+        self.assertTrue(self.resultados['resumo_trocou'])
 
     def test_entrada_ja_importada_some_do_celular(self):
         feitas = [a['id'] for a in self.resultados['nova_arquivos'] if a['id'] != self.ja_importada]

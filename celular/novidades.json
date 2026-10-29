@@ -1,6 +1,24 @@
 {
   "versoes": [
     {
+      "versao": "0.51.0",
+      "resumo": "3 novidades",
+      "itens": [
+        {
+          "tipo": "novidade",
+          "texto": "Celular: modo discreto — o olho no topo esconde todos os valores em reais (R$ •••••)."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: \"Colar e preencher\" na entrada nova — cole a mensagem do cliente e o app preenche nome, valores e datas."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: resumo da operação em imagem, com o logo, para mandar no WhatsApp sem dados sensíveis."
+        }
+      ]
+    },
+    {
       "versao": "0.50.0",
       "resumo": "4 novidades",
       "itens": [
@@ -69,16 +87,6 @@
         {
           "tipo": "novidade",
           "texto": "Programa: importa também as contas feitas no celular, junto com as entradas."
-        }
-      ]
-    },
-    {
-      "versao": "0.46.0",
-      "resumo": "1 correção",
-      "itens": [
-        {
-          "tipo": "correcao",
-          "texto": "Celular: o logo da abertura ficava atrás da janela do Face ID; agora fica mais alto, à vista."
         }
       ]
     }

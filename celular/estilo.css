@@ -374,3 +374,28 @@ details.acao[open] summary { margin-bottom: 10px; }
 .marca-dia { font-size: 0.7rem; font-weight: 700; min-height: 0.9em; line-height: 0.9; color: var(--marca); }
 .grade-agenda .dia.com-atraso .marca-dia { color: var(--vermelho); }
 .grade-agenda .dia.escolhido .marca-dia { color: var(--marca-texto); }
+
+/* ---- Modo discreto ---- */
+.topo { padding-right: 64px; }
+.botao-discreto {
+  position: absolute;
+  right: 12px;
+  bottom: 8px;
+  width: 44px;
+  height: 44px;
+  padding: 9px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--secundario);
+}
+.botao-discreto svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.botao-discreto .olho-fechado, .botao-discreto.ligado .olho-aberto { display: none; }
+.botao-discreto.ligado .olho-fechado { display: block; }
+.botao-discreto.ligado { color: var(--marca); background: var(--realce); }
+
+/* ---- Colar e preencher e resumo em imagem ---- */
+details.colar { margin-bottom: 12px; }
+.resumo-imagem { display: block; width: 100%; max-width: 420px; margin: 0 auto 12px; border-radius: 14px; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.18); }
+label.opcao { display: flex; align-items: center; gap: 10px; font-weight: 600; margin: 4px 0 12px; }
+label.opcao input { width: 22px; height: 22px; margin: 0; }
