@@ -67,4 +67,11 @@ jobs:
         env:
           GESTOR_RPV_TESTE_CELULAR: '1'
           GESTOR_RPV_NAVEGADOR: ${{ matrix.navegador }}
-        run: python -m unittest test_celular -v
+        run: |
+          # Em caso de falha, o fim da saída vira uma anotação do GitHub, legível sem baixar o log.
+          python -m unittest test_celular -v 2>&1 | tee saida.txt
+          codigo=${PIPESTATUS[0]}
+          if [ "$codigo" != 0 ]; then
+            python -c "import sys; t=''.join(open('saida.txt', encoding='utf-8').readlines()[-150:]); print('::error title=Testes do app (${{ matrix.navegador }})::' + t.replace('%', '%25').replace('\r', '').replace('\n', '%0A'))"
+          fi
+          exit $codigo
