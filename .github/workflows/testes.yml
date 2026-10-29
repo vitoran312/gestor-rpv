@@ -1,7 +1,7 @@
 name: Testes
 
-# Roda a suíte completa no Windows a cada push e pull request; o executável continua sendo gerado só
-# pelo fluxo "Executavel Windows", quando pedido.
+# Roda a suíte completa no Windows a cada push e pull request, e os testes do app do celular no Chromium e
+# no WebKit (o motor do Safari). O executável continua sendo gerado só pelo fluxo "Executavel Windows".
 on:
   push:
     branches: [main]
@@ -36,3 +36,35 @@ jobs:
         env:
           GESTOR_RPV_TESTE_UI: '1'
         run: python scripts/testes_ci.py
+
+  celular:
+    name: App do celular (${{ matrix.navegador }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        navegador: [chromium, webkit]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: requirements-build.txt
+      - name: Instalar dependencias do Python
+        run: python -m pip install -r requirements-build.txt
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: celular/testes/package-lock.json
+      - name: Instalar o Playwright e o navegador
+        working-directory: celular/testes
+        run: |
+          npm ci
+          npx playwright install --with-deps ${{ matrix.navegador }}
+      - name: Testar o app do celular
+        env:
+          GESTOR_RPV_TESTE_CELULAR: '1'
+          GESTOR_RPV_NAVEGADOR: ${{ matrix.navegador }}
+        run: python -m unittest test_celular -v

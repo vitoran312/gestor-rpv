@@ -22,6 +22,7 @@ from grafico import resumo_mensal
 from apoio_testes import SENHA_TESTE, banco_com_contas, dados_rpv, prorrogacao_antiga
 
 RAIZ = Path(__file__).resolve().parent
+NAVEGADOR = os.environ.get('GESTOR_RPV_NAVEGADOR', 'chromium')
 # Imagem PNG de 1x1 pixel, para o comprovante de teste.
 PNG_1X1 = bytes.fromhex('89504e470d0a1a0a0000000d4948445200000001000000010802000000907753de0000000c49444154789c63f8cf'
                         'c000000301010018dd8db40000000049454e44ae426082')
@@ -79,7 +80,7 @@ class TestAppDoCelular(unittest.TestCase):
                 ['node', str(RAIZ / 'celular' / 'testes' / 'navegador.cjs'),
                  f'http://127.0.0.1:{servidor.server_address[1]}', json.dumps(entrada)],
                 capture_output=True, text=True, timeout=300, check=True).stdout
-            faceid = subprocess.run(
+            faceid = None if NAVEGADOR != 'chromium' else subprocess.run(
                 # Chave de acesso exige um nome de site (localhost), não um endereço IP.
                 ['node', str(RAIZ / 'celular' / 'testes' / 'faceid.cjs'),
                  f'http://localhost:{servidor.server_address[1]}', json.dumps(cls.entrada_faceid)],
@@ -88,7 +89,7 @@ class TestAppDoCelular(unittest.TestCase):
             servidor.shutdown()
             servidor.server_close()
         cls.resultados = json.loads(saida)
-        cls.faceid = json.loads(faceid)
+        cls.faceid = json.loads(faceid) if faceid else None
 
     @classmethod
     def tearDownClass(cls):
@@ -259,6 +260,12 @@ class TestAppDoCelular(unittest.TestCase):
         self.assertTrue(self.resultados['sem_internet'])
 
     # ---- Backup guardado e Face ID (autenticador virtual com PRF) --------------------------------------------
+    def setUp(self):
+        if self._testMethodName.startswith('test_face_id') or 'pelo_face_id' in self._testMethodName \
+                or self._testMethodName == 'test_senha_errada_e_apagar_o_backup_guardado':
+            if self.faceid is None:
+                self.skipTest('O autenticador virtual (Face ID simulado) só existe no Chromium.')
+
     def test_face_id_abre_sem_senha_e_sem_escolher_arquivo(self):
         f = self.faceid
         self.assertEqual(f['erros'], [])

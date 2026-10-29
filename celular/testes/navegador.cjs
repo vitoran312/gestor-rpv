@@ -1,13 +1,16 @@
-// Abre o app num navegador (Chromium; o Safari do iPhone é conferido no aparelho) e imprime, em JSON, o que
+// Abre o app num navegador (Chromium ou WebKit; o Safari de verdade é conferido no aparelho) e imprime, em JSON, o que
 // ele encontrou em cada backup de teste, as contas feitas por dados.js e os erros das telas, para
 // test_celular.py comparar com o que o Python gravou e calcula.
 'use strict';
-const { chromium } = require('playwright');
+const playwright = require('playwright');
+
+// Chromium por padrão; no CI também WebKit, o motor do Safari do iPhone.
+const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
 
 (async () => {
   const [endereco, entradaJson] = process.argv.slice(2);
   const { casos, regras, telas } = JSON.parse(entradaJson);
-  const navegador = await chromium.launch();
+  const navegador = await playwright[NAVEGADOR].launch();
   try {
     const pagina = await navegador.newPage();
     const erros = [];

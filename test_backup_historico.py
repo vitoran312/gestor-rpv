@@ -8,7 +8,7 @@ from zipfile import ZipFile, ZIP_DEFLATED
 import hashlib
 import json
 
-from backup import criar_backup, BackupPreparado, executar_backup_automatico, PASTA_AUTOMATICA
+from backup import ASSINATURA, criar_backup, BackupPreparado, executar_backup_automatico, PASTA_AUTOMATICA
 from dados import Banco, VERSAO_BANCO, limitar_backups
 from apoio_testes import banco_com_contas, dados_rpv, dados_conta, SENHA_TESTE
 
@@ -312,6 +312,37 @@ class TestBackupHistorico(unittest.TestCase):
         self.assertTrue(manual.exists())
         with BackupPreparado(ultimo, SENHA_TESTE) as preparado:
             self.assertEqual(preparado.resumo['contas'], 2)
+
+    def test_backup_ao_fechar_so_quando_algo_mudou(self):
+        pasta = self.pasta / 'drive'
+        pasta.mkdir()
+        self.assertIsNone(executar_backup_automatico(self.origem, ao_fechar=True))  # Sem pasta escolhida.
+        self.origem.salvar_configuracao(PASTA_AUTOMATICA, str(pasta))
+        primeiro = executar_backup_automatico(self.origem, ao_fechar=True)  # Nenhum backup ainda: grava.
+        self.assertIsNotNone(primeiro)
+        self.assertIsNone(executar_backup_automatico(self.origem, ao_fechar=True))  # Nada mudou.
+        self.origem.salvar_configuracao('tema', 'escuro')                          # Preferência não é dado.
+        self.assertIsNone(executar_backup_automatico(self.origem, ao_fechar=True))
+        identificador = self.origem.salvar(dados_rpv(nome='Nova'))
+        self.assertIsNotNone(executar_backup_automatico(self.origem, ao_fechar=True))
+        for mudanca in (lambda: self.origem.registrar_recebimento(identificador, '2026-10-25'),
+                        lambda: self.anexar(self.origem, identificador, 'comprovante.pdf', b'%PDF'),
+                        lambda: self.origem.excluir(identificador)):
+            mudanca()
+            self.assertIsNotNone(executar_backup_automatico(self.origem, ao_fechar=True))
+            self.assertIsNone(executar_backup_automatico(self.origem, ao_fechar=True))
+        # Um backup manual também conta: fechar logo depois não grava outro igual.
+        self.origem.restaurar(identificador)
+        criar_backup(self.origem, self.pasta / 'manual')
+        self.assertIsNone(executar_backup_automatico(self.origem, ao_fechar=True))
+        # A marca é deste computador: não vai dentro do backup.
+        with BackupPreparado(primeiro, SENHA_TESTE) as pacote:
+            con = sqlite3.connect(pacote.pasta / 'banco.sqlite3')
+            try:
+                chaves = {r[0] for r in con.execute('SELECT chave FROM configuracoes')}
+            finally:
+                con.close()
+        self.assertNotIn(ASSINATURA, chaves)
 
     def test_backup_automatico_com_pasta_indisponivel_nao_cria_pasta(self):
         ausente = self.pasta / 'disco-externo' / 'backups'

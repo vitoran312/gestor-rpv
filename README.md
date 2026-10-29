@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.41.0
+# Gestor de RPV — 0.42.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -90,8 +90,8 @@ aparência; o menu **Exibir** do histórico oferece as mesmas opções.
 
 - **Arquivo → Nova entrada**: abre o cadastro de uma RPV.
 - **Arquivo → Contas de recebimento**: administra os dados bancários.
-- **Arquivo → Backup automático…**: escolhe uma pasta onde o programa salva sozinho,
-  uma vez por semana, uma cópia completa (veja “Backup automático” abaixo).
+- **Arquivo → Backup automático…**: escolhe uma pasta onde o programa salva sozinho uma cópia
+  completa ao fechar, se algo mudou, e uma vez por semana (veja “Backup automático” abaixo).
 - **Arquivo → Exportar para Excel**: gera uma planilha `.xlsx` com todas as operações
   ativas (sem as da lixeira), na ordem exibida na tabela. Valores em R$, datas reconhecidas
   pelo Excel, cabeçalho fixo e filtro em cada coluna. Não exige o Excel nem pacotes extras.
@@ -283,7 +283,10 @@ cadastrado. Em um computador que já tem dados, nada é acrescentado.
 Em **Arquivo → Backup automático…**, escolha uma pasta — de preferência sincronizada, como OneDrive
 ou Google Drive. Ao ativar, uma primeira cópia é gravada na hora. Depois, ao abrir o programa e a cada
 seis horas com ele aberto, uma nova cópia `GestorRPV-auto-data-hora.rpvbackup` é salva sempre que o
-último backup tiver sete dias ou mais. São mantidas as 10 cópias automáticas mais recentes; backups
+último backup tiver sete dias ou mais. Ao fechar o programa (X da janela ou Sair), uma cópia também é
+salva se algo mudou desde o último backup — operações, contas, recebimentos, previsões, lixeira ou anexos;
+preferências como o tema não contam. Com a pasta no Google Drive, o app do celular encontra sempre o backup
+do último uso. Se essa cópia falhar, o programa pergunta antes de fechar. São mantidas as 10 cópias automáticas mais recentes; backups
 manuais na mesma pasta nunca são apagados. Se a pasta estiver indisponível (por exemplo, um disco
 externo desconectado), o programa não cria outra no lugar: o lembrete de backup avisa a falha, sem
 janelas que interrompam o uso. O rodapé de Minhas operações indica quando o backup automático está ativo.

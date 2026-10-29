@@ -28,7 +28,9 @@ SENHA_BACKUP = 'senha_backup'
 # abertura sabe se a troca do banco chegou ao fim e devolve os anexos que combinam com ele.
 RESTAURACAO = 'restauracao_em_andamento'
 DESCARTAR = 'descartar'
-CONFIGURACOES_LOCAIS = (PASTA_AUTOMATICA, SENHA_BACKUP, RESTAURACAO)
+# Resumo dos dados no último backup: ao fechar o programa, um backup novo só é feito se algo mudou desde então.
+ASSINATURA = 'assinatura_ultimo_backup'
+CONFIGURACOES_LOCAIS = (PASTA_AUTOMATICA, SENHA_BACKUP, RESTAURACAO, ASSINATURA)
 
 
 LIMITE_IMPORTACAO = 4 * 1024 ** 3  # Soma dos arquivos descompactados de um backup.
@@ -268,6 +270,7 @@ def criar_backup(banco, pasta, prefixo='GestorRPV-', exigir_senha=True, registra
     senha = senha_salva(banco)
     if exigir_senha and not senha:
         raise SenhaAusente('Defina a senha dos backups antes de criar um backup.')
+    assinatura = assinatura_dados(banco) if registrar else None
     pasta = Path(pasta)
     pasta.mkdir(parents=True, exist_ok=True)
     limpar_parciais(pasta)
@@ -301,6 +304,7 @@ def criar_backup(banco, pasta, prefixo='GestorRPV-', exigir_senha=True, registra
             parcial.unlink(missing_ok=True)
     if registrar:
         banco.registrar_backup(quando)
+        banco.salvar_configuracao(ASSINATURA, assinatura)
     return destino
 
 
@@ -320,14 +324,35 @@ def salvar_senha(banco, senha):
     banco.salvar_configuracao(SENHA_BACKUP, cifra.proteger_senha(cifra.validar_senha(senha)))
 
 
-def executar_backup_automatico(banco, forcar=False, hoje=None):
-    """Grava um backup na pasta escolhida quando o último tiver sete dias ou mais.
+def assinatura_dados(banco):
+    """Resumo (SHA-256) de tudo o que o backup leva, menos as configurações: muda a cada cadastro, edição,
+    recebimento, exclusão ou anexo."""
+    resumo = hashlib.sha256()
+    with banco.conectar() as con:
+        for tabela in ESQUEMA:
+            if tabela == 'configuracoes' or not tem_tabela(con, tabela):
+                continue
+            resumo.update(tabela.encode())
+            # tabela vem do esquema do aplicativo, nunca de fora.
+            for linha in con.execute(f'SELECT * FROM {tabela} ORDER BY rowid'):
+                resumo.update(repr(tuple(linha)).encode())
+    return resumo.hexdigest()
+
+
+def executar_backup_automatico(banco, forcar=False, hoje=None, ao_fechar=False):
+    """Grava um backup na pasta escolhida quando o último tiver sete dias ou mais, ou, ao fechar o programa,
+    quando algo mudou desde o último backup.
 
     Só as cópias automáticas entram no limite de 10; backups manuais na mesma pasta são preservados.
     A pasta não é criada: se um disco externo ou pasta sincronizada sumir, o erro é informado.
     """
     pasta = banco.configuracao(PASTA_AUTOMATICA)
-    if not pasta or not (forcar or aviso_backup(banco.ultimo_backup(), hoje)):
+    if not pasta:
+        return None
+    if ao_fechar:
+        if banco.configuracao(ASSINATURA) == assinatura_dados(banco):
+            return None
+    elif not (forcar or aviso_backup(banco.ultimo_backup(), hoje)):
         return None
     if not Path(pasta).is_dir():
         raise OSError('A pasta do backup automático não está disponível neste computador.')

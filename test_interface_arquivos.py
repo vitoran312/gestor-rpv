@@ -10,13 +10,40 @@ import app
 import tela_arquivos
 import tela_registro
 from dados import Banco
-from backup import senha_salva
+from backup import PASTA_AUTOMATICA, senha_salva
 from apoio_testes import dados_rpv
 from apoio_interface import TesteDeInterface, botao, filhos
 
 
 @unittest.skipUnless(os.environ.get('GESTOR_RPV_TESTE_UI') == '1', 'Requer sessão gráfica e GESTOR_RPV_TESTE_UI=1')
 class TestArquivos(TesteDeInterface):
+    def test_fechar_o_programa_grava_backup_so_quando_algo_mudou(self):
+        # O X da janela e o botão Sair passam pelo mesmo caminho.
+        self.assertIn('fechar_programa', self.root.protocol('WM_DELETE_WINDOW'))
+        self.assertIn('fechar_programa', str(self.programa.botao_sair.cget('command')))
+        pasta = Path(self.pasta.name) / 'drive'
+        pasta.mkdir()
+        self.banco.salvar_configuracao(PASTA_AUTOMATICA, str(pasta))
+        self.banco.salvar(dados_rpv(nome='Nova'))
+        with patch.object(self.root, 'destroy') as destruir:
+            self.programa.fechar_programa()
+            self.programa.fechar_programa()
+        self.assertEqual(destruir.call_count, 2)
+        self.assertEqual(len(list(pasta.glob('*.rpvbackup'))), 1)  # O segundo fechamento não tinha mudanças.
+        self.assertEqual(self.root.cget('cursor'), 'watch')        # Mostrou a espera enquanto gravava.
+
+    def test_falha_no_backup_ao_fechar_pergunta_antes_de_fechar(self):
+        self.banco.salvar_configuracao(PASTA_AUTOMATICA, str(Path(self.pasta.name) / 'disco-desligado'))
+        with patch.object(self.root, 'destroy') as destruir, \
+                patch.object(messagebox, 'askyesno', return_value=False) as pergunta:
+            self.programa.fechar_programa()
+        destruir.assert_not_called()
+        self.assertIn('Fechar mesmo assim?', pergunta.call_args.args[1])
+        self.assertEqual(self.root.title(), 'Gestor de RPV')
+        with patch.object(self.root, 'destroy') as destruir, patch.object(messagebox, 'askyesno', return_value=True):
+            self.programa.fechar_programa()
+        destruir.assert_called_once()
+
     def test_backup_importacao_cancelada_e_confirmada_pela_interface(self):
         dados = dict(nome='Primeira', aquisicao='2026-10-01', previsto=2000000,
                      custo=1200000, conta='Vitor', previsao='2026-12-20', comissao=None, observacoes='')
@@ -362,7 +389,7 @@ class TestArquivos(TesteDeInterface):
         self.assertEqual(self.banco.configuracao(PASTA_AUTOMATICA), str(pasta))
         self.assertEqual(len(list(pasta.glob('GestorRPV-auto-*.rpvbackup'))), 1)
         self.assertIn('ativado', aviso.call_args.args[1])
-        self.assertIn('Backup automático semanal ativo', self.programa.texto_ultimo_backup.get())
+        self.assertIn('Backup automático ativo', self.programa.texto_ultimo_backup.get())
         self.assertEqual(self.programa.texto_aviso_backup.get(), '')
         ausente = Path(self.pasta.name) / 'ausente'
         with patch.object(filedialog, 'askdirectory', return_value=str(ausente)), patch.object(messagebox, 'showerror') as erro:

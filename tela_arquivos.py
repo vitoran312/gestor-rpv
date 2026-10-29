@@ -44,7 +44,7 @@ class ArquivosMixin:
         if self.texto_ultimo_backup is not None:
             automatico = ''
             if self.banco.configuracao(PASTA_AUTOMATICA):
-                automatico = (' · Backup automático semanal ativo' if senha_salva(self.banco) else
+                automatico = (' · Backup automático ativo' if senha_salva(self.banco) else
                               ' · Backup automático parado: falta criar a senha dos backups')
             self.texto_ultimo_backup.set('Último backup: ' + data + automatico)
 
@@ -66,6 +66,25 @@ class ArquivosMixin:
             if not forcar:
                 self.agendamento_backup = self.janela.after(6 * 60 * 60 * 1000, self.verificar_backup_automatico)
         return arquivo
+
+    def fechar_programa(self):
+        """Fecha o programa. Com o backup automático ativo, antes grava um backup se algo mudou desde o último:
+        assim a pasta (por exemplo, no Google Drive) sempre tem os dados do último uso, para o celular."""
+        if self.banco.configuracao(PASTA_AUTOMATICA) and senha_salva(self.banco):
+            self.janela.title('Gestor de RPV — salvando o backup…')
+            self.janela.configure(cursor='watch')
+            self.janela.update_idletasks()
+            try:
+                executar_backup_automatico(self.banco, ao_fechar=True)
+            except (OSError, sqlite3.Error, ValueError) as erro:
+                log.warning('Backup ao fechar não gravado.', exc_info=True)
+                self.janela.title('Gestor de RPV')
+                self.janela.configure(cursor='')
+                if not messagebox.askyesno('Backup automático', 'Não foi possível salvar o backup antes de fechar. '
+                                           + descrever_erro(erro) + '\n\nFechar mesmo assim?', parent=self.janela,
+                                           icon='warning'):
+                    return
+        self.janela.destroy()
 
     def cancelar_agendamento_backup(self, evento):
         if evento.widget is not self.janela:
@@ -89,10 +108,11 @@ class ArquivosMixin:
         corpo.pack(fill='both', expand=True)
         ttk.Label(corpo, text='Backup automático', style='Titulo.TLabel').pack(anchor='w')
         ttk.Label(corpo, wraplength=px(corpo, 520), justify='left', style='Subtitulo.TLabel', text=(
-            'Uma vez por semana, o programa salva sozinho uma cópia completa — dados e documentos — na pasta '
-            'escolhida. Prefira uma pasta sincronizada, como OneDrive ou Google Drive, para ter uma cópia fora '
-            'deste computador. As cópias são protegidas pela senha dos backups: sem ela, ninguém consegue '
-            'abri-las.')).pack(anchor='w', pady=(6, 16))
+            'Ao fechar o programa (se algo mudou desde o último backup) e também uma vez por semana, o programa '
+            'salva sozinho uma cópia completa — dados e documentos — na pasta escolhida. Prefira uma pasta '
+            'sincronizada, como OneDrive ou Google Drive, para ter uma cópia fora deste computador; no Google '
+            'Drive, o app do celular abre sempre o backup mais recente. As cópias são protegidas pela senha dos '
+            'backups: sem ela, ninguém consegue abri-las.')).pack(anchor='w', pady=(6, 16))
         situacao = tk.StringVar()
         ttk.Label(corpo, textvariable=situacao, wraplength=px(corpo, 520), justify='left').pack(anchor='w')
         ttk.Label(corpo, wraplength=px(corpo, 520), justify='left', style='Discreto.TLabel', text=(

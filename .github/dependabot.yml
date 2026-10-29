@@ -5,3 +5,8 @@ updates:
     directory: /
     schedule:
       interval: monthly
+  # Navegadores dos testes do app do celular (celular/testes/package.json).
+  - package-ecosystem: npm
+    directory: /celular/testes
+    schedule:
+      interval: monthly

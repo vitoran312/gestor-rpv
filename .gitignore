@@ -231,3 +231,4 @@ backups_automaticos/
 *.rpvbackup
 *.xlsx
 gestor-danificado-*
+node_modules/

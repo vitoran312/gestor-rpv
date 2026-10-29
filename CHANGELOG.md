@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## 0.42.0
+
+- Backup ao fechar o programa: com o backup automático ativo, fechar o Gestor (X da janela ou Sair) grava
+  uma cópia na pasta escolhida se algo mudou desde o último backup (operações, contas, recebimentos,
+  previsões, lixeira ou anexos; preferências como o tema não contam). Com a pasta no Google Drive, o app do
+  celular encontra sempre o backup do último uso. Se a cópia falhar, o programa pergunta antes de fechar.
+  O backup semanal continua.
+- Testes do app do celular também no GitHub, a cada envio, no Chromium e no WebKit (o motor do Safari).
+- App do celular: em "Sobre este backup", a versão do programa que gerou o backup passa a se chamar "Feito no
+  computador pela versão", e a versão do app aparece separada.
+
 ## 0.41.0
 
 - App do celular: o leitor de PDF passa a usar a versão do pdf.js feita para navegadores como o Safari do

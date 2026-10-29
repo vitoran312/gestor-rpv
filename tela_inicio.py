@@ -134,7 +134,7 @@ class InicioMixin:
             setattr(self, f'aviso_{chave}_inicio', rotulo)
             variavel.trace_add('write', lambda *_: self.janela.after_idle(self.organizar_inicio))
 
-        self.botao_sair = ttk.Button(tela, text='Sair', command=janela.destroy, width=12)
+        self.botao_sair = ttk.Button(tela, text='Sair', command=self.fechar_programa, width=12)
         self.marca_assinatura = tela.create_image(0, 0, image=janela._marca_rodape, anchor='e')
         self.assinatura_inicio = tela.create_text(0, 0, text=f'Vitoran Tech · v{VERSAO}', anchor='e')
         self.janelas_inicio = {nome: tela.create_window(0, 0, window=widget, anchor='nw') for nome, widget in (

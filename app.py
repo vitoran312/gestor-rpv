@@ -84,6 +84,7 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
         self.agendamento_tema = janela.after(1200, self.preparar_outro_tema)
         self.agendamento_backup = janela.after(1500, self.verificar_backup_automatico)
         janela.bind('<Destroy>', self.cancelar_agendamento_backup, add='+')
+        janela.protocol('WM_DELETE_WINDOW', self.fechar_programa)
         centralizar(janela, 1480, 980)
         janela.deiconify()
         # As placas de vidro entram logo depois que a janela aparece e ficam paradas ao fim da entrada.

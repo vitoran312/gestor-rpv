@@ -1,0 +1,8 @@
+{
+  "name": "gestor-rpv-testes-celular",
+  "private": true,
+  "description": "Navegadores para os testes do app do celular (test_celular.py).",
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}

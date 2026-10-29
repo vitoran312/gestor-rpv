@@ -7,7 +7,7 @@
 (() => {
   // Igual a versao.py (test_celular confere): mostrada na abertura e em Mais, para saber se o aparelho já
   // carregou a última versão publicada.
-  const VERSAO_APP = '0.41.0';
+  const VERSAO_APP = '0.42.0';
   const D = GestorDados;
   const $ = (id) => document.getElementById(id);
   const SITUACOES = { pendente: 'Pendente', atrasada: 'Atrasada', recebida: 'Recebida' };
@@ -593,7 +593,7 @@
     return [el('div', { class: 'menu' },
       opcao('#grafico', 'Gráfico mensal', 'Entradas e recebimentos dos últimos 12 meses'),
       opcao('#lixeira', `Lixeira (${dados.lixeira.length})`, 'Operações excluídas, só para consulta'),
-      opcao('#backup', 'Sobre este backup', `Arquivo, data e versão do programa · app ${VERSAO_APP}`),
+      opcao('#backup', 'Sobre este backup', `Arquivo, data e versões · app ${VERSAO_APP}`),
       senhaRecente && !faceIdAtivo && el('div', { class: 'cartao' },
         el('div', { texto: 'Ativar o Face ID' }), el('div', { class: 'discreto pequeno', texto: 'Abrir o app com o rosto, sem digitar a senha' }),
         el('div', { class: 'botoes' }, el('button', { type: 'button', class: 'primario', texto: 'Ativar',
@@ -617,7 +617,8 @@
     return [cartao(campos([
       ['Arquivo', info.arquivo],
       ['Criado em', D.dataHora(info.manifesto.criado_em)],
-      ['Versão do programa', info.manifesto.versao_app || 'não informada'],
+      ['Feito no computador pela versão', info.manifesto.versao_app || 'não informada'],
+      ['Versão deste app', VERSAO_APP],
       ['Protegido por senha', info.cifrado ? 'sim' : 'não'],
       ['Tempo para abrir', `${((Object.values(t).reduce((a, b) => a + b, 0)) / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} s`],
     ])), !info.cifrado && el('p', { class: 'aviso', texto: 'Este backup não tem senha: qualquer pessoa com o arquivo consegue ler os dados. Os backups das versões novas do programa sempre têm senha.' })];
