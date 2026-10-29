@@ -8,7 +8,6 @@
   só de desbloqueio (Face ID, ou senha); escolher outro backup fica em "Trocar por um backup mais novo".
 - "O que mudou nas últimas versões": as cinco últimas versões, com a contagem de novidades e correções, no
   Sobre do programa e no app (Mais → Novidades), a partir de uma lista única (novidades.py).
-- Correção no app: elementos marcados como escondidos podiam continuar aparecendo em telas com layout em grade.
 
 ## 0.43.0
 
