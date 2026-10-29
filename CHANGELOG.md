@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## 0.58.0
+
+- Celular (dados só no celular): Editar, Desativar/Reativar e Remover em cada conta de recebimento, com as mesmas
+  regras do computador (Banco.salvar_conta, ativar_conta e remover_contas): edição com o formulário preenchido e
+  sem repetir apelido, conta ou Pix; as operações guardam os dados bancários que copiaram; remover avisa quantas
+  operações usam a conta. Com backup do computador, as contas continuam sendo mudadas no programa.
+
 ## 0.57.0
 
 - Celular (dados só no celular): botão "Excluir permanentemente" na operação que está na lixeira, com confirmação.

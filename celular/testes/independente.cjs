@@ -194,6 +194,25 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
     await ir('#operacoes');
     r.operacoes_de_vez = await texto();
     r.encolheu_de_vez = antes - await tamanho();
+    // 6. Contas: editar (o formulário vem preenchido), desativar e remover, como no computador.
+    await ir('#contas');
+    await pagina.click('.acoes-conta >> text=Editar');
+    await pagina.waitForSelector('[name="identificacao"]');
+    r.conta_preenchida = await pagina.inputValue('[name="identificacao"]');
+    await pagina.fill('[name="identificacao"]', 'Conta Renomeada');
+    await pagina.click('text=Salvar conta');
+    await pagina.waitForFunction(() => location.hash === '#contas');
+    pagina.once('dialog', (d) => d.accept());
+    await pagina.click('.acoes-conta >> text=Desativar');
+    await pagina.waitForSelector('.acoes-conta >> text=Reativar');
+    r.contas_desativada = await texto();
+    pagina.once('dialog', (d) => { r.aviso_remover_conta = d.message(); d.accept(); });
+    await pagina.click('.acoes-conta >> text=Remover');
+    await pagina.waitForSelector('text=Nenhuma conta cadastrada.');
+    await ir('#operacoes');
+    await pagina.click('.lista a.item');
+    await pagina.waitForSelector('text=Conta de destino');
+    r.operacao_sem_conta = await texto();
     r.erros = erros;
   } finally {
     await navegador.close();

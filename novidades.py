@@ -10,6 +10,10 @@ from pathlib import Path
 MOSTRAR = 5  # Quantas versões aparecem no "Sobre".
 
 NOVIDADES = [
+    ('0.58.0', [
+        ('novidade', 'Celular: editar, desativar, reativar e remover contas de recebimento, para quem usa só o '
+                     'celular.'),
+    ]),
     ('0.57.0', [
         ('novidade', 'Celular: "Excluir permanentemente" na lixeira, para quem usa só o celular; a operação sai de vez, '
                      'com os documentos.'),

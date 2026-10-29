@@ -1,6 +1,16 @@
 {
   "versoes": [
     {
+      "versao": "0.58.0",
+      "resumo": "1 novidade",
+      "itens": [
+        {
+          "tipo": "novidade",
+          "texto": "Celular: editar, desativar, reativar e remover contas de recebimento, para quem usa só o celular."
+        }
+      ]
+    },
+    {
       "versao": "0.57.0",
       "resumo": "1 novidade",
       "itens": [
@@ -61,32 +71,6 @@
         {
           "tipo": "novidade",
           "texto": "Programa: gráfico mensal com barras planas de topo arredondado."
-        }
-      ]
-    },
-    {
-      "versao": "0.53.0",
-      "resumo": "5 novidades",
-      "itens": [
-        {
-          "tipo": "novidade",
-          "texto": "Programa: Minhas operações com os indicadores no topo, busca com lupa e Lixeira identificada."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Programa: campos com problema ficam contornados em vermelho ao salvar, até serem corrigidos."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Programa: avisos rápidos confirmam o que foi salvo, recebido, excluído ou restaurado."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Programa: tabelas realçam a linha sob o mouse e explicam quando não há nada para mostrar."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Programa e celular: transições suaves e foco visível pelo teclado, com menos movimento quando o sistema pede."
         }
       ]
     }

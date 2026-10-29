@@ -7,7 +7,7 @@
 (() => {
   // Igual a versao.py (test_celular confere): mostrada na abertura e em Mais, para saber se o aparelho já
   // carregou a última versão publicada.
-  const VERSAO_APP = '0.57.0';
+  const VERSAO_APP = '0.58.0';
   const D = GestorDados;
   const $ = (id) => document.getElementById(id);
   const SITUACOES = { pendente: 'Pendente', atrasada: 'Atrasada', recebida: 'Recebida' };
@@ -893,6 +893,27 @@
     await salvarLocal();
   }
 
+  // Como Banco.salvar_conta com identificador: as operações antigas continuam com a cópia dos dados que guardaram.
+  async function atualizarContaLocal(id, valores) {
+    const linha = D.linhaDaConta(valores);
+    const campos = Object.keys(linha);
+    bancoLocal.run(`UPDATE contas SET ${campos.map((k) => k + '=?').join(',')} WHERE id=?`, [...campos.map((k) => linha[k]), id]);
+    await salvarLocal();
+  }
+
+  // Banco.ativar_conta.
+  async function ativarContaLocal(id, ativa) {
+    bancoLocal.run('UPDATE contas SET ativa=? WHERE id=?', [ativa ? 1 : 0, id]);
+    await salvarLocal();
+  }
+
+  // Banco.remover_contas: as operações perdem o vínculo, mas guardam os dados bancários que copiaram.
+  async function removerContaLocal(id) {
+    bancoLocal.run('UPDATE rpvs SET conta_id=NULL WHERE conta_id=?', [id]);
+    bancoLocal.run('DELETE FROM contas WHERE id=?', [id]);
+    await salvarLocal();
+  }
+
   // Como Banco.registrar_recebimento (sem anexos, por enquanto).
   async function registrarRecebimentoLocal(registro, data) {
     D.validarDataIso(data, 'Data do recebimento');
@@ -1224,8 +1245,13 @@
     return new File([new Uint8Array(p.bytes)], p.arquivo, { type: 'application/octet-stream' });
   }
 
-  // Conta de recebimento nova: mesmas regras do computador, inclusive não repetir apelido, conta ou Pix.
-  function telaNovaConta() {
+  // Conta de recebimento nova (ou editada, só no celular): mesmas regras do computador, inclusive não repetir
+  // apelido, conta ou Pix.
+  function telaNovaConta(id) {
+    const existente = Number.isInteger(id) ? dados.contas.find((x) => x.id === id) : null;
+    if (Number.isInteger(id) && (!existente || !info.independente)) {
+      return [vazio('Conta não encontrada.')];
+    }
     if (!info.chave) {
       return [el('p', { class: 'aviso', texto: info.demonstracao ? 'Na demonstração não dá para cadastrar. Toque em "Começar com meus dados", no aviso do alto da tela.'
         : 'Para cadastrar contas no celular, abra um backup com senha (feito pelo programa a partir da versão 0.30).' })];
@@ -1245,6 +1271,11 @@
       numero: campo('numero', { inputmode: 'numeric' }),
       pix: campo('pix', { autocapitalize: 'off', spellcheck: 'false' }),
     };
+    if (existente) {
+      Object.entries(c).forEach(([k, controle]) => {
+        controle.value = k === 'cpf' ? D.cpf(existente.cpf) : (existente[k] || '');
+      });
+    }
     c.cpf.addEventListener('input', () => {
       const d = c.cpf.value.replace(/\D/g, '').slice(0, 11);
       c.cpf.value = [d.slice(0, 3), d.slice(3, 6), d.slice(6, 9)].filter(Boolean).join('.') + (d.length > 9 ? '-' + d.slice(9) : '');
@@ -1254,7 +1285,8 @@
     const formulario = el('form', { class: 'cartao formulario', autocomplete: 'off', onsubmit: async (evento) => {
       evento.preventDefault();
       const valores = Object.fromEntries(Object.entries(c).map(([k, controle]) => [k, controle.value.trim()]));
-      const problemas = D.problemasDaConta(valores, [...dados.contas, ...(info.independente ? [] : contasPendentes())]);
+      const outras = dados.contas.filter((x) => !existente || x.id !== existente.id);
+      const problemas = D.problemasDaConta(valores, [...outras, ...(info.independente ? [] : contasPendentes())]);
       if (problemas.length) {
         erros.replaceChildren(...problemas.map((p) => el('div', { texto: p })));
         erros.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1262,6 +1294,11 @@
       }
       salvar.disabled = true;
       try {
+        if (existente) {
+          await atualizarContaLocal(existente.id, valores);
+          location.replace('#contas');
+          return;
+        }
         if (info.independente) {
           await gravarContaLocal(valores);
           location.replace('#contas');
@@ -1276,6 +1313,10 @@
     ...Object.entries(D.TITULOS_CONTA).map(([chave, rotulo]) => campoFormulario(
       chave === 'agencia' ? 'Agência (opcional)' : rotulo, c[chave])),
     erros, salvar);
+    if (existente) {
+      return [el('p', { class: 'discreto pequeno', texto: 'Alterações não modificam os dados de recebimento guardados nas operações antigas.' }),
+        formulario];
+    }
     return [el('p', { class: 'discreto pequeno', texto: info.independente ? 'A conta é gravada nos seus dados deste celular.'
       : 'A conta fica guardada neste celular e já pode ser escolhida numa entrada nova. Ela vai para o computador do mesmo jeito que as entradas.' }), formulario];
   }
@@ -1771,8 +1812,39 @@
         el('div', { class: 'linha1 rotulo-conta' }, el('span', { class: 'discreto pequeno', texto: usos === 1
           ? '1 operação usa esta conta' : `${usos} operações usam esta conta` }),
         el('span', { class: 'selo ' + (c.ativa ? 'recebida' : 'pendente'), texto: c.ativa ? 'Ativa' : 'Desativada' })),
-        contaRecolhida(c.identificacao, c));
+        contaRecolhida(c.identificacao, c),
+        info.independente && acoesDaConta(c, usos + dados.lixeira.filter((r) => r.conta_id === c.id).length));
     }))];
+  }
+
+  // Ver / Editar, Desativar / Reativar e Remover, como na tela de contas do computador (só com os dados no celular).
+  function acoesDaConta(c, usos) {
+    const executar = async (botao, acao) => {
+      botao.disabled = true;
+      try {
+        await acao();
+        desenhar();
+      } catch (erro) {
+        botao.disabled = false;
+        alert('Não foi possível alterar a conta: ' + (erro && erro.message ? erro.message : erro));
+      }
+    };
+    const status = el('button', { type: 'button', class: 'secundario', texto: c.ativa ? 'Desativar' : 'Reativar', onclick: () => {
+      if (confirm(`${c.ativa ? 'Desativar' : 'Reativar'} a conta ${c.identificacao}?`
+        + (c.ativa ? ' Ela continua no histórico e pode ser reativada.' : ''))) {
+        executar(status, () => ativarContaLocal(c.id, !c.ativa));
+      }
+    } });
+    const remover = el('button', { type: 'button', class: 'secundario perigo', texto: 'Remover', onclick: () => {
+      const aviso = usos ? `${usos === 1 ? '1 operação usa' : usos + ' operações usam'} esta conta. Elas guardam os dados `
+        + 'bancários, mas a conta não poderá ser escolhida de novo nem reativada. Se for só parar de usar, prefira Desativar.'
+        : 'As operações e os dados bancários já guardados nelas continuam existindo.';
+      if (confirm(`Remover permanentemente a conta ${c.identificacao}?\n\n${aviso}`)) {
+        executar(remover, () => removerContaLocal(c.id));
+      }
+    } });
+    return el('div', { class: 'acoes-conta' },
+      el('a', { class: 'botao-link secundario', href: `#editar-conta/${c.id}`, texto: 'Editar' }), status, remover);
   }
 
   function telaLixeira() {
@@ -2002,6 +2074,7 @@
     copia: { titulo: 'Cópia de segurança', aba: 'mais', montar: telaCopia, voltar: true },
     convite: { titulo: 'Convidar alguém', aba: 'mais', montar: telaConvite, voltar: true },
     'nova-conta': { titulo: 'Nova conta', aba: 'contas', montar: telaNovaConta, voltar: true },
+    'editar-conta': { titulo: 'Editar conta', aba: 'contas', montar: telaNovaConta, voltar: true },
     pendentes: { titulo: 'Aguardando o computador', aba: 'operacoes', montar: telaPendentes, voltar: true },
     enviar: { titulo: 'Enviar ao computador', aba: 'operacoes', montar: telaEnviar, voltar: true, textual: true },
   };

@@ -656,6 +656,15 @@ class TestQuemUsaSoOCelular(unittest.TestCase):
         self.assertIn('A lixeira está vazia.', r['lixeira_de_vez'])
         self.assertNotIn('Segunda Entrada', r['operacoes_de_vez'])
         self.assertGreater(r['encolheu_de_vez'], len(self.PDF))  # Os anexos saíram do pacote.
+
+    def test_editar_desativar_e_remover_conta_no_celular(self):
+        r = self.r
+        self.assertEqual(r['conta_preenchida'], 'Nubank pessoal')
+        self.assertIn('Conta Renomeada', r['contas_desativada'])
+        self.assertIn('DESATIVADA', r['contas_desativada'].upper())
+        self.assertIn('1 operação usa esta conta', r['aviso_remover_conta'])
+        # A operação perde o vínculo, mas guarda os dados bancários que copiou.
+        self.assertIn('Maria De Souza', r['operacao_sem_conta'])
         self.assertIn('Segunda Entrada', r['agenda'])  # Previsão em 01/03/2027, ainda não recebida.
         self.assertIn('segunda 01/03', r['agenda'])
         self.assertIn('Agenda das previsões', r['inicio_com_dados'])
