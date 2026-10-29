@@ -123,7 +123,8 @@ button:disabled { opacity: 0.6; }
 .tela {
   max-width: 640px;
   margin: 0 auto;
-  padding: 12px 16px calc(84px + env(safe-area-inset-bottom));
+  /* Folga para o último botão ficar acima das abas fixas, com sobra. */
+  padding: 12px 16px calc(120px + env(safe-area-inset-bottom));
 }
 
 .abas {
@@ -330,8 +331,10 @@ form.recebimento { margin-top: 12px; }
 #comecar { margin: 4px 0 8px; }
 
 /* ---- Mudar operações e anexar documentos ---- */
-.oculto-visual { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
-label.botao-link { display: block; text-align: center; padding: 12px; border-radius: 10px; font-weight: 600; margin: 8px 0 4px; cursor: pointer; }
+/* Campo de arquivo invisível por cima do próprio botão (o toque cai nele); fica contido no botão, sem posição
+   solta na página, que o Safari do iPhone pode somar à altura da tela. */
+.oculto-visual { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; border: 0; opacity: 0; font-size: 16px; }
+label.botao-link { position: relative; overflow: hidden; display: block; text-align: center; padding: 12px; border-radius: 10px; font-weight: 600; margin: 8px 0 4px; cursor: pointer; }
 .botao-link.secundario { background: var(--superficie); border: 1px solid var(--borda); color: var(--texto); }
 button.perigo { color: var(--vermelho); }
 details.acao { margin-bottom: 12px; }
@@ -376,11 +379,13 @@ details.acao[open] summary { margin-bottom: 10px; }
 .grade-agenda .dia.escolhido .marca-dia { color: var(--marca-texto); }
 
 /* ---- Modo discreto ---- */
-.topo { padding-right: 64px; }
+/* O olho fica numa coluna própria do cabeçalho (sem sobrepor nada). */
+.topo { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; column-gap: 8px; }
+.topo .voltar, .topo h1 { grid-column: 1; justify-self: start; }
 .botao-discreto {
-  position: absolute;
-  right: 12px;
-  bottom: 8px;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: end;
   width: 44px;
   height: 44px;
   padding: 9px;

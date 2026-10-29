@@ -325,6 +325,13 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
       await pagina.click('#discreto');
       resultados.discreto_depois = await textoTela();
 
+      // No fim da operação, o último botão fica visível acima das abas fixas (a página rola até ele).
+      await ir(`#operacao/${x.operacao}`, 'button.perigo');
+      await pagina.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+      resultados.fim_da_operacao = await pagina.evaluate(() => ({
+        botao: document.querySelector('button.perigo').getBoundingClientRect().bottom,
+        abas: document.querySelector('.abas').getBoundingClientRect().top,
+      }));
       await ir('#nova', 'details.colar');
       await pagina.click('details.colar summary');
       await pagina.fill('[name="texto_colado"]', x.mensagem);

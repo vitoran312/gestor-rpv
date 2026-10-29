@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## 0.51.1
+
+- App do celular: no iPhone, a tela da operação voltava para cima ao rolar e escondia os botões do fim. O campo
+  de arquivo de "+ Anexar foto ou PDF" passa a ficar contido no próprio botão, o olho do modo discreto ganha
+  uma coluna própria no cabeçalho (sem sobreposição) e o fim das telas tem mais folga acima das abas.
+
 ## 0.51.0
 
 App do celular:

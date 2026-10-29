@@ -428,6 +428,10 @@ class TestAppDoCelular(unittest.TestCase):
         self.assertEqual(r['discreto_guardado'], ['1', 'true'])
         self.assertRegex(r['discreto_depois'], r'R\$ \d')
 
+    def test_ultimo_botao_da_operacao_fica_acima_das_abas(self):
+        fim = self.resultados['fim_da_operacao']
+        self.assertLessEqual(fim['botao'], fim['abas'] - 16)
+
     def test_ler_mensagens_coladas(self):
         self.assertEqual(self.resultados['regras']['mensagens'], [
             {'nome': 'MARIA DA SILVA SOUZA', 'processo': '0001234-56.2024.4.03.6301', 'cpf': '529.982.247-25',
