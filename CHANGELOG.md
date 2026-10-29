@@ -1,5 +1,17 @@
 # Histórico de versões
 
+## 0.43.0
+
+Entradas cadastradas no celular:
+- App: "+ Nova entrada" em Operações, com as mesmas regras do programa (todos os problemas numa mensagem só) e
+  o lucro calculado na hora. A entrada fica guardada no celular, cifrada com a chave do backup, e "Enviar para
+  o computador" salva o arquivo na pasta do backup no Google Drive. Em Operações aparece quantas aguardam o
+  computador; elas somem sozinhas quando um backup mais novo mostra que já foram importadas.
+- Programa: ao abrir, procura as entradas do celular na pasta do backup automático, mostra a lista e pergunta se
+  quer importar (também em Arquivo → Entradas do celular…). Cada entrada entra uma vez só, mesmo que o arquivo
+  volte pela sincronização; entradas fora das regras (por exemplo, conta desativada) são recusadas com o
+  motivo e continuam na pasta para nova tentativa.
+
 ## 0.42.0
 
 - Backup ao fechar o programa: com o backup automático ativo, fechar o Gestor (X da janela ou Sair) grava

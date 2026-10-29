@@ -139,6 +139,47 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
         }
       }
     }
+    // Nova entrada no celular: primeiro com um erro (a regra aparece), depois certa; o arquivo cifrado que o
+    // app guardou volta em base64 para o Python importar como o programa importa.
+    if (telas.nova) {
+      const n = telas.nova;
+      await pagina.evaluate(() => { location.hash = '#nova'; });
+      await pagina.waitForSelector('form [name="nome"]');
+      await pagina.fill('[name="nome"]', n.nome);
+      await pagina.fill('[name="aquisicao"]', n.aquisicao);
+      await pagina.fill('[name="custo"]', '9.000,00');
+      await pagina.fill('[name="previsto"]', n.previsto);
+      await pagina.selectOption('[name="conta"]', String(n.conta_id));
+      await pagina.fill('[name="previsao"]', n.previsao);
+      await pagina.fill('[name="comissao"]', n.comissao);
+      await pagina.fill('[name="observacoes"]', n.observacoes);
+      await pagina.click('text=Salvar entrada');
+      await pagina.waitForFunction(() => document.querySelector('form .erro').textContent.length > 0);
+      resultados.nova_erro = await pagina.evaluate(() => document.querySelector('form .erro').textContent);
+      await pagina.fill('[name="custo"]', n.custo);
+      resultados.nova_lucro = await pagina.evaluate(() => document.querySelector('form p.discreto').textContent);
+      await pagina.click('text=Salvar entrada');
+      await pagina.waitForFunction(() => location.hash.startsWith('#enviar/'));
+      resultados.nova_tela = await pagina.evaluate(() => document.getElementById('tela').innerText);
+      resultados.nova_arquivos = await pagina.evaluate(async () => (await Guarda.ler('pendentes')).map((p) => ({
+        id: p.id, arquivo: p.arquivo, bytes: btoa(String.fromCharCode(...new Uint8Array(p.bytes))) })));
+      await pagina.evaluate(() => { location.hash = '#operacoes'; });
+      await pagina.waitForSelector('text=aguarda o computador');
+      // Entrada já importada no computador (o backup novo traz a lista): some do celular ao abrir esse backup.
+      await pagina.evaluate(async (id) => {
+        const lista = await Guarda.ler('pendentes');
+        await Guarda.gravar('pendentes', [...lista, { id, arquivo: 'antiga.rpvcelular', criada_em: '2026-10-01T10:00:00Z', bytes: new Uint8Array([1, 2, 3]) }]);
+      }, n.ja_importada);
+      await pagina.evaluate(() => { location.hash = '#mais'; });
+      await pagina.getByText('Trancar agora').click();
+      await pagina.waitForSelector('#abertura:not([hidden])');
+      await pagina.setInputFiles('#arquivo', n.backup_com_importada);
+      await pagina.fill('#senha', telas.senha);
+      await pagina.click('#abrir');
+      await pagina.waitForSelector('#aplicativo:not([hidden])', { timeout: 120000 });
+      resultados.pendentes_depois = await pagina.evaluate(async () => (await Guarda.ler('pendentes')).map((p) => p.id));
+    }
+
     await pagina.evaluate(() => { location.hash = '#mais'; });
     resultados.blob_liberado = await pagina.evaluate(() => !document.querySelector('.documento'));
     await pagina.getByText('Trancar agora').click();

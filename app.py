@@ -83,6 +83,8 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
         self.agendamento_data = janela.after(60 * 1000, self.vigiar_data)
         self.agendamento_tema = janela.after(1200, self.preparar_outro_tema)
         self.agendamento_backup = janela.after(1500, self.verificar_backup_automatico)
+        # Entradas cadastradas no celular que chegaram pela pasta do backup automático (Google Drive).
+        self.agendamento_celular = janela.after(2500, lambda: self.importar_entradas_celular(automatico=True))
         janela.bind('<Destroy>', self.cancelar_agendamento_backup, add='+')
         janela.protocol('WM_DELETE_WINDOW', self.fechar_programa)
         centralizar(janela, 1480, 980)

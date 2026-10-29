@@ -17,7 +17,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from backup import criar_backup
-from dados import chave_texto, moeda, situacao
+from dados import Banco, chave_texto, moeda, situacao
 from grafico import resumo_mensal
 from apoio_testes import SENHA_TESTE, banco_com_contas, dados_rpv, prorrogacao_antiga
 
@@ -146,6 +146,17 @@ class TestAppDoCelular(unittest.TestCase):
         cls.endereco_pdf, cls.endereco_png = (f'#documento/{documentos[n]}' for n in ('contrato.pdf', 'comprovante.png'))
         telas = {'arquivo': str(cifrado), 'senha': SENHA_TESTE, 'enderecos': TELAS + [f'#operacao/{cls.antiga}'],
                  'documentos': [cls.endereco_pdf, cls.endereco_png]}
+        # Entrada feita no celular: os dados do formulário e um backup que já traz outra entrada como importada.
+        cls.ja_importada = '11111111-2222-4333-8444-555555555555'
+        banco.salvar_configuracao('senha_backup', SENHA_TESTE)  # Tirada acima para o backup antigo, sem senha.
+        banco.salvar_configuracao('entradas_celular_importadas', json.dumps([cls.ja_importada]))
+        com_importada = criar_backup(banco, cls.pasta / 'com-importada')
+        banco.remover_configuracao('entradas_celular_importadas')
+        cls.conta_vitor = next(c['id'] for c in banco.contas() if c['identificacao'] == 'Vitor')
+        telas['nova'] = {'nome': '  entrada   do celular ', 'aquisicao': '2026-10-20', 'custo': '5.000,00',
+                         'previsto': '8000', 'conta_id': cls.conta_vitor, 'previsao': '2026-12-15', 'comissao': '100',
+                         'observacoes': 'veio do celular', 'ja_importada': cls.ja_importada,
+                         'backup_com_importada': str(com_importada)}
         outro = banco_com_contas(cls.pasta / 'outro' / 'gestor.sqlite3')
         outro.salvar(dados_rpv(nome='Só No Segundo Backup'))
         segundo = criar_backup(outro, cls.pasta / 'segundo')
@@ -263,6 +274,39 @@ class TestAppDoCelular(unittest.TestCase):
         self.assertTrue(self.resultados['service_worker'])
         if NAVEGADOR == 'chromium':
             self.assertTrue(self.resultados['sem_internet'])
+
+    # ---- Entrada feita no celular ----------------------------------------------------------------------------
+    def test_nova_entrada_confere_as_regras_e_mostra_o_lucro(self):
+        self.assertIn('O valor de aquisição não pode superar o Valor Total RPV.', self.resultados['nova_erro'])
+        self.assertEqual(self.resultados['nova_lucro'], 'Lucro previsto: R$ 3.000,00')
+        self.assertIn('Como levar ao computador', self.resultados['nova_tela'])
+        self.assertIn('Entrada Do Celular'.lower(), self.resultados['nova_tela'].lower())
+
+    def test_arquivo_feito_no_celular_e_importado_pelo_programa(self):
+        import base64
+        import entradas_celular
+        from backup import PASTA_AUTOMATICA
+        (feita,) = [a for a in self.resultados['nova_arquivos'] if a['id'] != self.ja_importada]
+        self.assertTrue(feita['arquivo'].startswith('GestorRPV-celular-') and feita['arquivo'].endswith('.rpvcelular'))
+        copia = self.pasta / 'copia-para-importar.sqlite3'
+        shutil.copy(self.banco.caminho, copia)
+        destino = Banco(copia)
+        drive = self.pasta / 'drive-importacao'
+        drive.mkdir()
+        destino.salvar_configuracao(PASTA_AUTOMATICA, str(drive))
+        (drive / feita['arquivo']).write_bytes(base64.b64decode(feita['bytes']))
+        encontradas, problemas = entradas_celular.procurar(destino)
+        self.assertEqual(problemas, [])
+        self.assertEqual(entradas_celular.importar(destino, encontradas), (1, []))
+        nova = next(r for r in destino.listar() if r['nome'] == 'Entrada Do Celular')
+        self.assertEqual((nova['aquisicao'], nova['custo'], nova['previsto'], nova['comissao'], nova['previsao'],
+                          nova['conta_id'], nova['observacoes']),
+                         ('2026-10-20', 500000, 800000, 10000, '2026-12-15', self.conta_vitor, 'Veio do celular'))
+        self.assertIn(feita['id'], entradas_celular.importadas(destino))
+
+    def test_entrada_ja_importada_some_do_celular(self):
+        feita = next(a['id'] for a in self.resultados['nova_arquivos'] if a['id'] != self.ja_importada)
+        self.assertEqual(self.resultados['pendentes_depois'], [feita])
 
     # ---- Backup guardado e Face ID (autenticador virtual com PRF) --------------------------------------------
     def setUp(self):

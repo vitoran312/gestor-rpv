@@ -40,6 +40,7 @@ class OperacoesMixin:
         arquivo.add_command(label='Fazer backup', command=self.exportar_backup)
         arquivo.add_command(label='Backup automático…', command=self.configurar_backup_automatico)
         arquivo.add_command(label='Importar dados', command=self.importar_dados)
+        arquivo.add_command(label='Entradas do celular…', command=self.importar_entradas_celular)
         arquivo.add_command(label='Exportar para Excel', command=self.exportar_excel)
         arquivo.add_command(label='Abrir pasta dos documentos', command=self.abrir_pasta_documentos)
         arquivo.add_separator()

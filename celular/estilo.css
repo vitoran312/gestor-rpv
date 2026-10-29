@@ -253,3 +253,28 @@ details.conta .mostrar { color: var(--marca); }
 details.conta[open] .mostrar { display: none; }
 details.conta[open] summary { margin-bottom: 10px; }
 .rotulo-conta { margin: 0 4px 6px; }
+
+.campo { display: grid; gap: 4px; font-weight: 600; }
+.campo span.pequeno { font-weight: 400; }
+select, textarea {
+  font: inherit;
+  font-size: 16px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--borda);
+  background: var(--fundo);
+  color: var(--texto);
+  width: 100%;
+}
+input[type="date"] { min-height: 46px; -webkit-appearance: none; appearance: none; }
+a.botao-link {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  padding: 12px;
+  border-radius: 10px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+a.botao-link.primario { background: var(--marca); color: var(--marca-texto); }
+.passos { padding-left: 20px; margin: 0 0 16px; display: grid; gap: 6px; }

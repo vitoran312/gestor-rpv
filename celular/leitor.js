@@ -88,6 +88,43 @@ const LeitorBackup = (() => {
     return { conteudo: resultado, chave: { sal: Uint8Array.from(sal), bruta: Uint8Array.from(bruta) } };
   }
 
+  // Cifra no mesmo formato de cifra.cifrar_arquivo, com a chave do backup aberto (mesmo sal): o computador abre
+  // com a senha dos backups, e o celular não precisa refazer a conferência demorada da senha.
+  async function cifrar(conteudo, chave) {
+    const prefixo = crypto.getRandomValues(new Uint8Array(TAMANHO_PREFIXO));
+    const cabecalho = new Uint8Array(CABECALHO);
+    cabecalho.set(MAGICO, 0);
+    cabecalho.set(chave.sal, MAGICO.length);
+    cabecalho.set(prefixo, MAGICO.length + TAMANHO_SAL);
+    const aes = await crypto.subtle.importKey('raw', chave.bruta, 'AES-GCM', false, ['encrypt']);
+    const partes = [cabecalho];
+    let total = CABECALHO;
+    for (let inicio = 0, indice = 0; ; inicio += BLOCO, indice += 1) {
+      const fim = Math.min(inicio + BLOCO, conteudo.length);
+      const ultimo = fim === conteudo.length;
+      const parte = new Uint8Array(await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv: nonce(prefixo, indice, ultimo), additionalData: cabecalho, tagLength: 128 },
+        aes, conteudo.subarray(inicio, fim)));
+      partes.push(parte);
+      total += parte.length;
+      if (ultimo) {
+        break;
+      }
+    }
+    const resultado = new Uint8Array(total);
+    let posicao = 0;
+    for (const parte of partes) {
+      resultado.set(parte, posicao);
+      posicao += parte.length;
+    }
+    return resultado;
+  }
+
+  // O sal de um arquivo cifrado (para saber se a chave do backup aberto agora serve para ele).
+  function salDe(bytes) {
+    return cifrado(bytes) ? bytes.slice(MAGICO.length, MAGICO.length + TAMANHO_SAL) : null;
+  }
+
   async function sha256(bytes) {
     const resumo = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
     return Array.from(resumo, (b) => b.toString(16).padStart(2, '0')).join('');
@@ -173,5 +210,5 @@ const LeitorBackup = (() => {
     return { db, manifesto, cifrado: ehCifrado, tempos, arquivos, extrair, chave: chaveUsada };
   }
 
-  return { ler, decifrar, cifrado, ErroBackup, SenhaIncorreta };
+  return { ler, decifrar, cifrar, salDe, cifrado, ErroBackup, SenhaIncorreta };
 })();

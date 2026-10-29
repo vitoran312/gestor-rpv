@@ -17,6 +17,39 @@ from apoio_interface import TesteDeInterface, botao, filhos
 
 @unittest.skipUnless(os.environ.get('GESTOR_RPV_TESTE_UI') == '1', 'Requer sessão gráfica e GESTOR_RPV_TESTE_UI=1')
 class TestArquivos(TesteDeInterface):
+    def test_entradas_do_celular_ao_abrir_e_pelo_menu(self):
+        import json
+        import cifra
+        from test_entradas_celular import entrada
+        drive = Path(self.pasta.name) / 'drive'
+        drive.mkdir()
+        self.banco.salvar_configuracao(PASTA_AUTOMATICA, str(drive))
+        vitor = next(c['id'] for c in self.banco.contas() if c['identificacao'] == 'Vitor')
+        aberto = Path(self.pasta.name) / 'aberto.json'
+        aberto.write_text(json.dumps({'formato': 'gestor-rpv-celular', 'versao_formato': 1,
+                                      'entrada': entrada(conta_id=vitor, nome='Do Celular')}), encoding='utf-8')
+        cifra.cifrar_arquivo(aberto, drive / 'GestorRPV-celular-1.rpvcelular', senha_salva(self.banco))
+        # Ao abrir: pergunta; "Agora não" deixa o arquivo para depois.
+        with patch.object(messagebox, 'askyesno', return_value=False) as pergunta:
+            self.programa.importar_entradas_celular(automatico=True)
+        self.assertIn('Do Celular', pergunta.call_args.args[1])
+        self.assertEqual(self.banco.listar(), [])
+        # Pelo menu de Minhas operações: importa e a tabela já mostra a entrada.
+        self.programa.mostrar_historico()
+        self.root.update()
+        with patch.object(messagebox, 'askyesno', return_value=True), patch.object(messagebox, 'showinfo') as aviso:
+            self.programa.menus['Arquivo'].invoke('Entradas do celular…')
+        self.assertIn('1 entrada(s) importada(s)', aviso.call_args.args[1])
+        self.assertEqual([r['nome'] for r in self.banco.listar()], ['Do Celular'])
+        self.assertEqual(len(self.programa.tabela.get_children()), 1)
+        # Sem nada novo: ao abrir não aparece nada; pelo menu, oferece escolher arquivos.
+        with patch.object(messagebox, 'askyesno') as pergunta:
+            self.programa.importar_entradas_celular(automatico=True)
+        pergunta.assert_not_called()
+        with patch.object(filedialog, 'askopenfilenames', return_value=()) as escolher:
+            self.programa.menus['Arquivo'].invoke('Entradas do celular…')
+        escolher.assert_called_once()
+
     def test_fechar_o_programa_grava_backup_so_quando_algo_mudou(self):
         # O X da janela e o botão Sair passam pelo mesmo caminho.
         self.assertIn('fechar_programa', self.root.protocol('WM_DELETE_WINDOW'))

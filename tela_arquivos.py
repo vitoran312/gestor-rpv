@@ -5,6 +5,7 @@ from datetime import datetime
 from tkinter import messagebox, filedialog, simpledialog, ttk
 
 import cifra
+import entradas_celular
 from backup import (criar_backup, documentos_sem_arquivo, BackupPreparado, aviso_backup, executar_backup_automatico, PASTA_AUTOMATICA,
                     SenhaAusente, SenhaNecessaria, salvar_senha, senha_salva)
 from componentes import centralizar
@@ -67,6 +68,55 @@ class ArquivosMixin:
                 self.agendamento_backup = self.janela.after(6 * 60 * 60 * 1000, self.verificar_backup_automatico)
         return arquivo
 
+    def importar_entradas_celular(self, automatico=False):
+        """Entradas cadastradas no app do celular (arquivos .rpvcelular na pasta do backup automático).
+
+        Ao abrir o programa (automatico=True) só aparece algo se houver entradas novas; pelo menu, sem nada na
+        pasta, a pessoa pode escolher os arquivos à mão.
+        """
+        if not self.janela.winfo_exists():
+            return
+        pai = self.janela_ativa()
+        try:
+            encontradas, problemas = entradas_celular.procurar(self.banco)
+            if not encontradas and not problemas and not automatico:
+                arquivos = filedialog.askopenfilenames(parent=pai, title='Entradas enviadas pelo app do celular',
+                                                       filetypes=[('Entrada do app do celular', '*.rpvcelular')])
+                if not arquivos:
+                    return
+                encontradas, problemas = entradas_celular.conferir(self.banco, arquivos)
+        except (OSError, sqlite3.Error) as erro:
+            log.warning('Entradas do celular não conferidas.', exc_info=True)
+            if not automatico:
+                messagebox.showerror('Entradas do celular', descrever_erro(erro), parent=pai)
+            return
+        aviso = ''.join(f'\n• {arquivo.name}: {mensagem}' for arquivo, mensagem in problemas[:5])
+        aviso = f'\n\nNão foi possível abrir {len(problemas)} arquivo(s):{aviso}' if problemas else ''
+        if not encontradas:
+            if problemas and not automatico:
+                messagebox.showwarning('Entradas do celular', 'Nenhuma entrada nova para importar.' + aviso, parent=pai)
+            elif problemas:
+                log.warning('Arquivos do celular não abertos na pasta do backup automático: %d.', len(problemas))
+            return
+        lista = '\n'.join('• ' + entradas_celular.resumo(e) for _, e in encontradas[:15])
+        if len(encontradas) > 15:
+            lista += f'\n… e mais {len(encontradas) - 15}.'
+        if not messagebox.askyesno('Entradas do celular', f'Chegaram {len(encontradas)} entrada(s) cadastrada(s) no '
+                                   f'app do celular:\n\n{lista}{aviso}\n\nImportar agora?', parent=pai):
+            return
+        try:
+            gravadas, recusadas = entradas_celular.importar(self.banco, encontradas)
+        except (OSError, sqlite3.Error) as erro:
+            messagebox.showerror('Entradas do celular', 'Não foi possível importar. ' + descrever_erro(erro), parent=pai)
+            return
+        texto = f'{gravadas} entrada(s) importada(s).'
+        if recusadas:
+            texto += '\n\nNão importadas (corrija no celular e envie de novo, ou cadastre aqui):' + ''.join(
+                f'\n• {nome}: {mensagem}' for nome, mensagem in recusadas)
+        messagebox.showinfo('Entradas do celular', texto, parent=pai)
+        self.atualizar()
+        self.atualizar_aviso_atrasadas()
+
     def fechar_programa(self):
         """Fecha o programa. Com o backup automático ativo, antes grava um backup se algo mudou desde o último:
         assim a pasta (por exemplo, no Google Drive) sempre tem os dados do último uso, para o celular."""
@@ -89,7 +139,7 @@ class ArquivosMixin:
     def cancelar_agendamento_backup(self, evento):
         if evento.widget is not self.janela:
             return
-        for nome in ('agendamento_backup', 'agendamento_data', 'agendamento_tema', 'agendamento_arte'):
+        for nome in ('agendamento_backup', 'agendamento_data', 'agendamento_tema', 'agendamento_arte', 'agendamento_celular'):
             setattr(self, nome, None)
         # Qualquer tarefa ainda agendada (redesenhos com after_idle, relógio da animação, backup) é
         # cancelada: depois de fechar a janela, ela chamaria funções que não existem mais.

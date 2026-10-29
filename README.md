@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.42.0
+# Gestor de RPV — 0.43.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -470,6 +470,16 @@ substitui o guardado. Com o Face ID ativado (`celular/faceid.js`, iOS 18 ou mais
 uma chave de acesso do site, com a extensão PRF, tranca no aparelho a senha e a chave já calculada do backup,
 então a abertura também pula a conferência demorada da senha. Depois de 5 minutos em segundo plano o app
 tranca sozinho. Os dados bancários das contas aparecem recolhidos: só o nome do titular, até um toque.
+
+**Entradas feitas no celular.** Em Operações, "+ Nova entrada" abre um formulário com as mesmas regras do
+programa (`celular/dados.js`, conferidas contra `dados.py` pelos testes). A entrada vira um arquivo
+`.rpvcelular`, cifrado com a chave do backup aberto (o mesmo formato dos backups), guardado no celular até ser
+importado. "Enviar para o computador" abre o menu do iPhone: salve o arquivo na pasta do backup automático no
+Google Drive. Ao abrir, o Gestor no computador (`entradas_celular.py`) procura esses arquivos, abre com a senha
+dos backups, mostra as entradas e pergunta se quer importá-las (também em **Arquivo → Entradas do celular…**,
+que permite escolher os arquivos à mão). Importadas, elas são gravadas pelas regras de sempre, o arquivo vai
+para `importados-do-celular` e o identificador da entrada fica anotado: nunca entra duas vezes. O próximo
+backup leva essa anotação ao celular, que então apaga a cópia que guardava.
 
 `celular/leitor.js` abre o backup e `celular/dados.js` repete as regras de `dados.py` e `grafico.py`
 (situação, valores, busca, indicadores e resumo mensal). `test_celular.py` grava backups com o Python, abre-os

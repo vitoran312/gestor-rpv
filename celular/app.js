@@ -7,7 +7,7 @@
 (() => {
   // Igual a versao.py (test_celular confere): mostrada na abertura e em Mais, para saber se o aparelho já
   // carregou a última versão publicada.
-  const VERSAO_APP = '0.42.0';
+  const VERSAO_APP = '0.43.0';
   const D = GestorDados;
   const $ = (id) => document.getElementById(id);
   const SITUACOES = { pendente: 'Pendente', atrasada: 'Atrasada', recebida: 'Recebida' };
@@ -132,7 +132,8 @@
         leitura.db.close();
       }
       info = { arquivo: fonte.nome, tamanho: fonte.tamanho, manifesto: leitura.manifesto, cifrado: leitura.cifrado,
-        tempos: leitura.tempos, extrair: leitura.extrair };
+        tempos: leitura.tempos, extrair: leitura.extrair, chave: leitura.chave };
+      await carregarPendentes();
       if (fonte.novo) {
         // O arquivo é guardado como veio do computador: continua trancado pela senha.
         fonte = { bytes: fonte.bytes, nome: fonte.nome, tamanho: fonte.tamanho, criado_em: leitura.manifesto.criado_em,
@@ -257,6 +258,7 @@
     dados = null;
     info = null;
     senhaRecente = null;
+    abertasPendentes.clear();
     estado.busca = '';
     estado.filtro = 'todas';
     $('tela').replaceChildren();
@@ -377,7 +379,196 @@
         desenharLista();
       } });
     desenharLista();
-    return [busca, filtros, lista];
+    const pendentes = listaPendentes.length > 0 && el('a', { class: 'aviso item', href: '#pendentes' },
+      el('div', { class: 'nome', texto: listaPendentes.length === 1 ? '1 entrada feita no celular aguarda o computador'
+        : `${listaPendentes.length} entradas feitas no celular aguardam o computador` }),
+      el('div', { class: 'discreto pequeno', texto: 'Toque para ver ou enviar de novo' }));
+    const nova = el('a', { class: 'botao-link primario', href: '#nova', texto: '+ Nova entrada' });
+    return [nova, pendentes, busca, filtros, lista];
+  }
+
+  // ---- Entradas feitas no celular ----------------------------------------------------------------------
+  // Cada entrada vira um arquivo .rpvcelular, cifrado com a chave do backup aberto (o computador abre com a
+  // senha dos backups). O arquivo fica guardado aqui até um backup mais novo mostrar que o computador já o
+  // importou (configuração entradas_celular_importadas); até lá, pode ser enviado de novo.
+  let listaPendentes = [];          // [{id, arquivo, criada_em, bytes}] como guardadas no aparelho.
+  const abertasPendentes = new Map();  // id → entrada, para as que a chave do backup aberto consegue ler.
+
+  async function carregarPendentes() {
+    const guardadas = await Guarda.ler('pendentes').catch(() => null) || [];
+    listaPendentes = guardadas.filter((p) => !dados.importadasDoCelular.has(p.id));
+    if (listaPendentes.length !== guardadas.length) {
+      await Guarda.gravar('pendentes', listaPendentes).catch(() => {});
+    }
+    abertasPendentes.clear();
+    for (const p of listaPendentes) {
+      try {
+        const { conteudo } = await LeitorBackup.decifrar(new Uint8Array(p.bytes), { chave: info.chave });
+        abertasPendentes.set(p.id, JSON.parse(new TextDecoder().decode(conteudo)).entrada);
+      } catch (erro) {
+        // Feita com um backup de outra chave: continua guardada e pode ser enviada, só não é mostrada.
+      }
+    }
+  }
+
+  function campoFormulario(rotulo, controle, ajuda) {
+    return el('label', { class: 'campo' }, el('span', { texto: rotulo }), controle,
+      ajuda && el('span', { class: 'discreto pequeno', texto: ajuda }));
+  }
+
+  function telaNovaEntrada() {
+    if (!info.chave) {
+      return [el('p', { class: 'aviso', texto: 'Para cadastrar entradas no celular, abra um backup com senha (feito pelo programa a partir da versão 0.30).' })];
+    }
+    const contas = dados.contas.filter((c) => c.ativa);
+    if (!contas.length) {
+      return [el('p', { class: 'aviso', texto: 'Cadastre uma conta de recebimento no computador antes de cadastrar entradas no celular.' })];
+    }
+    const valor = (nome) => el('input', { name: nome, inputmode: 'decimal', autocomplete: 'off', placeholder: '0,00' });
+    const c = {
+      nome: el('input', { name: 'nome', autocomplete: 'off', autocapitalize: 'words', maxlength: '150' }),
+      aquisicao: el('input', { name: 'aquisicao', type: 'date', value: D.hojeIso() }),
+      custo: valor('custo'),
+      previsto: valor('previsto'),
+      conta: el('select', { name: 'conta' }, el('option', { value: '', texto: 'Escolha a conta' }),
+        contas.map((conta) => el('option', { value: String(conta.id), texto: conta.identificacao }))),
+      previsao: el('input', { name: 'previsao', type: 'date' }),
+      comissao: valor('comissao'),
+      observacoes: el('textarea', { name: 'observacoes', rows: '3', maxlength: '5000' }),
+    };
+    if (contas.length === 1) {
+      c.conta.value = String(contas[0].id);
+    }
+    const lucro = el('p', { class: 'discreto' });
+    const erros = el('div', { class: 'erro', role: 'alert' });
+    const atualizarLucro = () => {
+      try {
+        lucro.textContent = `Lucro previsto: ${D.reais(D.centavos(c.previsto.value) - D.centavos(c.custo.value))}`;
+      } catch (erro) {
+        lucro.textContent = 'Lucro previsto: preencha os dois valores.';
+      }
+    };
+    c.custo.addEventListener('input', atualizarLucro);
+    c.previsto.addEventListener('input', atualizarLucro);
+    atualizarLucro();
+    const salvar = el('button', { type: 'submit', class: 'primario', texto: 'Salvar entrada' });
+    const formulario = el('form', { class: 'cartao formulario', autocomplete: 'off', onsubmit: async (evento) => {
+      evento.preventDefault();
+      const problemas = [];
+      const converter = (rotulo, texto, opcional) => {
+        if (opcional && !texto.trim()) {
+          return null;
+        }
+        try {
+          return D.centavos(texto);
+        } catch (erro) {
+          problemas.push(`${rotulo}: ${erro.message}`);
+          return undefined;
+        }
+      };
+      const entrada = {
+        nome: D.nomeFormatado(c.nome.value), aquisicao: c.aquisicao.value, previsao: c.previsao.value,
+        custo: converter('Valor de aquisição', c.custo.value), previsto: converter('Valor Total RPV', c.previsto.value),
+        comissao: converter('Comissão', c.comissao.value, true), observacoes: c.observacoes.value.trim(),
+      };
+      // Todos os problemas de uma vez, como no computador: primeiro os valores mal escritos, depois as regras.
+      if (!problemas.length) {
+        problemas.push(...D.problemasDaEntrada(entrada));
+      }
+      const conta = contas.find((x) => String(x.id) === c.conta.value);
+      if (!conta) {
+        problemas.push('Escolha a conta de destino.');
+      }
+      if (problemas.length) {
+        erros.replaceChildren(...problemas.map((p) => el('div', { texto: p })));
+        erros.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      salvar.disabled = true;
+      try {
+        const completa = { id: crypto.randomUUID(), ...entrada, conta_id: conta.id, conta: conta.identificacao,
+          criada_em: new Date().toISOString() };
+        const pacote = { formato: 'gestor-rpv-celular', versao_formato: 1, versao_app: VERSAO_APP, entrada: completa };
+        const bytes = await LeitorBackup.cifrar(new TextEncoder().encode(JSON.stringify(pacote)), info.chave);
+        const agora = new Date();
+        const marca = `${D.hojeIso(agora).replaceAll('-', '')}-${String(agora.getHours()).padStart(2, '0')}${String(agora.getMinutes()).padStart(2, '0')}`;
+        const registro = { id: completa.id, arquivo: `GestorRPV-celular-${marca}-${completa.id.slice(0, 8)}.rpvcelular`,
+          criada_em: completa.criada_em, bytes };
+        listaPendentes = [...listaPendentes, registro];
+        await Guarda.gravar('pendentes', listaPendentes);
+        abertasPendentes.set(completa.id, completa);
+        location.replace(`#enviar/${completa.id}`);
+      } catch (erro) {
+        erros.replaceChildren(el('div', { texto: 'Não foi possível guardar a entrada neste aparelho: ' + (erro && erro.message ? erro.message : erro) }));
+        salvar.disabled = false;
+      }
+    } },
+    campoFormulario('Titular original', c.nome),
+    campoFormulario('Data de aquisição', c.aquisicao),
+    campoFormulario('Valor de aquisição', c.custo),
+    campoFormulario('Valor Total RPV', c.previsto),
+    lucro,
+    campoFormulario('Conta de destino', c.conta),
+    campoFormulario('Previsão inicial de recebimento', c.previsao),
+    campoFormulario('Comissão (opcional)', c.comissao),
+    campoFormulario('Observações (opcional)', c.observacoes),
+    erros,
+    salvar);
+    return [el('p', { class: 'discreto pequeno', texto: 'A entrada fica guardada neste celular e vai para o computador por um arquivo que você salva na pasta do backup no Google Drive. Ao abrir, o Gestor no computador pergunta se quer importá-la.' }), formulario];
+  }
+
+  function resumoPendente(p) {
+    const e = abertasPendentes.get(p.id);
+    return e ? [e.nome, `${D.reais(e.previsto)} · previsão ${D.dataBr(e.previsao)} · ${e.conta}`]
+      : ['Entrada feita com um backup anterior', `Criada em ${D.dataHora(p.criada_em)}`];
+  }
+
+  function telaPendentes() {
+    if (!listaPendentes.length) {
+      return [vazio('Nenhuma entrada aguardando o computador.')];
+    }
+    return [el('p', { class: 'discreto pequeno', texto: 'Somem daqui sozinhas quando um backup mais novo, feito depois da importação no computador, for aberto no celular.' }),
+      el('div', { class: 'menu' }, listaPendentes.map((p) => {
+        const [titulo, detalhe] = resumoPendente(p);
+        return el('a', { class: 'cartao', href: `#enviar/${p.id}` }, el('div', { class: 'nome', texto: titulo }),
+          el('div', { class: 'discreto pequeno', texto: detalhe }));
+      }))];
+  }
+
+  function telaEnviar(id) {
+    const p = listaPendentes.find((x) => x.id === id);
+    if (!p) {
+      return [vazio('Esta entrada já foi importada pelo computador ou apagada.')];
+    }
+    const [titulo, detalhe] = resumoPendente(p);
+    const arquivo = new File([new Uint8Array(p.bytes)], p.arquivo, { type: 'application/octet-stream' });
+    const podeCompartilhar = navigator.canShare && navigator.canShare({ files: [arquivo] });
+    const resultado = el('p', { class: 'discreto pequeno' });
+    const enviar = podeCompartilhar
+      ? el('button', { type: 'button', class: 'primario', texto: 'Enviar para o computador', onclick: () => {
+        navigator.share({ files: [arquivo] }).then(() => {
+          resultado.textContent = 'Arquivo enviado. Ao abrir o Gestor no computador, ele vai perguntar se quer importar.';
+        }).catch(() => {});  // Cancelar o menu não é erro.
+      } })
+      : el('a', { class: 'botao-link primario', href: URL.createObjectURL(arquivo), download: p.arquivo, texto: 'Baixar o arquivo' });
+    return [
+      cartao(el('div', { class: 'nome', texto: titulo }), el('div', { class: 'discreto pequeno', texto: detalhe })),
+      el('h2', { texto: 'Como levar ao computador' }),
+      el('ol', { class: 'passos' },
+        el('li', { texto: 'Toque em "Enviar para o computador".' }),
+        el('li', { texto: 'No menu do iPhone, escolha "Salvar em Arquivos".' }),
+        el('li', { texto: 'Abra Google Drive e a pasta onde ficam os backups do Gestor (a do backup automático) e toque em Salvar.' }),
+        el('li', { texto: 'Abra o Gestor no computador: ele mostra as entradas do celular e pergunta se quer importar.' })),
+      enviar, resultado,
+      el('button', { type: 'button', class: 'secundario', texto: 'Apagar esta entrada do celular', onclick: async () => {
+        if (!confirm('Apagar esta entrada do celular? Se o arquivo já foi salvo no Google Drive, o computador ainda pode importá-la.')) {
+          return;
+        }
+        listaPendentes = listaPendentes.filter((x) => x.id !== id);
+        await Guarda.gravar('pendentes', listaPendentes).catch(() => {});
+        location.replace('#operacoes');
+      } }),
+    ];
   }
 
   function telaOperacao(id) {
@@ -635,6 +826,9 @@
     lixeira: { titulo: 'Lixeira', aba: 'mais', montar: telaLixeira, voltar: true },
     grafico: { titulo: 'Gráfico mensal', aba: 'mais', montar: telaGrafico, voltar: true },
     backup: { titulo: 'Sobre este backup', aba: 'mais', montar: telaBackup, voltar: true },
+    nova: { titulo: 'Nova entrada', aba: 'operacoes', montar: telaNovaEntrada, voltar: true },
+    pendentes: { titulo: 'Aguardando o computador', aba: 'operacoes', montar: telaPendentes, voltar: true },
+    enviar: { titulo: 'Enviar ao computador', aba: 'operacoes', montar: telaEnviar, voltar: true, textual: true },
   };
 
   function desenhar() {
@@ -643,7 +837,7 @@
     }
     const [nome, parametro] = location.hash.slice(1).split('/');
     const tela = TELAS[nome] || TELAS.inicio;
-    const id = Number(parametro);
+    const id = tela.textual ? parametro : Number(parametro);
     liberarDocumento();
     $('titulo').textContent = tela.titulo;
     // A barra de zoom dos documentos fica logo abaixo do cabeçalho fixo.
