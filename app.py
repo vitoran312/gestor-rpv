@@ -13,6 +13,7 @@ import instancia
 from backup import limpar_temporarios, recuperar_interrompidas
 from recuperacao import abrir_banco
 from componentes import centralizar, maximizar
+from movimento import surgir
 from contas import JanelaContas
 from versao import CONTATO, VERSAO
 from tema import cores, definir_modo, atualizar_widgets
@@ -179,7 +180,7 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
         tela.bind('<Escape>', lambda _: tela.destroy())
         tela.bind('<Return>', lambda _: tela.destroy())
         centralizar(tela, 550)
-        tela.deiconify()
+        surgir(tela)
         tela.focus_set()
 
     def criar_novidades(self, corpo):

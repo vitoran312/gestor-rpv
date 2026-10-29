@@ -14,6 +14,10 @@
   --recebida: #e5f4ea;
   --realce: #fbeae4;
   --neutro: #9aa3b2;
+  /* Movimento (skill animate, Emil Kowalski): ease-out forte para entradas e toques, UI abaixo de 300 ms. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --toque: 160ms;
+  --entrada: 180ms;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-text-size-adjust: 100%;
 }
@@ -410,3 +414,40 @@ label.opcao input { width: 22px; height: 22px; margin: 0; }
 .aviso.demonstracao .nome { font-weight: 700; color: var(--marca); }
 label.escolher-backup { position: relative; overflow: hidden; display: block; margin-top: 0; cursor: pointer; }
 #ver-demonstracao { display: block; margin: 4px auto; }
+
+/* ---- Microinterações ---- */
+/* Toque: o elemento encolhe um pouco enquanto o dedo está nele (a confirmação de que o app ouviu o toque).
+   Só transform, que não refaz o layout; transição (não keyframes), para retomar do ponto atual se tocar de novo. */
+button, a.botao-link, label.botao-link, a.cartao, a.item, label.escolher-backup, .situacoes a, .filtros button,
+.grade-agenda .dia, details.acao summary, details.conta summary {
+  transition: transform var(--toque) var(--ease-out);
+  -webkit-tap-highlight-color: transparent;
+}
+button:active:not(:disabled), a.botao-link:active, label.botao-link:active, a.cartao:active, a.item:active,
+label.escolher-backup:active, .situacoes a:active, .filtros button:active, .grade-agenda .dia:active,
+details.acao summary:active, details.conta summary:active {
+  transform: scale(0.97);
+}
+/* Cartões grandes encolhem menos: 0,97 de um cartão largo já é um salto visível. */
+a.cartao.agenda-resumo:active, a.aviso.item:active { transform: scale(0.985); }
+
+/* Troca de tela: o conteúdo chega quase parado (4 px e opacidade), rápido o bastante para não atrasar o uso. */
+@keyframes chegar-tela {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.tela.entrando { animation: chegar-tela var(--entrada) var(--ease-out); }
+
+/* Aviso e erro que aparecem depois de uma ação: surgem em vez de piscar. */
+@keyframes surgir { from { opacity: 0; } to { opacity: 1; } }
+.erro:not(:empty), [role="status"]:not(:empty) { animation: surgir var(--entrada) var(--ease-out); }
+
+/* Menos movimento pedido pelo sistema: nada se desloca nem encolhe; só a opacidade continua. */
+@media (prefers-reduced-motion: reduce) {
+  button:active:not(:disabled), a.botao-link:active, label.botao-link:active, a.cartao:active, a.item:active,
+  label.escolher-backup:active, .situacoes a:active, .filtros button:active, .grade-agenda .dia:active,
+  details.acao summary:active, details.conta summary:active, a.cartao.agenda-resumo:active, a.aviso.item:active {
+    transform: none;
+  }
+  @keyframes chegar-tela { from { opacity: 0; } to { opacity: 1; } }
+}

@@ -169,6 +169,41 @@ def icone_tema(raiz, modo):
     return cache[chave]
 
 
+def _icone_desenhado(raiz, nome, lado, dentro, cor):
+    """Ícone de uma cor só, com bordas suavizadas (quatro amostras por pixel), guardado por nome e cor."""
+    cache = getattr(raiz, '_icones_desenhados', {})
+    raiz._icones_desenhados = cache
+    chave = (nome, lado, cor)
+    if chave not in cache:
+        rgb = _rgb(cor)
+        dados = bytearray()
+        for y in range(lado):
+            dados.append(0)
+            for x in range(lado):
+                cobertura = sum(dentro(x + dx, y + dy) for dx, dy in ((.25, .25), (.75, .25), (.25, .75), (.75, .75))) / 4
+                dados.extend((*rgb, round(255 * cobertura)))
+        cache[chave] = tk.PhotoImage(master=raiz, data=_codificar_png(lado, lado, dados))
+    return cache[chave]
+
+
+def _segmento(x, y, a, b):
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    t = max(0, min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy)))
+    return math.hypot(x - a[0] - t * dx, y - a[1] - t * dy)
+
+
+def icone_busca(raiz, cor):
+    """Lupa de 18 px para o campo de busca."""
+    return _icone_desenhado(raiz, 'busca', 18, lambda x, y: abs(math.hypot(x - 7.5, y - 7.5) - 5) <= .8
+                            or _segmento(x, y, (11.3, 11.3), (15.5, 15.5)) <= 1, cor)
+
+
+def icone_limpar(raiz, cor):
+    """× de 14 px, para limpar a busca."""
+    return _icone_desenhado(raiz, 'limpar', 14, lambda x, y: min(_segmento(x, y, (3.5, 3.5), (10.5, 10.5)),
+                                                                _segmento(x, y, (10.5, 3.5), (3.5, 10.5))) <= .8, cor)
+
+
 def aplicar_superficies(raiz):
     """Imagens guardadas pela raiz; estilos nativos mantêm foco, teclado e acessibilidade."""
     c = cores()
@@ -182,7 +217,9 @@ def aplicar_superficies(raiz):
                                   ('pressionado', c['selecao'], c['marca']),
                                   ('primario', c['primario'], None), ('primario_ativo', c['primario_ativo'], None),
                                   ('primario_pressionado', c['primario_pressionado'], None),
-                                  ('inativo', c['fundo'], c['borda_suave'])):
+                                  ('inativo', c['fundo'], c['borda_suave']),
+                                  ('foco', c['ativo'], c['marca']),
+                                  ('primario_foco', c['primario_ativo'], c['texto'])):
             imagens[nome] = tk.PhotoImage(master=raiz, data=_png_arredondado(cor, contorno, 8, 480, 48))
         # O ttk preenche o miolo repetindo a imagem como azulejos; no Windows, centenas de azulejos pequenos
         # com transparência tornavam lenta a troca de tema. Imagens do tamanho real cobrem cada superfície
@@ -192,11 +229,14 @@ def aplicar_superficies(raiz):
         imagens['filtro_selecionado'] = tk.PhotoImage(master=raiz, data=_png_arredondado(c['realce'], c['marca'], 16, 240, 32))
         imagens['cartao'] = tk.PhotoImage(master=raiz, data=_png_arredondado(c['superficie'], c['borda_suave'], 12, 1200, 800))
         prefixo = 'Pro' + chave[1:]
-        for nome, normal, hover, pressionado in (('secundario', 'botao', 'ativo', 'pressionado'),
-                                              ('primario', 'primario', 'primario_ativo', 'primario_pressionado')):
+        # Ordem dos estados: o primeiro que valer decide (desativado, pressionado, sob o mouse, com foco).
+        for nome, normal, hover, pressionado, foco in (('secundario', 'botao', 'ativo', 'pressionado', 'foco'),
+                                                      ('primario', 'primario', 'primario_ativo', 'primario_pressionado',
+                                                       'primario_foco')):
             estilo.element_create(prefixo + nome, 'image', imagens[normal],
                                   ('disabled', imagens['inativo']), ('pressed', imagens[pressionado]),
-                                  ('active', imagens[hover]), border=(10, 10, 10, 10), padding=0, width=40, height=36, sticky='nsew')
+                                  ('active', imagens[hover]), ('focus', imagens[foco]),
+                                  border=(10, 10, 10, 10), padding=0, width=40, height=36, sticky='nsew')
         estilo.element_create(prefixo + 'filtro', 'image', imagens['filtro'], ('selected', imagens['filtro_selecionado']),
                               ('active', imagens['filtro_ativo']), border=(16, 14, 16, 14), padding=0, width=40, height=32, sticky='nsew')
         estilo.element_create(prefixo + 'cartao', 'image', imagens['cartao'], border=(14, 14, 14, 14), padding=0, width=48, height=48, sticky='nsew')

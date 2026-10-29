@@ -2,7 +2,7 @@
 from tkinter import font as tkfont
 
 from tema import PALETAS, cores
-from visual import aplicar_superficies, px
+from visual import aplicar_superficies, misturar, px
 
 
 def criar_estilos(janela, estilo, fonte):
@@ -109,6 +109,24 @@ def criar_estilos(janela, estilo, fonte):
                    selectbackground=[('!disabled', c['selecao'])], selectforeground=[('!disabled', c['texto_selecao'])])
     estilo.configure('Dinheiro.TFrame', background=campo)
     estilo.configure('Dinheiro.TLabel', background=campo, foreground=c['secundario'])
+
+    # Busca: espaço à esquerda para a lupa e à direita para o × (veja componentes.CampoBusca).
+    estilo.configure('Busca.TEntry', padding=(px(janela, 36), 8, px(janela, 32), 8), font=(fonte, 11))
+    estilo.configure('BuscaIcone.TLabel', background=campo, padding=0)
+    estilo.configure('BuscaDica.TLabel', background=campo, foreground=c['desabilitado'], font=(fonte, 11), padding=0)
+    # Campo com problema (validação do formulário): contorno vermelho, mais forte com o foco.
+    for tipo in ('TEntry', 'TCombobox'):
+        for prefixo in ('Erro.', 'Form.Erro.'):
+            estilo.map(prefixo + tipo, bordercolor=[('!disabled', c['vermelho'])],
+                       lightcolor=[('focus', c['vermelho']), ('!focus', misturar(c['vermelho'], campo, 0.55))])
+        estilo.configure('Form.Erro.' + tipo, padding=(13, 9), arrowsize=17)
+    # Diálogos de uma operação (recebimento, previsão): título e o nome do titular logo abaixo.
+    estilo.configure('DialogoTitulo.TLabel', font=(fonte, 16, 'bold'), foreground=texto, background=fundo)
+    estilo.configure('DialogoSubtitulo.TLabel', font=(fonte, 10), foreground=c['secundario'], background=fundo)
+    # Estado vazio das tabelas.
+    estilo.configure('Vazio.TFrame', background=campo)
+    estilo.configure('VazioTitulo.TLabel', background=campo, foreground=texto, font=(fonte, 13, 'bold'))
+    estilo.configure('VazioTexto.TLabel', background=campo, foreground=c['secundario'], font=(fonte, 10))
 
     # Tabelas: linhas limpas, cabeçalho discreto e seleção em tom suave da marca.
     estilo.configure('Treeview', background=campo, fieldbackground=campo, foreground=texto, rowheight=px(janela, 40),

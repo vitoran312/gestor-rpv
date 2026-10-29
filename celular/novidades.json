@@ -1,6 +1,32 @@
 {
   "versoes": [
     {
+      "versao": "0.53.0",
+      "resumo": "5 novidades",
+      "itens": [
+        {
+          "tipo": "novidade",
+          "texto": "Programa: Minhas operações com os indicadores no topo, busca com lupa e Lixeira identificada."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Programa: campos com problema ficam contornados em vermelho ao salvar, até serem corrigidos."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Programa: avisos rápidos confirmam o que foi salvo, recebido, excluído ou restaurado."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Programa: tabelas realçam a linha sob o mouse e explicam quando não há nada para mostrar."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Programa e celular: transições suaves e foco visível pelo teclado, com menos movimento quando o sistema pede."
+        }
+      ]
+    },
+    {
       "versao": "0.52.0",
       "resumo": "2 novidades",
       "itens": [
@@ -61,28 +87,6 @@
         {
           "tipo": "novidade",
           "texto": "Programa: importa do celular alterações, previsões, exclusões e documentos, sem gravar por cima do que mudou no computador."
-        }
-      ]
-    },
-    {
-      "versao": "0.49.0",
-      "resumo": "4 novidades",
-      "itens": [
-        {
-          "tipo": "novidade",
-          "texto": "Celular: usar o app sem computador — cada pessoa cria a própria senha e começa com os dados vazios."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Celular: sem computador, as contas, as entradas e os recebimentos são gravados no próprio celular."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Celular: cópia de segurança dos dados do celular, trancada com a senha, para guardar no iCloud ou no Google Drive."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Celular: \"Convidar alguém\" em Mais, com link e QR code para mandar o app."
         }
       ]
     }

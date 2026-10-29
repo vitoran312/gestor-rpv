@@ -10,6 +10,14 @@ from pathlib import Path
 MOSTRAR = 5  # Quantas versões aparecem no "Sobre".
 
 NOVIDADES = [
+    ('0.53.0', [
+        ('novidade', 'Programa: Minhas operações com os indicadores no topo, busca com lupa e Lixeira identificada.'),
+        ('novidade', 'Programa: campos com problema ficam contornados em vermelho ao salvar, até serem corrigidos.'),
+        ('novidade', 'Programa: avisos rápidos confirmam o que foi salvo, recebido, excluído ou restaurado.'),
+        ('novidade', 'Programa: tabelas realçam a linha sob o mouse e explicam quando não há nada para mostrar.'),
+        ('novidade', 'Programa e celular: transições suaves e foco visível pelo teclado, com menos movimento quando '
+                     'o sistema pede.'),
+    ]),
     ('0.52.0', [
         ('novidade', 'Celular: "Abrir um backup mais novo" em Mais, sem precisar recusar o Face ID.'),
         ('novidade', 'Celular: na primeira abertura, uma demonstração com dados fictícios mostra como o app fica.'),

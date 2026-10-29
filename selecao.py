@@ -1,4 +1,9 @@
 """Seleção de linhas e atalhos, limitados à tabela que possui o foco."""
+from tema import cores
+from visual import misturar
+
+# Realce da linha sob o mouse, uma variação para cada cor de linha (normal, atrasada e recebida).
+REALCES = {'': 'realce', 'atrasada': 'realce_atrasada', 'recebida': 'realce_recebida'}
 
 
 def pressionar_linha(tabela, linha, estado=0):
@@ -116,3 +121,38 @@ def habilitar_selecao(tabela, abrir=None, excluir=None, copiar=None):
     if copiar:
         tabela.bind('<Control-c>', lambda _: executar(copiar))
         tabela.bind('<Control-C>', lambda _: executar(copiar))
+
+
+def preparar_realce(tabela):
+    """A linha sob o mouse ganha um tom um pouco mais forte, para o olho acompanhar a linha em tabelas largas.
+
+    Chamar logo depois de criar a tabela: no Treeview, a tag criada primeiro tem prioridade, e o realce
+    precisa vencer o fundo das linhas alternadas, atrasadas e recebidas. A linha selecionada continua com a
+    cor de seleção. É só cor (sem movimento): acompanha o mouse dezenas de vezes por minuto.
+    """
+    for tag in REALCES.values():
+        tabela.tag_configure(tag)
+    colorir_realce(tabela)
+    tabela._linha_realcada = None
+    tabela.bind('<Motion>', lambda e: realcar(tabela, tabela.identify_row(e.y)), add='+')
+    tabela.bind('<Leave>', lambda _: realcar(tabela, ''), add='+')
+
+
+def colorir_realce(tabela):
+    c = cores()
+    tabela.tag_configure('realce', background=c['hover_linha'])
+    tabela.tag_configure('realce_atrasada', background=misturar(c['atraso'], c['vermelho'], 0.1))
+    tabela.tag_configure('realce_recebida', background=misturar(c['recebida'], c['verde'], 0.1))
+
+
+def realcar(tabela, linha):
+    anterior = getattr(tabela, '_linha_realcada', None)
+    if linha == anterior:
+        return
+    if anterior and tabela.exists(anterior):
+        tabela.item(anterior, tags=[t for t in tabela.item(anterior, 'tags') if t not in REALCES.values()])
+    tabela._linha_realcada = linha or None
+    if linha and tabela.exists(linha):
+        etiquetas = [t for t in tabela.item(linha, 'tags') if t not in REALCES.values()]
+        estado = next((t for t in etiquetas if t in REALCES), '')
+        tabela.item(linha, tags=etiquetas + [REALCES[estado]])

@@ -73,10 +73,16 @@ class NavegacaoMixin:
             self.atualizar_aviso_atrasadas()
 
     def cabecalho_pagina(self, pai, titulo, subtitulo):
-        ttk.Button(pai, text='←  Voltar', style='Voltar.TButton', command=self.voltar,
-                   takefocus=False).pack(anchor='w', pady=(0, 14))
-        ttk.Label(pai, text=titulo, style='Titulo.TLabel').pack(anchor='w', pady=(0, 4))
-        ttk.Label(pai, text=subtitulo, style='Subtitulo.TLabel').pack(anchor='w', pady=(0, 20))
+        """Voltar à esquerda e, ao lado, o título com a explicação da página: uma faixa só, sobra altura para os dados."""
+        linha = ttk.Frame(pai)
+        linha.pack(fill='x', pady=(0, 18))
+        ttk.Button(linha, text='←  Voltar', style='Voltar.TButton', command=self.voltar,
+                   takefocus=False).pack(side='left', anchor='n', padx=(0, 18), pady=(5, 0))
+        textos = ttk.Frame(linha)
+        textos.pack(side='left', fill='x', expand=True)
+        ttk.Label(textos, text=titulo, style='Titulo.TLabel').pack(anchor='w')
+        ttk.Label(textos, text=subtitulo, style='Subtitulo.TLabel').pack(anchor='w', pady=(2, 0))
+        return linha
 
     def vigiar_data(self):
         """Se o programa ficar aberto na virada do dia, recalcula as operações atrasadas."""

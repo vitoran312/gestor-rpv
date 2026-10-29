@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.49.0
+# Gestor de RPV — 0.53.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -63,10 +63,25 @@ aparência; o menu **Exibir** do histórico oferece as mesmas opções.
 - Texto nítido com a escala de tela do Windows em 125%, 150% ou mais: o programa informa ao Windows que
   trata a escala sozinho, em vez de ser desenhado em 100% e esticado. Tamanhos de janelas, colunas,
   linhas das tabelas e quebras de texto acompanham a escala.
-- Minhas operações com cabeçalhos de 18 pontos em tom discreto e entradas de 12 pontos,
-  linhas alternadas e quatro indicadores em cartões alinhados. Nomes e contas ficam à esquerda,
-  valores à direita e datas centralizadas, com margem interna nas células.
+- Minhas operações na ordem de um painel financeiro: cabeçalho compacto (Voltar ao lado do título), quatro
+  indicadores em cartões no topo, busca com lupa e texto de exemplo (× limpa), filtros, a tabela e, no rodapé,
+  o último backup e a **Lixeira** (ícone e nome). Cabeçalhos de 18 pontos em tom discreto e entradas de 12
+  pontos, linhas alternadas; nomes e contas à esquerda, valores à direita e datas centralizadas.
   Lucro realizado é o último cartão, à direita, inclusive no layout com duas linhas.
+- Tabelas com realce da linha sob o mouse (inclusive nas atrasadas e recebidas, num tom mais forte da própria
+  cor) e estado vazio que explica o que aconteceu: busca sem resultado, filtro sem operações, lixeira vazia,
+  nenhuma conta ou documento.
+- Botões com foco visível pelo teclado (Tab): contorno na cor da marca.
+- Validação no próprio campo: ao salvar uma entrada ou conta com problema, além da mensagem, cada campo citado
+  fica contornado em vermelho até ser alterado, e o primeiro recebe o foco.
+- Avisos passageiros no centro da base da janela confirmam o que acabou de acontecer (entrada salva,
+  recebimento registrado, previsão alterada, exclusão, restauração, conta salva) e somem sozinhos.
+- Movimento discreto (`movimento.py`, princípios da skill animate de Emil Kowalski): diálogos surgem
+  esmaecendo em 180 ms e avisos entram e saem deslizando 16 px em 220 ms, com ease-out forte
+  (`cubic-bezier(0.23, 1, 0.32, 1)`). Nada anima em ações repetidas o dia todo. Com "Mostrar animações"
+  desligado no Windows (ou `GESTOR_RPV_SEM_ANIMACAO=1`), tudo aparece direto.
+- Cursor de espera durante backup, importação e exportação.
+- Tokens de espaçamento e tipografia em `tema.py` (`ESPACO`, `TIPO`), usados pelos componentes novos.
 - A janela **Nova entrada / Editar registro** é cerca de 30% maior que as demais: fontes de 13 pontos,
   campos, espaçamentos e botões na mesma proporção.
 - Cadastro de entradas e contas com rolagem e botões fixos no rodapé, inclusive em telas menores.

@@ -1,16 +1,30 @@
 """Página e formulário para administrar contas de recebimento."""
 from tema import cores
+from movimento import surgir
 import sqlite3
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-from componentes import centralizar, AreaRolavel, fechar_com_confirmacao
+from componentes import centralizar, AreaRolavel, AvisoVazio, fechar_com_confirmacao, marcar_erro, notificar
 from visual import px
-from selecao import habilitar_selecao, pressionar_linha, arrastar
+from selecao import arrastar, habilitar_selecao, preparar_realce, pressionar_linha
 from dados import ESTADOS, TITULOS_CONTA, validar_cpf
 from interacao import aplicar_formato, aplicar_cpf, capitalizar_inicio, formatar_cpf, novo_menu, mostrar_menu, copiar_texto
 from mensagens import descrever_erro
 import demonstracao
+
+
+# Palavras das mensagens de Banco.salvar_conta que apontam um campo além do próprio título dele.
+PALAVRAS_DO_CAMPO = {'cpf': 'cpf', 'estado': 'estado', 'pix': 'pix', 'identificação': 'identificacao',
+                     'conta bancária': 'numero', 'banco': 'banco'}
+
+
+def campos_da_mensagem(mensagem):
+    """Campos citados numa mensagem de erro da conta (para contorná-los em vermelho)."""
+    texto = mensagem.casefold()
+    chaves = {chave for chave, titulo in TITULOS_CONTA.items() if titulo.casefold() in texto}
+    chaves |= {chave for palavra, chave in PALAVRAS_DO_CAMPO.items() if palavra in texto}
+    return [chave for chave in TITULOS_CONTA if chave in chaves]
 
 
 def dados_para_copiar(conta):
@@ -47,6 +61,8 @@ class JanelaContas:
         ttk.Button(barra, text='Desativar / Reativar', style='Inicio.TButton', command=self.alterar_status).pack(side='left')
         ttk.Button(barra, text='Remover', style='Inicio.TButton', command=self.remover).pack(side='left', padx=8)
         self.tabela = ttk.Treeview(self.cartao, style='Contas.Treeview', columns=('nome', 'banco', 'status'), show='headings', selectmode='browse')
+        preparar_realce(self.tabela)
+        self.vazio = AvisoVazio(self.tabela)
         for chave, titulo, largura in (('nome', 'Identificação', 200), ('banco', 'Banco', 170), ('status', 'Situação', 220)):
             alinhamento = 'center' if chave == 'status' else 'w'
             self.tabela.heading(chave, text=titulo, anchor=alinhamento)
@@ -90,6 +106,10 @@ class JanelaContas:
                 status = '⚠ Completar cadastro' + (' — Desativada' if not conta['ativa'] else '')
             self.tabela.insert('', 'end', iid=str(conta['id']), values=(conta['identificacao'], conta['banco'], status),
                                tags=('incompleta',) if incompleta else ())
+        if self.tabela.get_children():
+            self.vazio.ocultar()
+        else:
+            self.vazio.mostrar('Nenhuma conta cadastrada', 'Cadastre a conta onde você recebe os valores das RPVs.')
 
         self.agendar_situacoes()
 
@@ -169,6 +189,7 @@ class JanelaContas:
             messagebox.showerror('Contas de recebimento', 'Não foi possível alterar a conta.', parent=self.tela)
             return
         self.atualizar()
+        notificar(self.app.janela, f"Conta {conta['identificacao']} {'desativada' if conta['ativa'] else 'reativada'}.")
 
     def remover(self):
         selecao = self.tabela.selection()
@@ -194,6 +215,7 @@ class JanelaContas:
             messagebox.showerror('Remover contas', 'Não foi possível remover as contas.', parent=self.tela)
             return
         self.atualizar()
+        notificar(self.app.janela, 'Conta removida.' if len(selecao) == 1 else f'{len(selecao)} contas removidas.')
 
     def formulario(self, identificador=None):
         conta = self.banco.obter_conta(identificador) if identificador else None
@@ -209,7 +231,7 @@ class JanelaContas:
         area = AreaRolavel(tela)
         area.pack(fill='both', expand=True)
         quadro = area.conteudo
-        campos = {}
+        campos, entradas = {}, {}
         for linha, (chave, titulo) in enumerate(TITULOS_CONTA.items()):
             if chave == 'identificacao':
                 titulo += ' (ex.: Conta principal)'
@@ -220,6 +242,7 @@ class JanelaContas:
             else:
                 entrada = ttk.Entry(quadro, textvariable=campos[chave], width=40)
             entrada.grid(row=linha, column=1, sticky='ew', pady=6)
+            entradas[chave] = entrada
             if chave == 'cpf':
                 aplicar_cpf(entrada, campos[chave])
             elif chave in ('identificacao', 'nome', 'endereco', 'cidade', 'banco'):
@@ -232,7 +255,12 @@ class JanelaContas:
                 salva = self.banco.salvar_conta({k: v.get() for k, v in campos.items()}, identificador)
                 demonstracao.adotar(self.banco, conta=salva)
             except ValueError as erro:
+                marcados = campos_da_mensagem(str(erro))
+                for chave in marcados:
+                    marcar_erro(entradas[chave], campos[chave])
                 messagebox.showerror('Confira a conta', descrever_erro(erro), parent=tela)
+                if marcados and tela.winfo_exists():
+                    entradas[marcados[0]].focus_set()
                 return
             except sqlite3.IntegrityError:
                 messagebox.showerror('Confira a conta', 'Já existe uma conta com esses dados únicos.', parent=tela)
@@ -242,6 +270,7 @@ class JanelaContas:
                 return
             self.atualizar()
             tela.destroy()
+            notificar(self.app.janela, 'Alterações da conta salvas.' if identificador else 'Conta cadastrada.')
 
         ttk.Separator(tela).pack(fill='x', padx=24)
         botoes = ttk.Frame(tela, padding=(24, 8, 24, 12))
@@ -251,5 +280,5 @@ class JanelaContas:
         ttk.Button(botoes, text='Cancelar', command=fechar).pack(side='left', expand=True, fill='x', padx=(0, 8))
         ttk.Button(botoes, text='Salvar conta', style='Salvar.TButton', command=salvar).pack(side='left', expand=True, fill='x')
         centralizar(tela)
-        tela.deiconify()
+        surgir(tela)
         tela.grab_set()

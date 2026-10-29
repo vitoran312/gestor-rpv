@@ -1,5 +1,25 @@
 # Histórico de versões
 
+## 0.53.0
+
+Repaginada visual (identidade Vitoran Pro mantida):
+- Minhas operações: cabeçalho compacto, indicadores no topo, busca com lupa, texto de exemplo e ×, tabela, e
+  rodapé com o último backup e a Lixeira com ícone e nome. Contas e Gráfico usam o mesmo cabeçalho.
+- Tabelas (operações, contas, lixeira): realce da linha sob o mouse, que respeita a cor das atrasadas e
+  recebidas; estados vazios com orientação (busca sem resultado, filtros, lixeira, contas, documentos,
+  histórico da previsão).
+- Validação no campo: entrada e conta contornam em vermelho cada campo citado nos problemas e focam o
+  primeiro; o contorno some ao alterar o campo.
+- Avisos passageiros (componentes.Notificacao) para entrada salva, alterações, recebimento, previsão,
+  exclusão, restauração, contas e dados de demonstração apagados.
+- Diálogos e formulários surgem esmaecendo (movimento.surgir); foco visível nos botões pelo teclado; cursor
+  de espera em backup, importação e exportação.
+- Diálogos de recebimento e previsão com título e o nome do titular abaixo.
+- movimento.py: curva ease-out da skill animate, preferência do Windows por menos animação e
+  GESTOR_RPV_SEM_ANIMACAO=1. tema.py: tokens ESPACO e TIPO e cores de realce e de aviso.
+- App do celular: toque com leve encolhimento (0,97, 160 ms) e entrada sutil ao trocar de tela (4 px, 180 ms),
+  sem deslocamento quando o sistema pede menos movimento.
+
 ## 0.52.0
 
 App do celular:

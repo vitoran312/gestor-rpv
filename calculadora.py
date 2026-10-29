@@ -4,6 +4,7 @@ from decimal import Decimal, DecimalException, localcontext
 from tkinter import ttk
 
 from componentes import centralizar
+from movimento import surgir
 from tema import cores
 from visual import familia_fonte
 
@@ -165,7 +166,7 @@ class JanelaCalculadora:
             painel.columnconfigure(coluna, weight=1)
         self.tela.bind('<KeyPress>', self.teclado)
         centralizar(self.tela, 370, 480)
-        self.tela.deiconify()
+        surgir(self.tela)
         self.tela.focus_set()
 
     def clicar(self, tecla):

@@ -8,7 +8,8 @@ import cifra
 import entradas_celular
 from backup import (criar_backup, documentos_sem_arquivo, BackupPreparado, aviso_backup, executar_backup_automatico, PASTA_AUTOMATICA,
                     SenhaAusente, SenhaNecessaria, salvar_senha, senha_salva)
-from componentes import centralizar
+from componentes import centralizar, ocupado
+from movimento import surgir
 from visual import px
 from tema import cores
 from documentos import abrir_pasta
@@ -106,7 +107,8 @@ class ArquivosMixin:
                                    parent=pai):
             return
         try:
-            gravadas, recusadas = entradas_celular.importar(self.banco, encontradas)
+            with ocupado(pai):
+                gravadas, recusadas = entradas_celular.importar(self.banco, encontradas)
         except (OSError, sqlite3.Error) as erro:
             messagebox.showerror('Entradas do celular', 'Não foi possível importar. ' + descrever_erro(erro), parent=pai)
             return
@@ -225,7 +227,7 @@ class ArquivosMixin:
         atualizar()
         tela.bind('<Escape>', lambda _: tela.destroy())
         centralizar(tela)
-        tela.deiconify()
+        surgir(tela)
         tela.grab_set()
 
     def garantir_senha_backup(self, pai):
@@ -284,7 +286,7 @@ class ArquivosMixin:
         tela.bind('<Return>', salvar)
         tela.bind('<Escape>', lambda _: tela.destroy())
         centralizar(tela)
-        tela.deiconify()
+        surgir(tela)
         campos[0].focus_set()
         tela.grab_set()
         tela.wait_window()
@@ -303,7 +305,8 @@ class ArquivosMixin:
         if not pasta:
             return
         try:
-            arquivo = criar_backup(self.banco, pasta)
+            with ocupado(pai):
+                arquivo = criar_backup(self.banco, pasta)
         except (OSError, sqlite3.Error, ValueError) as erro:
             messagebox.showerror('Backup', 'Não foi possível criar o backup. ' + descrever_erro(erro), parent=pai)
             return
@@ -327,7 +330,7 @@ class ArquivosMixin:
         senha, digitada = senha_salva(self.banco), False
         while True:
             try:
-                with BackupPreparado(arquivo, senha, pasta_trabalho=self.banco.caminho.parent) as pacote:
+                with ocupado(self.historico), BackupPreparado(arquivo, senha, pasta_trabalho=self.banco.caminho.parent) as pacote:
                     self.confirmar_importacao(pacote)
                 return
             except SenhaNecessaria as erro:
@@ -394,7 +397,8 @@ class ArquivosMixin:
         if not arquivo:
             return
         try:
-            destino = exportar_excel(registros, arquivo)
+            with ocupado(pai):
+                destino = exportar_excel(registros, arquivo)
         except (OSError, sqlite3.Error, ValueError) as erro:
             messagebox.showerror('Exportar para Excel', 'Não foi possível exportar. ' + descrever_erro(erro), parent=pai)
             return

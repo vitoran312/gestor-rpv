@@ -7,7 +7,9 @@ from tkinter import messagebox, ttk, filedialog
 
 from dados import centavos, moeda, data_iso, data_br, previsao_por_prazo, reais
 from visual import px
-from componentes import CampoMoeda, CampoData, centralizar, AreaRolavel, BalaoAjuda, fechar_com_confirmacao
+from movimento import surgir
+from componentes import (CampoMoeda, CampoData, centralizar, AreaRolavel, AvisoVazio, BalaoAjuda, fechar_com_confirmacao,
+                         marcar_erro, notificar)
 from contas import dados_para_copiar
 from tema import cores
 from documentos import validar_anexo, abrir_arquivo
@@ -39,6 +41,30 @@ def ampliar_formulario(widget, fonte):
     for filho in widget.winfo_children():
         if not isinstance(filho, tk.Toplevel):
             ampliar_formulario(filho, fonte)
+
+
+# Cada mensagem de regra (Banco.problemas_da_entrada) aponta o campo que a pessoa precisa corrigir.
+CAMPO_DO_PROBLEMA = (('comissão', 'comissao'), ('valor de aquisição', 'custo'), ('valor total', 'previsto'), ('nome', 'nome'),
+                     ('titular', 'nome'), ('data da aquisição', 'aquisicao'), ('previsão', 'previsao'), ('prazo', 'previsao'))
+
+
+def campos_com_problema(problemas, mal_preenchidos):
+    """Chaves dos campos citados nos problemas, na ordem do formulário (o primeiro recebe o foco)."""
+    chaves = set(mal_preenchidos)
+    for problema in problemas:
+        texto = problema.split(':')[0].casefold() if ':' in problema else problema.casefold()
+        chave = next((c for trecho, c in CAMPO_DO_PROBLEMA if trecho in texto), None)
+        if chave:
+            chaves.add(chave)
+    ordem = ('nome', 'aquisicao', 'previsto', 'custo', 'conta', 'previsao', 'comissao')
+    return [c for c in ordem if c in chaves]
+
+
+def cabecalho_dialogo(corpo, titulo, subtitulo=''):
+    """Título forte e, abaixo, de quem é a operação: o mesmo cabeçalho em todos os diálogos de uma operação."""
+    ttk.Label(corpo, text=titulo, style='DialogoTitulo.TLabel').pack(anchor='w')
+    if subtitulo:
+        ttk.Label(corpo, text=subtitulo, style='DialogoSubtitulo.TLabel').pack(anchor='w', pady=(2, 0))
 
 
 def pad(valor):
@@ -76,6 +102,8 @@ def criar_campos_principais(quadro, registro, conta_inicial, mapa_contas, modo_p
         else:
             entrada = ttk.Entry(quadro, textvariable=campos[chave], width=32)
         entrada.grid(row=linha, column=1, sticky='ew', pady=pad(6))
+        quadro.entradas = getattr(quadro, 'entradas', {})
+        quadro.entradas[chave] = entrada
         if chave == 'previsao':
             campo_previsao = entrada
         if chave == 'nome':
@@ -170,6 +198,8 @@ def criar_comissao(quadro, linha, registro, tela):
     valor_comissao = tk.StringVar(value=moeda(registro['comissao']) if registro and registro['comissao'] is not None else '')
     rotulo_comissao = ttk.Label(quadro, text='Valor da comissão')
     entrada_comissao = CampoMoeda(quadro, valor_comissao)
+    quadro.entradas = getattr(quadro, 'entradas', {})
+    quadro.entradas['comissao'] = entrada_comissao
     rotulo_comissao.grid(row=linha + 1, column=0, sticky='w', pady=pad(6))
     entrada_comissao.grid(row=linha + 1, column=1, sticky='ew')
 
@@ -284,7 +314,14 @@ class RegistroMixin:
             dados['observacoes'] = observacoes.get('1.0', 'end-1c').strip()
             problemas += self.banco.problemas_da_entrada(dados, ignorar=mal_preenchidos)
             if problemas:
+                # Além da mensagem, cada campo com problema fica contornado em vermelho até ser alterado.
+                marcados = campos_com_problema(problemas, mal_preenchidos)
+                for chave in marcados:
+                    if chave in quadro.entradas:
+                        marcar_erro(quadro.entradas[chave], valor_comissao if chave == 'comissao' else campos.get(chave))
                 messagebox.showerror('Confira o cadastro', '\n'.join(problemas), parent=tela)
+                if marcados and marcados[0] in quadro.entradas and tela.winfo_exists():
+                    getattr(quadro.entradas[marcados[0]], 'entrada', quadro.entradas[marcados[0]]).focus_set()
                 return
             try:
                 salvo = self.banco.salvar(dados, identificador, anexos=anexos_pendentes)
@@ -298,6 +335,7 @@ class RegistroMixin:
             demonstracao.adotar(self.banco, operacao=salvo)
             self.atualizar()
             tela.destroy()
+            notificar(self.janela, 'Alterações salvas.' if identificador else 'Entrada salva.')
 
         ttk.Separator(tela).pack(fill='x', padx=pad(24))
         botoes = ttk.Frame(tela, padding=pad((20, 8, 20, 12)))
@@ -313,7 +351,7 @@ class RegistroMixin:
         ttk.Button(botoes, text='Salvar registro', width=20, style='Salvar.TButton', command=salvar).grid(row=0, column=2, sticky='ew', padx=pad((8, 0)))
         ampliar_formulario(tela, self.fonte)
         centralizar(tela)
-        tela.deiconify()
+        surgir(tela)
         tela.grab_set()
 
     def criar_painel_documentos(self, painel_documentos, tela, identificador=None, tipo='entrada'):
@@ -364,6 +402,7 @@ class RegistroMixin:
         lista.column('situacao', width=px(lista, 160))
         lista.pack(fill='both', expand=True)
         caminhos = {}
+        vazio = AvisoVazio(lista)
 
         def atualizar_lista():
             lista.delete(*lista.get_children())
@@ -377,6 +416,10 @@ class RegistroMixin:
                 iid = 'novo:' + str(indice)
                 lista.insert('', 'end', iid=iid, values=(arquivo.name, 'Salvar com o recebimento' if tipo == 'recebimento' else 'Salvar com a entrada'))
                 caminhos[iid] = ('novo', arquivo)
+            if caminhos:
+                vazio.ocultar()
+            else:
+                vazio.mostrar('Nenhum documento', 'Use "Anexar documentos" para guardar PDFs e imagens.')
 
         def abrir_documento():
             selecao = lista.selection()
@@ -425,7 +468,7 @@ class RegistroMixin:
         janela.bind('<Escape>', lambda _: fechar())
         atualizar_lista()
         centralizar(janela, 650, 400)
-        janela.deiconify()
+        surgir(janela)
         janela.grab_set()
 
     def ver_dados_recebimento(self, pai, registro, conta_id):
@@ -460,7 +503,7 @@ class RegistroMixin:
         tela.protocol('WM_DELETE_WINDOW', fechar)
         tela.bind('<Escape>', lambda _: fechar())
         centralizar(tela)
-        tela.deiconify()
+        surgir(tela)
         tela.grab_set()
 
     def abrir_recebimento(self, identificador, variavel=None, atual=False):
@@ -480,8 +523,8 @@ class RegistroMixin:
         tela.transient(self.historico)
         corpo = ttk.Frame(tela, padding=20)
         corpo.pack(fill='both', expand=True)
-        ttk.Label(corpo, text=registro['nome']).pack(anchor='w')
-        ttk.Label(corpo, text='Data do recebimento', style='Recebido.TLabel').pack(anchor='w', pady=(15, 6))
+        cabecalho_dialogo(corpo, 'Recebimento', registro['nome'])
+        ttk.Label(corpo, text='Data do recebimento', style='Recebido.TLabel').pack(anchor='w', pady=(18, 6))
         valor = tk.StringVar(value=data_br(registro['recebimento']) if registro['recebimento'] else date.today().strftime('%d/%m/%Y'))
         CampoData(corpo, valor).pack(fill='x')
         ttk.Label(corpo, text='Comprovantes de recebimento').pack(anchor='w', pady=(15, 6))
@@ -504,6 +547,7 @@ class RegistroMixin:
                 demonstracao.adotar(self.banco, operacao=identificador)
             self.atualizar()
             tela.destroy()
+            notificar(self.janela, f'Recebimento registrado em {valor.get()}.')
 
         def desmarcar():
             if not messagebox.askyesno('Desmarcar recebimento', 'Remover a confirmação de recebimento desta RPV?',
@@ -516,6 +560,7 @@ class RegistroMixin:
                 return
             self.atualizar()
             tela.destroy()
+            notificar(self.janela, 'Recebimento desmarcado.')
 
         botoes = ttk.Frame(corpo)
         botoes.pack(fill='x', pady=(15, 0))
@@ -525,7 +570,7 @@ class RegistroMixin:
         ttk.Button(botoes, text='Cancelar', command=fechar).pack(side='right')
         ttk.Button(botoes, text='Salvar recebimento', style='Salvar.TButton', command=salvar).pack(side='right', padx=8)
         centralizar(tela)
-        tela.deiconify()
+        surgir(tela)
         tela.grab_set()
 
     def editar_previsao(self, identificador):
@@ -543,8 +588,8 @@ class RegistroMixin:
         tela.transient(self.historico)
         corpo = ttk.Frame(tela, padding=20)
         corpo.pack(fill='both', expand=True)
-        ttk.Label(corpo, text=registro['nome']).pack(anchor='w')
-        ttk.Label(corpo, text='Previsão inicial: ' + data_br(registro['previsao'])).pack(anchor='w', pady=10)
+        cabecalho_dialogo(corpo, 'Previsão atual', registro['nome'])
+        ttk.Label(corpo, text='Previsão inicial: ' + data_br(registro['previsao'])).pack(anchor='w', pady=(16, 10))
         ttk.Label(corpo, text='Previsão atual de recebimento').pack(anchor='w', pady=(0, 6))
         valor = tk.StringVar(value=data_br(registro['previsao_atual']))
         CampoData(corpo, valor).pack(fill='x')
@@ -557,9 +602,12 @@ class RegistroMixin:
             historico.heading(coluna, text=titulo)
             historico.column(coluna, width=px(historico, 180), anchor='center')
         historico.pack(side='left', fill='both', expand=True)
-        for item in self.banco.historico_previsoes(identificador):
+        alteracoes = self.banco.historico_previsoes(identificador)
+        for item in alteracoes:
             historico.insert('', 'end', values=(data_br(item['anterior']), data_br(item['nova']),
                 datetime.fromisoformat(item['alterada_em']).strftime('%d/%m/%Y %H:%M')))
+        if not alteracoes:
+            AvisoVazio(historico).mostrar('Sem alterações', 'A previsão nunca foi alterada.')
         barra = ttk.Scrollbar(quadro_historico, orient='vertical', command=historico.yview)
         historico.configure(yscrollcommand=barra.set)
         barra.pack(side='right', fill='y')
@@ -574,6 +622,7 @@ class RegistroMixin:
                 return
             self.atualizar()
             tela.destroy()
+            notificar(self.janela, f'Previsão atual: {valor.get()}.')
 
         rodape = ttk.Frame(corpo)
         rodape.pack(fill='x', pady=(15, 0))
@@ -581,5 +630,5 @@ class RegistroMixin:
         ttk.Button(rodape, text='Cancelar', command=fechar).pack(side='right')
         ttk.Button(rodape, text='Salvar previsão', style='Salvar.TButton', command=salvar).pack(side='right', padx=8)
         centralizar(tela)
-        tela.deiconify()
+        surgir(tela)
         tela.grab_set()

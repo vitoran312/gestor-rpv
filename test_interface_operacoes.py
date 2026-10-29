@@ -232,7 +232,9 @@ class TestOperacoes(TesteDeInterface):
         lixeira.event_generate('<Return>')
         self.root.update()
         self.assertEqual(len(self.banco.listar()), 4)
-        self.assertEqual(str(self.programa.botao_lixeira.cget('compound')), 'image')
+        # Ícone acompanhado do nome: o botão diz o que faz sem depender do balão de ajuda.
+        self.assertEqual(str(self.programa.botao_lixeira.cget('compound')), 'left')
+        self.assertEqual(self.programa.botao_lixeira.cget('text'), 'Lixeira')
 
     def test_comissao_e_saldos_recebimento_filtro_lixeira_e_colunas(self):
         recebido = self.banco.salvar(dados_rpv(nome='Recebido', comissao=50000))
@@ -298,8 +300,12 @@ class TestOperacoes(TesteDeInterface):
                 self.assertEqual(len({c.winfo_rooty() for c in cartoes[inicio:inicio + colunas]}), 1)
                 valores = [c.winfo_children()[1] for c in cartoes[inicio:inicio + colunas]]
                 self.assertEqual(len({v.winfo_rooty() for v in valores}), 1)
-            self.assertGreaterEqual(self.programa.botao_lixeira.winfo_rootx(),
-                                    self.programa.resumo.winfo_rootx() + self.programa.resumo.winfo_width())
+            # Indicadores no topo, acima da tabela; a lixeira no rodapé, abaixo dela e alinhada à direita.
+            tabela, lixeira, resumo = self.programa.tabela, self.programa.botao_lixeira, self.programa.resumo
+            self.assertLess(resumo.winfo_rooty() + resumo.winfo_height(), tabela.winfo_rooty())
+            self.assertGreaterEqual(lixeira.winfo_rooty(), tabela.winfo_rooty() + tabela.winfo_height())
+            self.assertLessEqual(abs((lixeira.winfo_rootx() + lixeira.winfo_width()) - (resumo.winfo_rootx() + resumo.winfo_width())),
+                                 8)
         self.programa.formulario(identificador)
         self.root.update()
         form = next(w for w in self.root.winfo_children() if isinstance(w, tk.Toplevel) and w.title() == 'Editar registro')

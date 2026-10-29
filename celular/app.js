@@ -7,7 +7,7 @@
 (() => {
   // Igual a versao.py (test_celular confere): mostrada na abertura e em Mais, para saber se o aparelho já
   // carregou a última versão publicada.
-  const VERSAO_APP = '0.52.0';
+  const VERSAO_APP = '0.53.0';
   const D = GestorDados;
   const $ = (id) => document.getElementById(id);
   const SITUACOES = { pendente: 'Pendente', atrasada: 'Atrasada', recebida: 'Recebida' };
@@ -1958,6 +1958,8 @@
         onclick: sairDaDemonstracao })));
   }
 
+  let telaAnimada = null;  // Endereço da última tela que entrou com animação.
+
   function desenhar() {
     if (!dados) {
       return;
@@ -1972,6 +1974,13 @@
     $('voltar').hidden = !tela.voltar;
     document.querySelectorAll('.abas a').forEach((a) => a.classList.toggle('ativa', a.dataset.aba === tela.aba));
     $('tela').replaceChildren(...[info.demonstracao && avisoDemonstracao(), tela.montar(id)].flat(2).filter(Boolean));
+    // Entrada sutil só ao trocar de tela; redesenhar a mesma (modo discreto, depois de salvar) não anima.
+    if (location.hash !== telaAnimada) {
+      telaAnimada = location.hash;
+      $('tela').classList.remove('entrando');
+      void $('tela').offsetWidth;  // Reinicia a animação.
+      $('tela').classList.add('entrando');
+    }
     if (tela === TELAS.operacao && dados.operacoes.concat(dados.lixeira).some((r) => r.id === id)) {
       const r = dados.operacoes.find((o) => o.id === id) || dados.lixeira.find((o) => o.id === id);
       $('titulo').textContent = r.nome;

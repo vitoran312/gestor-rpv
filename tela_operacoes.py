@@ -7,11 +7,12 @@ from tkinter import messagebox, ttk, font as tkfont
 from dados import data_br, reais, situacao
 from grafico import JanelaGrafico
 import demonstracao
-from componentes import centralizar
+from componentes import AvisoVazio, CampoBusca, centralizar, notificar
+from movimento import surgir
 from visual import LARGURA_LAYOUT_LARGO, MODIFICADORES_SELECAO, px
 from tema import cores
 from ordenacao import ordenar
-from selecao import habilitar_selecao, pressionar_linha, arrastar
+from selecao import arrastar, colorir_realce, habilitar_selecao, preparar_realce, pressionar_linha
 from interacao import aplicar_formato, capitalizar_inicio, novo_menu, mostrar_menu, copiar_texto
 from mensagens import descrever_erro
 
@@ -82,6 +83,7 @@ class OperacoesMixin:
                                  parent=self.historico)
             return
         self.atualizar()
+        notificar(self.janela, 'Dados de demonstração apagados. O programa está pronto para os seus dados.')
         if self.janela_contas is not None and self.janela_contas.tela.winfo_exists():
             self.janela_contas.atualizar()
 
@@ -106,6 +108,8 @@ class OperacoesMixin:
                   text='Você está vendo dados de demonstração, com nomes e valores fictícios.').pack(side='left')
         ttk.Button(self.aviso_demonstracao, text='Apagar dados de demonstração', style='Demonstracao.TButton',
                    command=self.apagar_demonstracao).pack(side='right')
+        # Ordem de leitura de um painel financeiro: indicadores, busca e filtros, a tabela e, no fim, backup e lixeira.
+        self.criar_indicadores(corpo)
         entrada_busca = self.criar_busca_e_filtros(corpo)
         quadro = self.criar_tabela(corpo)
         self.criar_rodape(corpo, quadro)
@@ -119,10 +123,10 @@ class OperacoesMixin:
     def criar_busca_e_filtros(self, corpo):
         barra = self.barra_busca = ttk.Frame(corpo)
         barra.pack(fill='x', pady=(0, 12))
-        ttk.Label(barra, text='Buscar nome ou data:').pack(side='left', padx=(0, 6))
         self.busca = tk.StringVar()
-        entrada_busca = ttk.Entry(barra, textvariable=self.busca)
-        entrada_busca.pack(side='left', fill='x', expand=True)
+        campo_busca = CampoBusca(barra, self.busca, 'Buscar por nome, conta ou data   ·   Ctrl+F')
+        campo_busca.pack(side='left', fill='x', expand=True)
+        entrada_busca = campo_busca.entrada
         aplicar_formato(entrada_busca, self.busca, capitalizar_inicio)
         self.busca.trace_add('write', lambda *_: self.atualizar())
         filtros = ttk.Frame(corpo)
@@ -141,6 +145,8 @@ class OperacoesMixin:
         quadro.pack(fill='both', expand=True)
         self.tabela = ttk.Treeview(quadro, style='Operacoes.Treeview', columns=tuple(COLUNAS_OPERACOES),
                                    show='headings', selectmode='browse')
+        preparar_realce(self.tabela)
+        self.vazio_operacoes = AvisoVazio(self.tabela)
         self.ordenacao = None
         self.titulos_colunas = {coluna: titulo for coluna, (titulo, _alinhamento) in COLUNAS_OPERACOES.items()}
         for coluna, (titulo, alinhamento) in COLUNAS_OPERACOES.items():
@@ -172,20 +178,16 @@ class OperacoesMixin:
         self.tabela.bind('<Double-1>', self.duplo_clique_historico)
         return quadro
 
-    def criar_rodape(self, corpo, quadro):
-        rodape = ttk.Frame(corpo)
-        rodape.pack(side='bottom', fill='x', pady=(12, 0), before=quadro)
-        rodape.columnconfigure(0, weight=1)
-        self.resumo = ttk.Frame(rodape)
-        self.resumo.grid(row=0, column=0, sticky='ew')
+    def criar_indicadores(self, corpo):
+        self.resumo = ttk.Frame(corpo)
+        self.resumo.pack(fill='x', pady=(0, 16))
         self.indicadores_resumo = {}
         self.cartoes_resumo = []
         for chave, titulo in (('registros', 'Registros'), ('previsto', 'Lucro previsto'),
                              ('aberto', 'Capital investido em aberto'), ('realizado', 'Lucro realizado')):
-            cartao = ttk.Frame(self.resumo, style='Resumo.TFrame', padding=(22, 20))
+            cartao = ttk.Frame(self.resumo, style='Resumo.TFrame', padding=(20, 14, 20, 16))
             rotulo = ttk.Label(cartao, text=titulo, style='ResumoTitulo.TLabel', anchor='sw')
             cartao.columnconfigure(0, weight=1)
-            cartao.rowconfigure(0, minsize=2 * tkfont.Font(font=(self.fonte, 10)).metrics('linespace'))
             rotulo.grid(row=0, column=0, sticky='sw')
             valor = tk.StringVar()
             ttk.Label(cartao, textvariable=valor, style='ResumoRealizado.TLabel' if chave == 'realizado' else 'ResumoValor.TLabel').grid(row=1, column=0, sticky='ew', pady=(6, 0))
@@ -193,14 +195,19 @@ class OperacoesMixin:
             self.cartoes_resumo.append((cartao, rotulo))
         self.colunas_resumo = None
         self.resumo.bind('<Configure>', self.organizar_resumo)
+
+    def criar_rodape(self, corpo, quadro):
+        rodape = ttk.Frame(corpo)
+        rodape.pack(side='bottom', fill='x', pady=(12, 0), before=quadro)
+        rodape.columnconfigure(0, weight=1)
         self.desenhar_icone_lixeira()
-        self.botao_lixeira = ttk.Button(rodape, text='Lixeira', image=self.icone_lixeira, compound='image',
-                                       width=3, command=self.mostrar_lixeira)
-        self.botao_lixeira.grid(row=0, column=1, rowspan=3, sticky='se', padx=(16, 0))
+        self.botao_lixeira = ttk.Button(rodape, text='Lixeira', image=self.icone_lixeira, compound='left',
+                                       command=self.mostrar_lixeira)
+        self.botao_lixeira.grid(row=0, column=1, rowspan=2, sticky='e', padx=(16, 0))
         self.texto_ultimo_backup = tk.StringVar()
-        ttk.Label(rodape, textvariable=self.texto_ultimo_backup, style='Discreto.TLabel').grid(row=1, column=0, sticky='w', padx=6, pady=(8, 0))
+        ttk.Label(rodape, textvariable=self.texto_ultimo_backup, style='Discreto.TLabel').grid(row=0, column=0, sticky='w', padx=2)
         aviso = ttk.Label(rodape, textvariable=self.texto_aviso_backup, style='BackupAviso.TLabel', cursor='hand2', wraplength=px(rodape, 760))
-        aviso.grid(row=2, column=0, sticky='w', padx=6)
+        aviso.grid(row=1, column=0, sticky='w', padx=2)
         aviso.bind('<Button-1>', lambda _: self.exportar_backup())
 
     def organizar_resumo(self, evento):
@@ -215,7 +222,10 @@ class OperacoesMixin:
                             padx=(4, 4),
                             pady=(0, 8) if indice // colunas == 0 and colunas == 2 else 0)
         largura = max(100, evento.width // colunas - 36)
+        # Em duas colunas, um título pode quebrar em duas linhas: todos reservam a mesma altura e os valores alinham.
+        linhas = 2 if colunas == 2 else 1
         for cartao, rotulo in self.cartoes_resumo:
+            cartao.rowconfigure(0, minsize=linhas * tkfont.Font(font=(self.fonte, 10)).metrics('linespace'))
             rotulo.configure(wraplength=largura)
             for valor in cartao.winfo_children()[1:]:
                 valor.configure(wraplength=largura)
@@ -235,6 +245,7 @@ class OperacoesMixin:
         self.tabela.tag_configure('alternada', background=c['linha'])
         self.tabela.tag_configure('atrasada', foreground=c['vermelho'], background=c['atraso'])
         self.tabela.tag_configure('recebida', foreground=c['verde'], background=c['recebida'])
+        colorir_realce(self.tabela)
 
     def atualizar(self):
         if self.historico is None or not self.historico.winfo_exists():
@@ -242,7 +253,7 @@ class OperacoesMixin:
         self.atualizar_ultimo_backup()
         if demonstracao.ativa(self.banco):
             if not self.aviso_demonstracao.winfo_manager():
-                self.aviso_demonstracao.pack(fill='x', pady=(0, 16), before=self.barra_busca)
+                self.aviso_demonstracao.pack(fill='x', pady=(0, 16), before=self.resumo)
         else:
             self.aviso_demonstracao.pack_forget()
         selecionados = self.tabela.selection()
@@ -278,6 +289,7 @@ class OperacoesMixin:
                 reais(r['previsto']), reais(r['previsto'] - r['custo']),
                 r['conta'], data_br(r['previsao']), data_br(r['previsao_atual']),
                 ''))
+        self.mostrar_vazio(registros)
         disponiveis = set(self.tabela.get_children())
         self.tabela.selection_set([i for i in selecionados if i in disponiveis])
         if foco in disponiveis:
@@ -290,6 +302,24 @@ class OperacoesMixin:
         # Com a lixeira aberta ao lado, o que acabou de ser excluído aparece nela na hora.
         if self.janela_lixeira is not None and self.janela_lixeira.winfo_exists():
             self.janela_lixeira.atualizar_lista()
+
+    def mostrar_vazio(self, registros):
+        """Sem linhas para mostrar, a tabela explica por quê e o que fazer, em vez de ficar em branco."""
+        if registros:
+            self.vazio_operacoes.ocultar()
+            return
+        busca, filtro = self.busca.get().strip(), self.filtro.get()
+        if busca:
+            self.vazio_operacoes.mostrar(f'Nada encontrado para “{busca}”',
+                                         'Confira a grafia ou busque por outra parte do nome, pela conta ou pela data.')
+        elif filtro == 'atrasada':
+            self.vazio_operacoes.mostrar('Nenhuma operação atrasada', 'Tudo em dia: nenhuma previsão vencida sem recebimento.')
+        elif filtro == 'pendente':
+            self.vazio_operacoes.mostrar('Nenhuma operação pendente', 'Todas as operações já foram recebidas ou estão atrasadas.')
+        elif filtro == 'recebida':
+            self.vazio_operacoes.mostrar('Nenhum recebimento ainda', 'Marque "Recebido" na linha da operação quando o valor cair na conta.')
+        else:
+            self.vazio_operacoes.mostrar('Nenhuma operação cadastrada', 'Cadastre a primeira em Arquivo → Nova entrada (Ctrl+N).')
 
     def ordenar_coluna(self, coluna):
         primeira = 'asc' if coluna in ('nome', 'conta') else 'desc'
@@ -447,6 +477,8 @@ class OperacoesMixin:
             messagebox.showerror('Lixeira', descrever_erro(erro), parent=self.historico)
             return
         self.atualizar()
+        notificar(self.janela, '1 entrada enviada à lixeira.' if len(selecao) == 1
+                  else f'{len(selecao)} entradas enviadas à lixeira.')
 
     def desenhar_icone_lixeira(self):
         if self.icone_lixeira is None:
@@ -471,6 +503,8 @@ class OperacoesMixin:
         corpo.rowconfigure(0, weight=1)
         corpo.columnconfigure(0, weight=1)
         tabela = ttk.Treeview(corpo, columns=('nome', 'data', 'removido'), show='headings')
+        preparar_realce(tabela)
+        vazio = AvisoVazio(tabela)
         for chave, titulo in (('nome', 'Titular'), ('data', 'Data de Aquisição'), ('removido', 'Enviado à lixeira')):
             tabela.heading(chave, text=titulo)
             tabela.column(chave, width=px(tabela, 220), anchor='center')
@@ -484,6 +518,10 @@ class OperacoesMixin:
             for registro in self.banco.listar_lixeira():
                 quando = datetime.fromisoformat(registro['lixeira_em']).strftime('%d/%m/%Y %H:%M:%S')
                 tabela.insert('', 'end', iid=str(registro['id']), values=(registro['nome'], data_br(registro['aquisicao']), quando))
+            if tabela.get_children():
+                vazio.ocultar()
+            else:
+                vazio.mostrar('A lixeira está vazia', 'O que for excluído de Minhas operações fica aqui até ser restaurado.')
 
         def restaurar():
             selecao = tabela.selection()
@@ -497,6 +535,7 @@ class OperacoesMixin:
                 return
             atualizar()
             self.atualizar()
+            notificar(tela, '1 entrada restaurada.' if len(selecao) == 1 else f'{len(selecao)} entradas restauradas.')
 
         def excluir_definitivamente():
             selecao = tabela.selection()
@@ -514,6 +553,7 @@ class OperacoesMixin:
                 return
             atualizar()
             self.atualizar()
+            notificar(tela, 'Excluído permanentemente.')
 
         def contexto(evento):
             linha = tabela.identify_row(evento.y)
@@ -536,4 +576,4 @@ class OperacoesMixin:
                    command=restaurar).pack(side='right')
         atualizar()
         centralizar(tela, 800, 450)
-        tela.deiconify()
+        surgir(tela)

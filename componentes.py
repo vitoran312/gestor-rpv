@@ -2,10 +2,13 @@
 from tema import cores
 import calendar
 import tkinter as tk
+from contextlib import contextmanager
 from datetime import date, datetime
 from tkinter import messagebox, ttk
 
 from dados import moeda, centavos
+from movimento import DURACAO_AVISO, animar, surgir
+from visual import familia_fonte, icone_busca, icone_limpar, px
 
 
 def centralizar(janela, largura=None, altura=None):
@@ -237,7 +240,7 @@ class CampoData(ttk.Frame):
         tela.bind('<Escape>', lambda _: self.fechar())
         self.desenhar()
         centralizar(tela)
-        tela.deiconify()
+        surgir(tela)
         tela.grab_set()
         tela.focus_set()
 
@@ -401,3 +404,175 @@ class BalaoAjuda:
         if self.janela is not None:
             tela, self.janela = self.janela, None
             if tela.winfo_exists(): tela.destroy()
+
+
+@contextmanager
+def ocupado(widget):
+    """Cursor de espera na janela enquanto uma tarefa demorada (backup, exportação, importação) roda."""
+    janela = widget.winfo_toplevel()
+    anterior = janela.cget('cursor')
+    janela.configure(cursor='watch')
+    janela.update_idletasks()
+    try:
+        yield
+    finally:
+        if janela.winfo_exists():
+            janela.configure(cursor=anterior)
+
+
+class Notificacao:
+    """Aviso passageiro no centro da base da janela: confirma o que acabou de acontecer sem pedir clique.
+
+    Entra subindo 16 px em ease-out e sai pelo mesmo caminho; um aviso novo substitui o anterior (como um
+    "toast"). Clicar fecha na hora. Com movimento reduzido, só aparece e some.
+    """
+    DURACAO_VISIVEL = 3200
+    DESLOCAMENTO = 16
+
+    def __init__(self, janela, texto, tipo='sucesso'):
+        anterior = getattr(janela, '_notificacao', None)
+        if anterior is not None:
+            anterior.fechar(imediato=True)
+        janela._notificacao = self
+        self.janela = janela
+        c = cores()
+        fonte = familia_fonte(janela)
+        self.quadro = tk.Frame(janela, bg=c['notificacao'], padx=px(janela, 16), pady=px(janela, 12), cursor='hand2',
+                               highlightthickness=0)
+        lado = px(janela, 20)
+        icone = tk.Canvas(self.quadro, width=lado, height=lado, bg=c['notificacao'], highlightthickness=0, bd=0)
+        cor = c['notificacao_sucesso'] if tipo == 'sucesso' else c['notificacao_erro']
+        icone.create_oval(1, 1, lado - 1, lado - 1, outline=cor, width=max(1.5, lado / 12))
+        if tipo == 'sucesso':
+            icone.create_line(lado * .3, lado * .52, lado * .45, lado * .67, lado * .72, lado * .36, fill=cor,
+                              width=max(1.5, lado / 11), capstyle='round', joinstyle='round')
+        else:
+            icone.create_line(lado / 2, lado * .28, lado / 2, lado * .58, fill=cor, width=max(1.5, lado / 11), capstyle='round')
+            icone.create_oval(lado / 2 - 1.2, lado * .7, lado / 2 + 1.2, lado * .72 + 2, fill=cor, outline=cor)
+        icone.pack(side='left', padx=(0, px(janela, 10)))
+        self.rotulo = tk.Label(self.quadro, text=texto, bg=c['notificacao'], fg=c['notificacao_texto'],
+                               font=(fonte, 10), justify='left', wraplength=px(janela, 380))
+        self.rotulo.pack(side='left')
+        for widget in (self.quadro, icone, self.rotulo):
+            widget.bind('<Button-1>', lambda _: self.fechar())
+        self.margem = px(janela, 24)
+        self.saindo = False
+        self.agendado = None
+        self.posicionar(0)
+        self.quadro.lift()
+        animar(self.quadro, DURACAO_AVISO, lambda efeito: self.posicionar(1 - efeito),
+               lambda: self.agendar_saida())
+
+    def posicionar(self, fracao):
+        """fracao 1 = deslocado para baixo (fora da posição); 0 = no lugar."""
+        if self.quadro.winfo_exists():
+            self.quadro.place(relx=0.5, rely=1.0, anchor='s',
+                              y=-self.margem + round(px(self.janela, self.DESLOCAMENTO) * fracao))
+
+    def agendar_saida(self):
+        if self.quadro.winfo_exists() and not self.saindo:
+            self.agendado = self.quadro.after(self.DURACAO_VISIVEL, self.fechar)
+
+    def fechar(self, imediato=False):
+        if self.saindo or not self.quadro.winfo_exists():
+            return
+        self.saindo = True
+        if self.agendado is not None:
+            self.quadro.after_cancel(self.agendado)
+        if getattr(self.janela, '_notificacao', None) is self:
+            self.janela._notificacao = None
+        if imediato:
+            self.quadro.destroy()
+            return
+        animar(self.quadro, DURACAO_AVISO * 3 // 4, self.posicionar, self.quadro.destroy)
+
+
+def notificar(janela, texto, tipo='sucesso'):
+    """Mostra um aviso passageiro na janela principal (veja Notificacao)."""
+    if janela is None or not janela.winfo_exists():
+        return None
+    return Notificacao(janela.winfo_toplevel(), texto, tipo)
+
+
+class CampoBusca(ttk.Frame):
+    """Campo de busca com lupa, texto de exemplo enquanto vazio e × para limpar."""
+
+    def __init__(self, pai, variavel, dica):
+        super().__init__(pai)
+        self.variavel = variavel
+        self.entrada = ttk.Entry(self, textvariable=variavel, style='Busca.TEntry')
+        self.entrada.pack(fill='x', expand=True)
+        self.lupa = ttk.Label(self.entrada, style='BuscaIcone.TLabel', cursor='xterm')
+        self.lupa.place(x=px(self, 11), rely=0.5, anchor='w')
+        self.dica = ttk.Label(self.entrada, text=dica, style='BuscaDica.TLabel', cursor='xterm')
+        self.limpar = ttk.Label(self.entrada, style='BuscaIcone.TLabel', cursor='hand2')
+        for rotulo in (self.lupa, self.dica):
+            rotulo.bind('<Button-1>', lambda _: self.entrada.focus_set())
+        self.limpar.bind('<Button-1>', lambda _: (self.variavel.set(''), self.entrada.focus_set()))
+        variavel.trace_add('write', lambda *_: self.mostrar_dica())
+        self.atualizar_tema()
+        self.mostrar_dica()
+
+    def atualizar_tema(self):
+        c = cores()
+        self.lupa.configure(image=icone_busca(self._root(), c['secundario']))
+        self.limpar.configure(image=icone_limpar(self._root(), c['secundario']))
+
+    def mostrar_dica(self):
+        if not self.winfo_exists():
+            return
+        if self.variavel.get():
+            self.dica.place_forget()
+            self.limpar.place(relx=1.0, x=-px(self, 12), rely=0.5, anchor='e')
+        else:
+            self.dica.place(x=px(self, 36), rely=0.5, anchor='w')
+            self.limpar.place_forget()
+
+
+class AvisoVazio:
+    """Estado vazio de uma tabela: título e uma frase de orientação, centralizados sobre a área das linhas."""
+
+    def __init__(self, tabela):
+        self.tabela = tabela
+        self.quadro = ttk.Frame(tabela, style='Vazio.TFrame', padding=px(tabela, 16))
+        self.titulo = ttk.Label(self.quadro, style='VazioTitulo.TLabel', anchor='center', justify='center')
+        self.titulo.pack()
+        self.detalhe = ttk.Label(self.quadro, style='VazioTexto.TLabel', anchor='center', justify='center',
+                                 wraplength=px(tabela, 420))
+        self.detalhe.pack(pady=(px(tabela, 6), 0))
+        for widget in (self.quadro, self.titulo, self.detalhe):
+            widget.bind('<Button-3>', lambda e: tabela.event_generate('<Button-3>', x=e.x_root - tabela.winfo_rootx(),
+                                                                      y=e.y_root - tabela.winfo_rooty()))
+
+    def mostrar(self, titulo, detalhe=''):
+        self.titulo.configure(text=titulo)
+        self.detalhe.configure(text=detalhe)
+        self.quadro.place(relx=0.5, rely=0.5, anchor='center')
+
+    def ocultar(self):
+        self.quadro.place_forget()
+
+    @property
+    def visivel(self):
+        return bool(self.quadro.winfo_manager())
+
+
+def marcar_erro(widget, variavel=None):
+    """Contorno vermelho num campo com problema, até a pessoa mexer nele de novo."""
+    entrada = getattr(widget, 'entrada', widget)
+    if not isinstance(entrada, (ttk.Entry, ttk.Combobox)):
+        return
+    estilo = str(entrada.cget('style')) or entrada.winfo_class()
+    if 'Erro.' in estilo:
+        return
+    base = estilo
+    entrada.configure(style=('Form.Erro.' if estilo.startswith('Form.') else 'Erro.') + entrada.winfo_class())
+
+    def limpar(*_):
+        if entrada.winfo_exists():
+            entrada.configure(style=base)
+        if variavel is not None and marcador[0]:
+            variavel.trace_remove('write', marcador[0])
+            marcador[0] = None
+    marcador = [variavel.trace_add('write', limpar) if variavel is not None else None]
+    entrada.bind('<KeyPress>', limpar, add='+')
