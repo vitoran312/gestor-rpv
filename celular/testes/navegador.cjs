@@ -103,11 +103,9 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
       const visualizacao = await pagina.waitForSelector('.documento canvas, .documento img, .documento .erro', { timeout: 30000 });
       const tag = await visualizacao.evaluate((e) => e.tagName.toLowerCase());
       if (tag === 'canvas') {
-        await pagina.waitForFunction(() => {
-          const tela = document.querySelector('.pagina canvas');
-          return tela.width > 0 && !tela.closest('.paginas').querySelector('canvas[width="0"]:first-child');
-        }, null, { timeout: 30000 });
-        await pagina.waitForTimeout(500);
+        // Espera a primeira página terminar de ser desenhada (o WebKit leva mais tempo que o Chromium).
+        await pagina.waitForFunction(() => document.querySelector('.pagina canvas').dataset.pronta === '1',
+          null, { timeout: 30000 });
         const medida = () => pagina.evaluate(() => {
           const tela = document.querySelector('.pagina canvas');
           const contexto = tela.getContext('2d');
@@ -125,7 +123,8 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
         });
         const antes = await medida();
         await pagina.click('[aria-label="Aumentar o zoom"]');
-        await pagina.waitForTimeout(300);
+        await pagina.waitForFunction(() => document.querySelector('.pagina canvas').dataset.pronta === '1.5',
+          null, { timeout: 30000 });
         antes.largura_com_zoom = (await medida()).largura;
         antes.rotulo_zoom = await pagina.evaluate(() => document.querySelector('.zoom span').textContent);
         resultados.documentos[endereco] = antes;

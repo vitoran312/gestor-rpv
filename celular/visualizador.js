@@ -127,9 +127,11 @@ const Visualizador = (() => {
       q.tela.height = Math.floor(vista.height);
       const zoomDesenhado = zoom;
       q.tarefa = q.pagina.render({ canvasContext: q.tela.getContext('2d'), viewport: vista });
+      q.tela.dataset.pronta = '';
       q.tarefa.promise.then(() => {
         q.desenhada = zoomDesenhado;
         q.tarefa = null;
+        q.tela.dataset.pronta = String(zoomDesenhado);  // Página terminada neste zoom (usado pelos testes).
       }).catch(() => {});  // Cancelada por um novo zoom ou por sair da tela.
     }
 
