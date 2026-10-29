@@ -1,6 +1,16 @@
 {
   "versoes": [
     {
+      "versao": "0.48.0",
+      "resumo": "1 novidade",
+      "itens": [
+        {
+          "tipo": "novidade",
+          "texto": "Celular: a abertura do app passa a mostrar o nome GESTOR RPV."
+        }
+      ]
+    },
+    {
       "versao": "0.47.0",
       "resumo": "3 novidades",
       "itens": [
@@ -57,20 +67,6 @@
         {
           "tipo": "novidade",
           "texto": "Lista do que mudou nas últimas versões, no \"Sobre\" do programa e no app."
-        }
-      ]
-    },
-    {
-      "versao": "0.43.0",
-      "resumo": "2 novidades",
-      "itens": [
-        {
-          "tipo": "novidade",
-          "texto": "Celular: cadastrar novas entradas pelo app."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Programa: importar as entradas feitas no celular, que chegam pela pasta do backup no Google Drive."
         }
       ]
     }

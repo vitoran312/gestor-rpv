@@ -10,6 +10,9 @@ from pathlib import Path
 MOSTRAR = 5  # Quantas versões aparecem no "Sobre".
 
 NOVIDADES = [
+    ('0.48.0', [
+        ('novidade', 'Celular: a abertura do app passa a mostrar o nome GESTOR RPV.'),
+    ]),
     ('0.47.0', [
         ('novidade', 'Celular: cadastrar novas contas de recebimento pelo app (aba Contas).'),
         ('novidade', 'Celular: a conta nova já pode ser usada numa entrada, antes mesmo de chegar ao computador.'),

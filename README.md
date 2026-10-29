@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.47.0
+# Gestor de RPV — 0.48.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.

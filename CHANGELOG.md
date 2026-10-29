@@ -1,5 +1,9 @@
 # Histórico de versões
 
+## 0.48.0
+
+- App do celular: a abertura (logo animado e tela de desbloqueio) mostra o nome GESTOR RPV.
+
 ## 0.47.0
 
 - App do celular: "+ Nova conta" na aba Contas, com as mesmas regras do programa (campos obrigatórios, CPF,
