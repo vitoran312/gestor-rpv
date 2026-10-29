@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## 0.45.0
+
+- App do celular: ao abrir, o logo aparece sozinho e o Face ID só é pedido depois da animação (a janela do
+  iPhone cobria a abertura). O logo fica ao fundo enquanto o Face ID é pedido e esmaece já mostrando o Início,
+  ou a tela de desbloqueio se o Face ID for cancelado.
+
 ## 0.44.0
 
 - App do celular: valores com pontuação automática enquanto se digita (os números entram pelos centavos, como

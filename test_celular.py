@@ -335,6 +335,9 @@ class TestAppDoCelular(unittest.TestCase):
         # Ao abrir o app de novo, o Face ID é pedido sozinho e os dados aparecem, sem escolher arquivo.
         self.assertTrue(f['reabriu_sozinho']['app'])
         self.assertIn('Tempo para abrir\n0 s', f['tempo_com_faceid'])  # Com a chave guardada, sem o scrypt.
+        # O logo aparece sozinho primeiro: o Face ID (janela do iPhone) só é pedido depois da animação.
+        self.assertGreaterEqual(f['splash']['pedido_em'], 1150)
+        self.assertTrue(f['splash']['logo_ao_abrir'])
 
     def test_backup_novo_aberto_pelo_face_id_passa_a_ser_o_guardado(self):
         self.assertIn('Só No Segundo Backup', self.faceid['segundo_nomes'])

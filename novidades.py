@@ -10,6 +10,10 @@ from pathlib import Path
 MOSTRAR = 5  # Quantas versões aparecem no "Sobre".
 
 NOVIDADES = [
+    ('0.45.0', [
+        ('correcao', 'Celular: a janela do Face ID cobria a animação de abertura; agora o logo aparece primeiro e o '
+                     'Face ID vem logo depois, com o logo ao fundo.'),
+    ]),
     ('0.44.0', [
         ('novidade', 'Celular: os valores ganham a pontuação sozinhos enquanto você digita (1.500,00).'),
         ('novidade', 'Celular: abertura com o logo do app.'),

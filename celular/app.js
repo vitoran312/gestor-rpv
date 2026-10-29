@@ -7,7 +7,7 @@
 (() => {
   // Igual a versao.py (test_celular confere): mostrada na abertura e em Mais, para saber se o aparelho já
   // carregou a última versão publicada.
-  const VERSAO_APP = '0.44.0';
+  const VERSAO_APP = '0.45.0';
   const D = GestorDados;
   const $ = (id) => document.getElementById(id);
   const SITUACOES = { pendente: 'Pendente', atrasada: 'Atrasada', recebida: 'Recebida' };
@@ -926,18 +926,30 @@
   window.addEventListener('hashchange', desenhar);
 
   $('versao-app').textContent = `Versão ${VERSAO_APP}`;
-  $('splash').addEventListener('animationend', (evento) => {
-    if (evento.target === $('splash')) {
-      $('splash').remove();
-    }
-  });
+
 
   // ---- Abertura do app: com Face ID ativo, já pede o rosto ------------------------------------------------
-  prepararAbertura().then((faceId) => {
-    if (faceId) {
-      abrirFonte({ faceId: true, automatico: true });
+  // O logo aparece sozinho primeiro; só depois da animação o app pede o Face ID (a janela do iPhone cobre boa
+  // parte da tela). O logo continua ao fundo enquanto o Face ID é pedido e esmaece quando o app já está pronto:
+  // no Início, se o Face ID deu certo, ou na tela de desbloqueio.
+  const ANIMACAO_LOGO_MS = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 300 : 1200;
+  const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
+
+  function esconderSplash() {
+    const splash = $('splash');
+    if (!splash) {
+      return;
     }
-  });
+    splash.classList.add('sumindo');
+    setTimeout(() => splash.remove(), 700);
+  }
+
+  Promise.all([prepararAbertura(), esperar(ANIMACAO_LOGO_MS)]).then(async ([faceId]) => {
+    if (faceId) {
+      await abrirFonte({ faceId: true, automatico: true });
+    }
+    esconderSplash();
+  }, esconderSplash);
 
   // ---- App na Tela de Início -----------------------------------------------------------------------------
   const instalado = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;

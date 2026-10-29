@@ -292,14 +292,16 @@ a.botao-link.primario { background: var(--marca); color: var(--marca-texto); }
   gap: 14px;
   background: var(--fundo);
   pointer-events: none;  /* Só visual: nunca segura um toque. */
-  animation: sumir-splash 1.5s ease-in forwards;
+  transition: opacity 0.6s ease-in, visibility 0.6s;
 }
-.splash img { width: 112px; height: 112px; animation: chegar-logo 1.5s ease-out forwards; }
-.splash-nome { font-size: 1.3rem; font-weight: 700; letter-spacing: 0.01em; }
-@keyframes sumir-splash { 0%, 55% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
-@keyframes chegar-logo { 0% { transform: scale(0.92); } 55% { transform: scale(1); } 100% { transform: scale(1.04); } }
+/* O logo chega e fica parado até o app decidir sair (depois do Face ID, quando ativo); então tudo esmaece. */
+.splash img { width: 112px; height: 112px; animation: chegar-logo 1.2s ease-out both; }
+.splash-nome { font-size: 1.3rem; font-weight: 700; letter-spacing: 0.01em; animation: chegar-nome 1.2s ease-out both; }
+.splash.sumindo { opacity: 0; visibility: hidden; }
+@keyframes chegar-logo { 0% { opacity: 0; transform: scale(0.9); } 60% { opacity: 1; transform: scale(1.02); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes chegar-nome { 0%, 30% { opacity: 0; transform: translateY(6px); } 100% { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
-  .splash, .splash img { animation-duration: 0.6s; }
+  .splash img, .splash-nome { animation-duration: 0.3s; }
 }
 
 /* ---- Desbloqueio ---- */

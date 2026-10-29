@@ -52,10 +52,23 @@ const { chromium } = require('playwright');
     await aberto();
     r.faceid_abriu = await pagina.evaluate(() => document.getElementById('tela').innerText.includes('Lucro previsto'));
 
-    // 3. Fechar o app (recarregar a página): já abre pedindo o Face ID, com o backup guardado.
+    // 3. Fechar o app (recarregar a página): já abre pedindo o Face ID, com o backup guardado. O pedido só sai
+    //    depois da animação do logo, e o logo ainda cobre a tela quando os dados aparecem.
+    await pagina.addInitScript(() => {
+      const original = navigator.credentials.get.bind(navigator.credentials);
+      navigator.credentials.get = (...args) => {
+        window.__faceIdPedidoEm = window.__faceIdPedidoEm || performance.now();
+        return original(...args);
+      };
+    });
     await pagina.reload();
     await aberto();
     r.reabriu_sozinho = await estado();
+    r.splash = await pagina.evaluate(() => ({
+      pedido_em: Math.round(window.__faceIdPedidoEm || 0),
+      logo_ao_abrir: Boolean(document.getElementById('splash')),
+    }));
+    await pagina.waitForFunction(() => !document.getElementById('splash'), null, { timeout: 5000 });
     await pagina.evaluate(() => { location.hash = '#backup'; });
     r.tempo_com_faceid = await pagina.evaluate(() => document.getElementById('tela').innerText);
 

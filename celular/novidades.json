@@ -1,6 +1,16 @@
 {
   "versoes": [
     {
+      "versao": "0.45.0",
+      "resumo": "1 correção",
+      "itens": [
+        {
+          "tipo": "correcao",
+          "texto": "Celular: a janela do Face ID cobria a animação de abertura; agora o logo aparece primeiro e o Face ID vem logo depois, com o logo ao fundo."
+        }
+      ]
+    },
+    {
       "versao": "0.44.0",
       "resumo": "4 novidades",
       "itens": [
@@ -65,20 +75,6 @@
         {
           "tipo": "correcao",
           "texto": "Celular: em alguns iPhones o PDF não abria no app."
-        }
-      ]
-    },
-    {
-      "versao": "0.40.0",
-      "resumo": "1 novidade · 1 correção",
-      "itens": [
-        {
-          "tipo": "novidade",
-          "texto": "Celular: zoom nos PDFs e nas imagens dos anexos."
-        },
-        {
-          "tipo": "correcao",
-          "texto": "Celular: o PDF abria ampliado, sem caber na tela."
         }
       ]
     }
