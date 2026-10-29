@@ -1,6 +1,16 @@
 {
   "versoes": [
     {
+      "versao": "0.57.0",
+      "resumo": "1 novidade",
+      "itens": [
+        {
+          "tipo": "novidade",
+          "texto": "Celular: \"Excluir permanentemente\" na lixeira, para quem usa só o celular; a operação sai de vez, com os documentos."
+        }
+      ]
+    },
+    {
       "versao": "0.56.0",
       "resumo": "1 novidade",
       "itens": [
@@ -77,20 +87,6 @@
         {
           "tipo": "novidade",
           "texto": "Programa e celular: transições suaves e foco visível pelo teclado, com menos movimento quando o sistema pede."
-        }
-      ]
-    },
-    {
-      "versao": "0.52.0",
-      "resumo": "2 novidades",
-      "itens": [
-        {
-          "tipo": "novidade",
-          "texto": "Celular: \"Abrir um backup mais novo\" em Mais, sem precisar recusar o Face ID."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Celular: na primeira abertura, uma demonstração com dados fictícios mostra como o app fica."
         }
       ]
     }

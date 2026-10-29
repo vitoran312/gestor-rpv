@@ -10,6 +10,10 @@ from pathlib import Path
 MOSTRAR = 5  # Quantas versões aparecem no "Sobre".
 
 NOVIDADES = [
+    ('0.57.0', [
+        ('novidade', 'Celular: "Excluir permanentemente" na lixeira, para quem usa só o celular; a operação sai de vez, '
+                     'com os documentos.'),
+    ]),
     ('0.56.0', [
         ('novidade', 'Programa e celular: senha nova com no mínimo 6 caracteres (antes 10), misturando letras, números '
                      'e símbolos.'),

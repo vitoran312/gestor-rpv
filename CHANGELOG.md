@@ -1,5 +1,12 @@
 # Histórico de versões
 
+## 0.57.0
+
+- Celular (dados só no celular): botão "Excluir permanentemente" na operação que está na lixeira, com confirmação.
+  Como Banco.excluir_permanentemente: só vale para o que está na lixeira; apaga a operação, o histórico da
+  previsão, as prorrogações e os documentos, que deixam de ir no pacote guardado. Com backup do computador, a
+  lixeira continua só para consulta.
+
 ## 0.56.0
 
 - Senha mínima de 6 caracteres (antes 10) no programa (cifra.SENHA_MINIMA) e no celular (dados.js), para a senha

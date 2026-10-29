@@ -178,6 +178,22 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
       const g = await Guarda.ler('backup');
       return { independente: g.independente, bytes: btoa(Array.from(new Uint8Array(g.bytes), (b) => String.fromCharCode(b)).join('')) };
     });
+    // 5. Excluir permanentemente da lixeira: some de vez, com os anexos fora do pacote guardado.
+    const tamanho = () => pagina.evaluate(async () => (await Guarda.ler('backup')).bytes.byteLength);
+    const antes = await tamanho();
+    await ir(`#operacao/${segundaId}`);
+    pagina.once('dialog', (d) => d.accept());
+    await pagina.click('text=Excluir operação');
+    await pagina.waitForFunction(() => location.hash === '#operacoes');
+    await ir(`#operacao/${segundaId}`);
+    pagina.once('dialog', (d) => { r.aviso_de_vez = d.message(); d.accept(); });
+    await pagina.click('text=Excluir permanentemente');
+    await pagina.waitForFunction(() => location.hash === '#lixeira');
+    await pagina.waitForSelector('text=A lixeira está vazia.');
+    r.lixeira_de_vez = await texto();
+    await ir('#operacoes');
+    r.operacoes_de_vez = await texto();
+    r.encolheu_de_vez = antes - await tamanho();
     r.erros = erros;
   } finally {
     await navegador.close();

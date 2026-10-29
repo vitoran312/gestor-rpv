@@ -7,7 +7,7 @@
 (() => {
   // Igual a versao.py (test_celular confere): mostrada na abertura e em Mais, para saber se o aparelho já
   // carregou a última versão publicada.
-  const VERSAO_APP = '0.56.0';
+  const VERSAO_APP = '0.57.0';
   const D = GestorDados;
   const $ = (id) => document.getElementById(id);
   const SITUACOES = { pendente: 'Pendente', atrasada: 'Atrasada', recebida: 'Recebida' };
@@ -721,11 +721,12 @@
 
   // ---- Quem usa só o celular: gravações direto nos dados do aparelho ---------------------------------------
   // Cada gravação reempacota os dados como um backup (trancado pela mesma chave) e o guarda no aparelho.
-  // `novos` traz os anexos acrescentados agora ({caminho: bytes}); os que já existiam vão junto.
-  async function salvarLocal(novos = {}) {
+  // `novos` traz os anexos acrescentados agora ({caminho: bytes}); os que já existiam vão junto, menos os `removidos`.
+  async function salvarLocal(novos = {}, removidos = []) {
     const banco = bancoLocal.export();
-    const { bytes, manifesto, extrair, todos } = await LeitorBackup.empacotar(banco, info.chave, VERSAO_APP,
-      { ...await info.todos(), ...novos });
+    const anexos = { ...await info.todos(), ...novos };
+    removidos.forEach((caminho) => delete anexos[caminho]);
+    const { bytes, manifesto, extrair, todos } = await LeitorBackup.empacotar(banco, info.chave, VERSAO_APP, anexos);
     fonte = { ...fonte, bytes, tamanho: bytes.length, criado_em: manifesto.criado_em, independente: true };
     await Guarda.gravar('backup', { bytes, nome: fonte.nome, tamanho: bytes.length, criado_em: manifesto.criado_em,
       guardado_em: new Date().toISOString(), independente: true });
@@ -777,6 +778,22 @@
   async function lixeiraLocal(r, excluir) {
     bancoLocal.run('UPDATE rpvs SET lixeira_em=? WHERE id=?', [excluir ? LeitorBackup.dataHoraLocal() : null, r.id]);
     await salvarLocal();
+  }
+
+  // Como Banco.excluir_permanentemente: só sai de vez quem está na lixeira, com o histórico, as prorrogações e os
+  // anexos (que deixam de ir no pacote).
+  async function excluirDeVez(r) {
+    const conferida = bancoLocal.exec('SELECT 1 FROM rpvs WHERE id=? AND lixeira_em IS NOT NULL', [r.id]);
+    if (!conferida.length) {
+      throw new Error('Somente entradas na lixeira podem ser excluídas permanentemente.');
+    }
+    const documentos = bancoLocal.exec('SELECT caminho FROM documentos WHERE rpv_id=?', [r.id]);
+    const caminhos = documentos.length ? documentos[0].values.map((linha) => linha[0]) : [];
+    for (const tabela of ['documentos', 'previsoes_historico', 'prorrogacoes']) {
+      bancoLocal.run(`DELETE FROM ${tabela} WHERE rpv_id=?`, [r.id]);
+    }
+    bancoLocal.run('DELETE FROM rpvs WHERE id=?', [r.id]);
+    await salvarLocal({}, caminhos);
   }
 
   // Anexos como Banco.copiar_anexos grava ("12/<32 letras>.jpg"); devolve os arquivos para salvarLocal.
@@ -1437,12 +1454,29 @@
       return null;
     }
     if (r.lixeira_em) {
-      return info.independente && el('button', { type: 'button', class: 'secundario', texto: 'Restaurar da lixeira',
-        onclick: async (evento) => {
-          evento.target.disabled = true;
-          await lixeiraLocal(r, false);
-          desenhar();
-        } });
+      return info.independente && [
+        el('button', { type: 'button', class: 'secundario', texto: 'Restaurar da lixeira',
+          onclick: async (evento) => {
+            evento.target.disabled = true;
+            await lixeiraLocal(r, false);
+            desenhar();
+          } }),
+        el('button', { type: 'button', class: 'secundario perigo', texto: 'Excluir permanentemente',
+          onclick: async (evento) => {
+            if (!confirm(`Excluir permanentemente a operação de ${r.nome}? Ela e os documentos anexados saem de vez `
+              + 'e não podem ser restaurados.')) {
+              return;
+            }
+            evento.target.disabled = true;
+            try {
+              await excluirDeVez(r);
+              location.replace('#lixeira');
+            } catch (erro) {
+              evento.target.disabled = false;
+              alert(erro && erro.message ? erro.message : String(erro));
+            }
+          } }),
+      ];
     }
     const excluir = el('button', { type: 'button', class: 'secundario perigo', texto: 'Excluir operação', onclick: async () => {
       if (!confirm(info.independente ? 'Excluir esta operação? Ela vai para a lixeira (em Mais), de onde pode ser restaurada.'
@@ -1745,7 +1779,7 @@
     if (!dados.lixeira.length) {
       return [vazio('A lixeira está vazia.')];
     }
-    return [el('p', { class: 'discreto pequeno', texto: info.independente ? 'Operações excluídas. Toque numa delas para ver ou restaurar.'
+    return [el('p', { class: 'discreto pequeno', texto: info.independente ? 'Operações excluídas. Toque numa delas para ver, restaurar ou excluir de vez.'
       : 'Operações excluídas no computador. Para restaurar, use o programa no computador.' }),
       el('div', { class: 'lista' }, dados.lixeira.map((r) => itemOperacao(r, `#operacao/${r.id}`)))];
   }
@@ -1847,7 +1881,8 @@
     return [el('div', { class: 'menu' },
       opcao('#agenda', 'Agenda das previsões', 'Calendário com as datas previstas de recebimento'),
       opcao('#grafico', 'Gráfico mensal', 'Entradas e recebimentos dos últimos 12 meses'),
-      opcao('#lixeira', `Lixeira (${dados.lixeira.length})`, 'Operações excluídas, só para consulta'),
+      opcao('#lixeira', `Lixeira (${dados.lixeira.length})`, info.independente ? 'Operações excluídas: restaurar ou excluir de vez'
+        : 'Operações excluídas, só para consulta'),
       opcao('#backup', 'Sobre este backup', `Arquivo, data e versões · app ${VERSAO_APP}`),
       opcao('#novidades', 'Novidades', 'O que mudou nas últimas versões'),
       info.independente && opcao('#copia', 'Fazer cópia de segurança', 'Salvar seus dados (trancados) no iCloud ou no Google Drive'),

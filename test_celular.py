@@ -651,6 +651,11 @@ class TestQuemUsaSoOCelular(unittest.TestCase):
         self.assertIn('restaurar', r['lixeira'])
         self.assertNotIn('Na lixeira desde', r['restaurada'])
         self.assertEqual((r['documentos_restaurada'], r['documentos_depois']), (3, 3))
+        # Excluir permanentemente (depois de guardar o pacote que o programa confere abaixo).
+        self.assertIn('não podem ser restaurados', r['aviso_de_vez'])
+        self.assertIn('A lixeira está vazia.', r['lixeira_de_vez'])
+        self.assertNotIn('Segunda Entrada', r['operacoes_de_vez'])
+        self.assertGreater(r['encolheu_de_vez'], len(self.PDF))  # Os anexos saíram do pacote.
         self.assertIn('Segunda Entrada', r['agenda'])  # Previsão em 01/03/2027, ainda não recebida.
         self.assertIn('segunda 01/03', r['agenda'])
         self.assertIn('Agenda das previsões', r['inicio_com_dados'])
