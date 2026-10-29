@@ -26,7 +26,22 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
       senhas: senhasRegra.map((s) => { try { GestorDados.validarSenha(s); return 'ok'; } catch (e) { return e.message; } }),
     }), { nomes, senhasRegra });
 
-    // 1. Primeira vez: "Começar sem computador", com senhas ruins antes da boa.
+    // 0. Primeira vez, sem dados: a demonstração abre sozinha, com o aviso de dados fictícios em todas as telas.
+    await pagina.waitForSelector('text=Começar com meus dados', { timeout: 30000 });
+    r.demonstracao = {};
+    for (const hash of ['#inicio', '#operacoes', '#contas', '#mais', '#nova', '#agenda']) {
+      await ir(hash);
+      r.demonstracao[hash] = await texto();
+    }
+    await pagina.evaluate(() => { location.hash = '#operacao/1'; });
+    await pagina.waitForSelector('text=Compartilhar resumo em imagem');
+    r.demonstracao.operacao = await texto();
+    await pagina.click('text=Começar com meus dados');
+    await pagina.waitForSelector('#abertura:not([hidden])');
+    r.depois_da_demonstracao = await pagina.evaluate(() => ({ app: !document.getElementById('aplicativo').hidden,
+      comecar: !document.getElementById('comecar').hidden, demonstracao: !document.getElementById('ver-demonstracao').hidden }));
+
+    // 1. "Começar sem computador", com senhas ruins antes da boa.
     await pagina.click('#comecar');
     r.erros_senha = [];
     for (const [nova, repetida] of senhasRuins) {

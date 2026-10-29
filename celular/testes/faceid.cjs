@@ -28,7 +28,14 @@ const { chromium } = require('playwright');
     }));
 
     // 1. Primeira vez: escolhe o arquivo e digita a senha; o app oferece o Face ID.
+    // Sem nada guardado, a demonstração abre sozinha; "Começar com meus dados" leva à abertura de sempre.
+    const sairDaDemonstracao = async () => {
+      await pagina.waitForSelector('text=Começar com meus dados', { timeout: 30000 });
+      await pagina.click('text=Começar com meus dados');
+      await pagina.waitForSelector('#abertura:not([hidden])');
+    };
     await pagina.goto(endereco + '/index.html');
+    await sairDaDemonstracao();
     r.inicial = await estado();
     await pagina.setInputFiles('#arquivo', primeiro);
     await pagina.fill('#senha', senha);
@@ -85,6 +92,15 @@ const { chromium } = require('playwright');
     await aberto();
     r.segundo_guardado = await pagina.evaluate(() => { location.hash = '#operacoes'; return new Promise((ok) => setTimeout(() => ok(document.getElementById('tela').innerText), 200)); });
 
+    // 4b. Em Mais, "Abrir um backup mais novo": escolhe o arquivo e o Face ID abre direto, sem passar pela abertura.
+    await pagina.evaluate(() => { location.hash = '#mais'; });
+    await pagina.waitForSelector('[name="escolher_backup"]', { state: 'attached' });
+    r.mais_escolher = await pagina.evaluate(() => document.querySelector('label.escolher-backup').innerText);
+    await pagina.setInputFiles('[name="escolher_backup"]', primeiro);
+    await pagina.waitForFunction(() => !document.getElementById('aplicativo').hidden && location.hash === '#inicio'
+      && !document.getElementById('tela').innerText.includes('Abrir um backup mais novo'), null, { timeout: 60000 });
+    r.pelo_mais = await pagina.evaluate(() => { location.hash = '#operacoes'; return new Promise((ok) => setTimeout(() => ok(document.getElementById('tela').innerText), 200)); });
+
     // 5. Senha errada no backup guardado (sem Face ID) mostra o erro e não abre.
     await pagina.evaluate(() => { location.hash = '#mais'; });
     await pagina.click('text=Trancar agora');
@@ -104,7 +120,7 @@ const { chromium } = require('playwright');
     await pagina.click('text=Apagar o backup guardado');
     await pagina.waitForSelector('#abertura:not([hidden])');
     await pagina.reload();
-    await pagina.waitForTimeout(500);
+    await sairDaDemonstracao();
     r.apagado = await estado();
     r.erros = erros;
   } finally {

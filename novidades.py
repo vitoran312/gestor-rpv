@@ -10,6 +10,10 @@ from pathlib import Path
 MOSTRAR = 5  # Quantas versões aparecem no "Sobre".
 
 NOVIDADES = [
+    ('0.52.0', [
+        ('novidade', 'Celular: "Abrir um backup mais novo" em Mais, sem precisar recusar o Face ID.'),
+        ('novidade', 'Celular: na primeira abertura, uma demonstração com dados fictícios mostra como o app fica.'),
+    ]),
     ('0.51.1', [
         ('correcao', 'Celular: no iPhone, a tela da operação voltava sozinha para cima e escondia os botões do fim '
                      '(anexar, alterar previsão, editar e excluir).'),

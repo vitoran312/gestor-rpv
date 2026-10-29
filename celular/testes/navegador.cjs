@@ -96,6 +96,11 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
       };
     }, regras);
 
+    // Sem nada guardado, a demonstração abre sozinha: sai dela para abrir o backup de teste.
+    await pagina.waitForSelector('text=Começar com meus dados', { timeout: 30000 });
+    await pagina.click('text=Começar com meus dados');
+    await pagina.waitForSelector('#abertura:not([hidden])');
+
     // As telas: abre o backup pelo formulário e passa por todas, guardando o texto de cada uma.
     await pagina.setInputFiles('#arquivo', telas.arquivo);
     await pagina.fill('#senha', telas.senha);

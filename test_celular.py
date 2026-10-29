@@ -532,6 +532,11 @@ class TestAppDoCelular(unittest.TestCase):
         self.assertIn('Só No Segundo Backup', self.faceid['segundo_nomes'])
         self.assertIn('Só No Segundo Backup', self.faceid['segundo_guardado'])
 
+    def test_backup_escolhido_em_mais_abre_pelo_face_id(self):
+        self.assertIn('Abrir um backup mais novo', self.faceid['mais_escolher'])
+        self.assertNotIn('Só No Segundo Backup', self.faceid['pelo_mais'])
+        self.assertIn('Bruno Lima', self.faceid['pelo_mais'])
+
     def test_senha_errada_e_apagar_o_backup_guardado(self):
         self.assertFalse(self.faceid['senha_errada']['app'])
         self.assertIn('Senha incorreta', self.faceid['senha_errada']['erro'])
@@ -579,6 +584,23 @@ class TestQuemUsaSoOCelular(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.temp.cleanup()
+
+    def test_primeira_abertura_mostra_a_demonstracao(self):
+        d = self.r['demonstracao']
+        for hash, texto in d.items():
+            self.assertIn('meramente sugestivos', texto, hash)
+            self.assertIn('Começar com meus dados', texto, hash)
+        import demonstracao
+        self.assertIn(f'Registros\n{len(demonstracao.OPERACOES)}', d['#inicio'])
+        self.assertIn('Helena Batista Correia', d['#operacoes'])
+        self.assertIn('Conta principal', d['#contas'])
+        self.assertIn('Abrir meu backup', d['#mais'])
+        self.assertIn('Sair da demonstração', d['#mais'])
+        self.assertNotIn('Apagar o backup guardado', d['#mais'])
+        self.assertIn('Na demonstração não dá para cadastrar', d['#nova'])
+        self.assertIn('Atrasadas', d['#agenda'])
+        self.assertNotIn('Mudar esta operação', d['operacao'])  # Só consulta.
+        self.assertEqual(self.r['depois_da_demonstracao'], {'app': False, 'comecar': True, 'demonstracao': True})
 
     def test_senha_nova_com_as_regras_do_programa(self):
         erros = self.r['erros_senha']
@@ -709,6 +731,32 @@ class TestArquivosDoApp(unittest.TestCase):
             novo = Path(pasta) / 'modelo.sqlite3'
             gerar_modelo_celular.gerar(novo)
             self.assertEqual(esquema(RAIZ / 'celular' / 'modelo.sqlite3'), esquema(novo))
+
+    def test_demonstracao_do_celular_igual_a_do_programa(self):
+        # Mudou o esquema ou os dados fictícios? Rode "python gerar_modelo_celular.py".
+        import sqlite3
+        import gerar_modelo_celular
+
+        def conteudo(caminho):
+            con = sqlite3.connect(caminho)
+            try:
+                return {t: con.execute(f'SELECT * FROM {t} ORDER BY 1').fetchall()
+                        for t in ('rpvs', 'contas', 'prorrogacoes', 'previsoes_historico', 'documentos')} | {
+                    'esquema': sorted(con.execute("SELECT type, name, sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'")),
+                    'configuracoes': sorted(con.execute('SELECT chave FROM configuracoes'))}
+            finally:
+                con.close()
+
+        with tempfile.TemporaryDirectory() as pasta:
+            novo = Path(pasta) / 'demonstracao.sqlite3'
+            gerar_modelo_celular.gerar(novo, com_demonstracao=True)
+            atual = conteudo(RAIZ / 'celular' / 'demonstracao.sqlite3')
+            gerado = conteudo(novo)
+        # A data em que a operação teve a previsão alterada é o momento da geração: fica de fora.
+        for dados in (atual, gerado):
+            dados['previsoes_historico'] = [linha[:4] for linha in dados['previsoes_historico']]
+        self.assertEqual(atual, gerado)
+        self.assertEqual(atual['configuracoes'], [('dados_demonstracao',), ('demonstracao_referencia',)])
 
     def test_versao_mostrada_no_app_e_a_do_programa(self):
         import re

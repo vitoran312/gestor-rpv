@@ -7,7 +7,7 @@
 (() => {
   // Igual a versao.py (test_celular confere): mostrada na abertura e em Mais, para saber se o aparelho já
   // carregou a última versão publicada.
-  const VERSAO_APP = '0.51.1';
+  const VERSAO_APP = '0.52.0';
   const D = GestorDados;
   const $ = (id) => document.getElementById(id);
   const SITUACOES = { pendente: 'Pendente', atrasada: 'Atrasada', recebida: 'Recebida' };
@@ -119,6 +119,7 @@
     $('trocar-backup').hidden = !desbloqueio || !$('grupo-arquivo').hidden;
     $('usar-senha').hidden = !faceId || !$('grupo-senha').hidden;
     $('explicacao').hidden = desbloqueio;
+    $('ver-demonstracao').hidden = Boolean(guardado);
     $('trocar-backup').textContent = guardado && guardado.independente ? 'Restaurar uma cópia de segurança'
       : 'Trocar por um backup mais novo';
     // Primeira vez: além de abrir um backup do computador, dá para começar só no celular.
@@ -277,6 +278,67 @@
     }
   }
 
+  // ---- Demonstração: dados fictícios na primeira abertura --------------------------------------------------
+  // Quem ainda não tem dados neste aparelho vê o app funcionando com os dados fictícios do programa
+  // (demonstracao.sqlite3, gerado por gerar_modelo_celular.py), sem senha e só para consulta. As datas são
+  // deslocadas para hoje, como o programa faz: sempre há operações pendentes, atrasadas e recebidas.
+  let demonstracaoDispensada = false;  // A pessoa saiu da demonstração: não volta sozinha até o app ser aberto de novo.
+
+  async function abrirDemonstracao() {
+    const SQL = await LeitorBackup.sqlJs();
+    const db = new SQL.Database(new Uint8Array(await (await fetch('demonstracao.sqlite3')).arrayBuffer()));
+    try {
+      const referencia = db.exec("SELECT valor FROM configuracoes WHERE chave='demonstracao_referencia'")[0].values[0][0];
+      const [ano, mes, dia] = referencia.split('-').map(Number);
+      const [ha, hm, hd] = D.hojeIso().split('-').map(Number);
+      const dias = Math.round((Date.UTC(ha, hm - 1, hd) - Date.UTC(ano, mes - 1, dia)) / 86400000);
+      const mudar = `${dias >= 0 ? '+' : ''}${dias} days`;
+      db.run(`UPDATE rpvs SET aquisicao=date(aquisicao, $d), previsao=date(previsao, $d),
+        previsao_atual_definida=date(previsao_atual_definida, $d), recebimento=date(recebimento, $d)`, { $d: mudar });
+      db.run('UPDATE previsoes_historico SET anterior=date(anterior, $d), nova=date(nova, $d)', { $d: mudar });
+      db.run('UPDATE prorrogacoes SET data=date(data, $d)', { $d: mudar });
+      dados = D.carregar(db);
+    } finally {
+      db.close();
+    }
+    const nenhum = () => Promise.reject(new LeitorBackup.ErroBackup('A demonstração não tem documentos.'));
+    info = { arquivo: 'Demonstração', tamanho: 0, manifesto: { criado_em: LeitorBackup.dataHoraLocal() }, cifrado: false,
+      tempos: {}, extrair: nenhum, todos: async () => ({}), chave: null, independente: false, demonstracao: true };
+    listaPendentes = [];
+    abertasPendentes.clear();
+    $('abertura').hidden = true;
+    $('aplicativo').hidden = false;
+    if (location.hash === '#inicio') {
+      desenhar();
+    } else {
+      location.hash = '#inicio';
+    }
+  }
+
+  function sairDaDemonstracao() {
+    demonstracaoDispensada = true;
+    return fecharDados();
+  }
+
+  $('ver-demonstracao').addEventListener('click', () => {
+    abrirDemonstracao().catch((erro) => mostrarErro('Não foi possível abrir a demonstração: ' + (erro && erro.message ? erro.message : erro)));
+  });
+
+  // Em Mais: escolher um backup mais novo (ou uma cópia de segurança) sem precisar recusar o Face ID. O app volta à
+  // abertura com o arquivo escolhido e, com Face ID ativo, já pede o rosto para abri-lo.
+  async function trocarPorArquivo(arquivo) {
+    const escolhido = { bytes: await arquivo.arrayBuffer(), nome: arquivo.name, tamanho: arquivo.size, novo: true };
+    demonstracaoDispensada = true;
+    await fecharDados();
+    fonte = escolhido;
+    mostrarArquivo = true;
+    if (await prepararAbertura()) {
+      await abrirFonte({ faceId: true, automatico: true });
+    } else {
+      $('senha').focus();
+    }
+  }
+
   function segredoDe(senha, chave) {
     return { senha, sal: FaceId.paraB64(chave.sal), bruta: FaceId.paraB64(chave.bruta) };
   }
@@ -392,7 +454,8 @@
       escondidoEm = Date.now();
       return;
     }
-    if (dados && escondidoEm && Date.now() - escondidoEm > BLOQUEIO_MS) {
+    // A demonstração não tem o que trancar: continua aberta.
+    if (dados && info && !info.demonstracao && escondidoEm && Date.now() - escondidoEm > BLOQUEIO_MS) {
       if (await fecharDados()) {
         abrirFonte({ faceId: true });
       }
@@ -437,15 +500,15 @@
       info.independente && localStorageLer('copia_pendente') === '1' && el('a', { class: 'aviso item', href: '#copia' },
         el('div', { class: 'nome', texto: 'Faça uma cópia de segurança' }),
         el('div', { class: 'discreto pequeno', texto: 'Há mudanças só neste celular. Toque para salvar uma cópia trancada no iCloud ou no Google Drive.' })),
-      dados.demonstracao && el('p', { class: 'aviso', texto: 'Este backup tem dados de demonstração, com nomes e valores fictícios.' }),
-      el('p', { class: 'discreto pequeno', texto: info.independente ? 'Seus dados, guardados neste celular.'
+      dados.demonstracao && !info.demonstracao && el('p', { class: 'aviso', texto: 'Este backup tem dados de demonstração, com nomes e valores fictícios.' }),
+      !info.demonstracao && el('p', { class: 'discreto pequeno', texto: info.independente ? 'Seus dados, guardados neste celular.'
         : `Dados do backup de ${D.dataHora(info.manifesto.criado_em)}${idade}.` }),
       info.independente && !dados.operacoes.length && el('div', { class: 'aviso' },
         el('div', { class: 'nome', texto: 'Por onde começar' }),
         el('div', { texto: '1. Cadastre a conta onde você recebe, na aba Contas.' }),
         el('div', { texto: '2. Cadastre suas entradas na aba Operações (+ Nova entrada).' }),
         el('div', { texto: '3. Quando receber, abra a operação e toque em "Registrar recebimento".' })),
-      !info.independente && dias !== null && dias > 7 && el('p', { class: 'aviso', texto: 'Este backup tem mais de uma semana. Faça um backup novo no computador para ver os dados atuais.' }),
+      !info.independente && !info.demonstracao && dias !== null && dias > 7 && el('p', { class: 'aviso', texto: 'Este backup tem mais de uma semana. Faça um backup novo no computador para ver os dados atuais.' }),
       dados.operacoes.length > 0 && cartaoAgenda(),
       el('div', { class: 'indicadores' },
         indicador('Registros', String(ind.registros)),
@@ -896,7 +959,8 @@
   // Formulário de entrada: nova (r = null) ou edição de uma operação que já existe.
   function telaEntrada(r) {
     if (!info.chave) {
-      return [el('p', { class: 'aviso', texto: 'Para cadastrar ou mudar entradas no celular, abra um backup com senha (feito pelo programa a partir da versão 0.30).' })];
+      return [el('p', { class: 'aviso', texto: info.demonstracao ? 'Na demonstração não dá para cadastrar. Toque em "Começar com meus dados", no aviso do alto da tela.'
+        : 'Para cadastrar ou mudar entradas no celular, abra um backup com senha (feito pelo programa a partir da versão 0.30).' })];
     }
     const contas = [...dados.contas.filter((c) => c.ativa || (r && c.id === r.conta_id)), ...(info.independente ? [] : contasPendentes()
       .map((c) => ({ id: `p:${c.id}`, conta_id: -1, identificacao: c.identificacao, pendente: true })))];
@@ -1136,7 +1200,8 @@
   // Conta de recebimento nova: mesmas regras do computador, inclusive não repetir apelido, conta ou Pix.
   function telaNovaConta() {
     if (!info.chave) {
-      return [el('p', { class: 'aviso', texto: 'Para cadastrar contas no celular, abra um backup com senha (feito pelo programa a partir da versão 0.30).' })];
+      return [el('p', { class: 'aviso', texto: info.demonstracao ? 'Na demonstração não dá para cadastrar. Toque em "Começar com meus dados", no aviso do alto da tela.'
+        : 'Para cadastrar contas no celular, abra um backup com senha (feito pelo programa a partir da versão 0.30).' })];
     }
     const campo = (nome, extra = {}) => el('input', { name: nome, autocomplete: 'off', ...extra });
     const c = {
@@ -1766,6 +1831,7 @@
       opcao('#novidades', 'Novidades', 'O que mudou nas últimas versões'),
       info.independente && opcao('#copia', 'Fazer cópia de segurança', 'Salvar seus dados (trancados) no iCloud ou no Google Drive'),
       opcao('#convite', 'Convidar alguém', 'Mandar o app para outra pessoa usar com os dados dela'),
+      escolherBackup(),
       senhaRecente && !faceIdAtivo && el('div', { class: 'cartao' },
         el('div', { texto: 'Ativar o Face ID' }), el('div', { class: 'discreto pequeno', texto: 'Abrir o app com o rosto, sem digitar a senha' }),
         el('div', { class: 'botoes' }, el('button', { type: 'button', class: 'primario', texto: 'Ativar',
@@ -1779,9 +1845,24 @@
           desenhar();
         }
       } }, el('div', { texto: 'Desativar o Face ID' }), el('div', { class: 'discreto pequeno', texto: 'Voltar a abrir só com a senha' })),
-      el('button', { type: 'button', class: 'primario', texto: 'Trancar agora', onclick: fecharDados }),
-      el('p', { class: 'discreto pequeno', texto: 'Trancar apaga os dados da memória; o backup guardado continua trancado no aparelho. O app também tranca sozinho depois de 5 minutos em segundo plano.' }),
-      el('button', { type: 'button', class: 'secundario', texto: 'Apagar o backup guardado neste aparelho', onclick: esquecerBackup }))];
+      info.demonstracao ? el('button', { type: 'button', class: 'primario', texto: 'Sair da demonstração', onclick: sairDaDemonstracao })
+        : el('button', { type: 'button', class: 'primario', texto: 'Trancar agora', onclick: fecharDados }),
+      !info.demonstracao && el('p', { class: 'discreto pequeno', texto: 'Trancar apaga os dados da memória; o backup guardado continua trancado no aparelho. O app também tranca sozinho depois de 5 minutos em segundo plano.' }),
+      !info.demonstracao && el('button', { type: 'button', class: 'secundario', texto: 'Apagar o backup guardado neste aparelho', onclick: esquecerBackup }))];
+  }
+
+  function escolherBackup() {
+    const [titulo, detalhe] = info.demonstracao ? ['Abrir meu backup', 'Escolher o arquivo .rpvbackup feito pelo programa no computador']
+      : info.independente ? ['Restaurar uma cópia de segurança', 'Escolher um arquivo .rpvbackup (substitui os dados deste celular)']
+        : ['Abrir um backup mais novo', 'Escolher o arquivo .rpvbackup no Google Drive ou em Arquivos'];
+    const entrada = el('input', { type: 'file', class: 'oculto-visual', name: 'escolher_backup', 'aria-label': titulo,
+      onchange: () => {
+        if (entrada.files[0]) {
+          trocarPorArquivo(entrada.files[0]);
+        }
+      } });
+    return el('label', { class: 'cartao escolher-backup' }, el('div', { texto: titulo }),
+      el('div', { class: 'discreto pequeno', texto: detalhe }), entrada);
   }
 
   // O que mudou nas últimas versões (novidades.json, gerado de novidades.py: o mesmo texto do "Sobre" do programa).
@@ -1869,6 +1950,14 @@
     enviar: { titulo: 'Enviar ao computador', aba: 'operacoes', montar: telaEnviar, voltar: true, textual: true },
   };
 
+  function avisoDemonstracao() {
+    return el('div', { class: 'aviso demonstracao' },
+      el('div', { class: 'nome', texto: 'Demonstração' }),
+      el('div', { class: 'pequeno', texto: 'Estes dados são fictícios e meramente sugestivos: servem só para mostrar como o app fica. Nada aqui é real.' }),
+      el('div', { class: 'botoes' }, el('button', { type: 'button', class: 'primario', texto: 'Começar com meus dados',
+        onclick: sairDaDemonstracao })));
+  }
+
   function desenhar() {
     if (!dados) {
       return;
@@ -1882,7 +1971,7 @@
     document.documentElement.style.setProperty('--altura-topo', `${document.querySelector('.topo').offsetHeight}px`);
     $('voltar').hidden = !tela.voltar;
     document.querySelectorAll('.abas a').forEach((a) => a.classList.toggle('ativa', a.dataset.aba === tela.aba));
-    $('tela').replaceChildren(...[tela.montar(id)].flat(2).filter(Boolean));
+    $('tela').replaceChildren(...[info.demonstracao && avisoDemonstracao(), tela.montar(id)].flat(2).filter(Boolean));
     if (tela === TELAS.operacao && dados.operacoes.concat(dados.lixeira).some((r) => r.id === id)) {
       const r = dados.operacoes.find((o) => o.id === id) || dados.lixeira.find((o) => o.id === id);
       $('titulo').textContent = r.nome;
@@ -1935,6 +2024,8 @@
   Promise.all([prepararAbertura(), esperar(ANIMACAO_LOGO_MS)]).then(async ([faceId]) => {
     if (faceId) {
       await abrirFonte({ faceId: true, automatico: true });
+    } else if (!guardadoAtual && !demonstracaoDispensada) {
+      await abrirDemonstracao().catch(() => {});  // Sem a demonstração, fica a tela de abertura de sempre.
     }
     esconderSplash();
   }, esconderSplash);

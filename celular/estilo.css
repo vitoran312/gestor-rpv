@@ -404,3 +404,9 @@ details.colar { margin-bottom: 12px; }
 .resumo-imagem { display: block; width: 100%; max-width: 420px; margin: 0 auto 12px; border-radius: 14px; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.18); }
 label.opcao { display: flex; align-items: center; gap: 10px; font-weight: 600; margin: 4px 0 12px; }
 label.opcao input { width: 22px; height: 22px; margin: 0; }
+
+/* ---- Demonstração e escolher backup em Mais ---- */
+.aviso.demonstracao { border: 1px solid var(--marca); }
+.aviso.demonstracao .nome { font-weight: 700; color: var(--marca); }
+label.escolher-backup { position: relative; overflow: hidden; display: block; margin-top: 0; cursor: pointer; }
+#ver-demonstracao { display: block; margin: 4px auto; }

@@ -234,3 +234,4 @@ gestor-danificado-*
 node_modules/
 # Única exceção: o banco VAZIO com que o app do celular começa (gerado por gerar_modelo_celular.py, sem dados).
 !celular/modelo.sqlite3
+!celular/demonstracao.sqlite3

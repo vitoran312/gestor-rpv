@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## 0.52.0
+
+App do celular:
+- Mais: "Abrir um backup mais novo" (ou "Restaurar uma cópia de segurança", para quem usa só o celular). Escolhido
+  o arquivo, o app volta à abertura com ele e, com Face ID ativo, já pede o rosto para abrir.
+- Primeira abertura, sem dados no aparelho: o app mostra uma demonstração com os dados fictícios do programa
+  (celular/demonstracao.sqlite3, gerado por gerar_modelo_celular.py, com as datas deslocadas para hoje), só para
+  consulta, com o aviso de que os dados são meramente sugestivos em todas as telas e o botão "Começar com meus
+  dados". A abertura também oferece "Ver a demonstração".
+
 ## 0.51.1
 
 - App do celular: no iPhone, a tela da operação voltava para cima ao rolar e escondia os botões do fim. O campo

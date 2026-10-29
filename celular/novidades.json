@@ -1,6 +1,20 @@
 {
   "versoes": [
     {
+      "versao": "0.52.0",
+      "resumo": "2 novidades",
+      "itens": [
+        {
+          "tipo": "novidade",
+          "texto": "Celular: \"Abrir um backup mais novo\" em Mais, sem precisar recusar o Face ID."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: na primeira abertura, uma demonstração com dados fictícios mostra como o app fica."
+        }
+      ]
+    },
+    {
       "versao": "0.51.1",
       "resumo": "1 correção",
       "itens": [
@@ -69,16 +83,6 @@
         {
           "tipo": "novidade",
           "texto": "Celular: \"Convidar alguém\" em Mais, com link e QR code para mandar o app."
-        }
-      ]
-    },
-    {
-      "versao": "0.48.0",
-      "resumo": "1 novidade",
-      "itens": [
-        {
-          "tipo": "novidade",
-          "texto": "Celular: a abertura do app passa a mostrar o nome GESTOR RPV."
         }
       ]
     }
