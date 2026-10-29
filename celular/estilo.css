@@ -322,3 +322,9 @@ button.link {
 
 ul.novidades { margin: 10px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
 ul.novidades .selo { margin-right: 4px; }
+
+.qr { display: grid; justify-items: center; gap: 8px; background: #ffffff; }
+.qr img { width: 220px; height: 220px; image-rendering: pixelated; }
+.qr .discreto { color: #5c6576; overflow-wrap: anywhere; text-align: center; }
+form.recebimento { margin-top: 12px; }
+#comecar { margin: 4px 0 8px; }

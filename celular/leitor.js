@@ -120,6 +120,28 @@ const LeitorBackup = (() => {
     return resultado;
   }
 
+  // Chave nova para quem começa só no celular: sal aleatório e a mesma derivação (scrypt) dos backups.
+  async function novaChave(senha, aoProgredir = () => {}) {
+    const sal = crypto.getRandomValues(new Uint8Array(TAMANHO_SAL));
+    return { sal, bruta: Uint8Array.from(await derivarChave(senha, sal, aoProgredir)) };
+  }
+
+  function dataHoraLocal(agora = new Date()) {
+    const dois = (n) => String(Math.abs(n)).padStart(2, '0');
+    const fuso = -agora.getTimezoneOffset();
+    return `${agora.getFullYear()}-${dois(agora.getMonth() + 1)}-${dois(agora.getDate())}T${dois(agora.getHours())}:`
+      + `${dois(agora.getMinutes())}:${dois(agora.getSeconds())}${fuso >= 0 ? '+' : '-'}${dois(Math.trunc(fuso / 60))}:${dois(fuso % 60)}`;
+  }
+
+  // Monta um backup completo (ZIP com manifesto e banco, cifrado) igual ao que o programa grava; origem
+  // "celular" marca os dados de quem usa só o app. O programa no computador consegue importar este arquivo.
+  async function empacotar(banco, chave, versaoApp) {
+    const manifesto = { formato: FORMATO, versao_formato: 1, versao_app: versaoApp, origem: 'celular',
+      criado_em: dataHoraLocal(), arquivos: { 'banco.sqlite3': await sha256(banco) } };
+    const zip = fflate.zipSync({ 'banco.sqlite3': banco, 'manifesto.json': new TextEncoder().encode(JSON.stringify(manifesto, null, 2)) });
+    return { bytes: await cifrar(zip, chave), manifesto };
+  }
+
   // O sal de um arquivo cifrado (para saber se a chave do backup aberto agora serve para ele).
   function salDe(bytes) {
     return cifrado(bytes) ? bytes.slice(MAGICO.length, MAGICO.length + TAMANHO_SAL) : null;
@@ -210,5 +232,5 @@ const LeitorBackup = (() => {
     return { db, manifesto, cifrado: ehCifrado, tempos, arquivos, extrair, chave: chaveUsada };
   }
 
-  return { ler, decifrar, cifrar, salDe, cifrado, ErroBackup, SenhaIncorreta };
+  return { ler, decifrar, cifrar, empacotar, novaChave, salDe, cifrado, sqlJs, ErroBackup, SenhaIncorreta };
 })();

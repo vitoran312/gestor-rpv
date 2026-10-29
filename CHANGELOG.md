@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## 0.49.0
+
+App do celular para quem não usa o computador:
+- "Começar sem computador" na primeira abertura: a pessoa cria a própria senha (mesmas regras do programa) e
+  o app abre com os dados vazios, com uma dica de por onde começar.
+- Contas, entradas e recebimentos gravados direto no celular, com as mesmas regras e transformações do
+  programa; os dados ficam guardados como um backup trancado pela senha, que o programa consegue importar.
+- "Fazer cópia de segurança" (Mais) e aviso no Início quando há mudanças sem cópia.
+- "Convidar alguém" (Mais): link, mensagem pronta e QR code.
+
 ## 0.48.0
 
 - App do celular: a abertura (logo animado e tela de desbloqueio) mostra o nome GESTOR RPV.

@@ -38,6 +38,8 @@
       <div id="fonte-detalhe" class="nome"></div>
     </div>
     <button id="abrir-faceid" class="primario" type="button" hidden>Abrir com Face ID</button>
+    <!-- Quem não usa o programa no computador: cria a própria senha e começa com os dados vazios. -->
+    <button id="comecar" class="primario" type="button" hidden>Começar sem computador</button>
     <form id="formulario" class="cartao formulario" autocomplete="off">
       <div id="grupo-arquivo" class="formulario">
         <label id="rotulo-arquivo" for="arquivo">Backup (.rpvbackup)</label>
@@ -48,6 +50,15 @@
         <input id="senha" type="password" autocomplete="off" autocapitalize="off" spellcheck="false">
         <button id="abrir" class="primario" type="submit">Abrir com a senha</button>
       </div>
+    </form>
+    <form id="form-novo" class="cartao formulario" autocomplete="off" hidden>
+      <p class="discreto pequeno">Crie a senha que vai proteger seus dados neste celular. Anote em lugar seguro: sem
+        ela não há como abrir os dados nem as cópias de segurança.</p>
+      <label for="senha-nova">Nova senha (pelo menos 10 caracteres)</label>
+      <input id="senha-nova" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false">
+      <label for="senha-repetida">Repita a senha</label>
+      <input id="senha-repetida" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false">
+      <button id="criar" class="primario" type="submit">Criar e começar</button>
     </form>
     <div class="links">
       <button id="usar-senha" class="link" type="button" hidden>Usar a senha</button>
@@ -62,7 +73,7 @@
       trancado pela senha; nada é enviado para a internet.</p>
     <p id="versao-app" class="discreto pequeno"></p>
     <p id="instalar" class="aviso pequeno" hidden>Para usar como app: no Safari, toque em <strong>Compartilhar</strong>
-      e depois em <strong>Adicionar à Tela de Início</strong>.</p>
+      e depois em <strong>Adicionar à Tela de Início</strong>. Abra sempre pelo ícone: o app guarda os dados lá.</p>
   </main>
 
   <!-- Aplicativo: as telas são montadas por app.js conforme o endereço (#inicio, #operacoes...). -->

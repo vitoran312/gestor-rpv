@@ -170,7 +170,7 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
       await pagina.waitForFunction(() => document.querySelector('form .erro').textContent.length > 0);
       resultados.nova_erro = await pagina.evaluate(() => document.querySelector('form .erro').textContent);
       await pagina.fill('[name="custo"]', n.custo);
-      resultados.nova_lucro = await pagina.evaluate(() => document.querySelector('form p.discreto').textContent);
+      resultados.nova_lucro = await pagina.evaluate(() => document.querySelector('#tela form p.discreto').textContent);
       await pagina.click('text=Salvar entrada');
       await pagina.waitForFunction(() => location.hash.startsWith('#enviar/'));
       resultados.nova_tela = await pagina.evaluate(() => document.getElementById('tela').innerText);

@@ -9,7 +9,7 @@ const VERSAO = '__VERSAO__';  // Trocada pelo fluxo de publicação a cada vers�
 const CACHE = 'gestor-rpv-' + VERSAO;
 const ARQUIVOS = [
   './', 'index.html', 'estilo.css', 'app.js', 'dados.js', 'leitor.js', 'guarda.js', 'faceid.js', 'manifest.webmanifest',
-  'novidades.json',
+  'novidades.json', 'modelo.sqlite3', 'icones/qr-app.svg',
   'vendor/scrypt.js', 'vendor/fflate.js', 'vendor/sql-wasm.js', 'vendor/sql-wasm.wasm', 'visualizador.js',
   'vendor/pdfjs/pdf.min.mjs', 'vendor/pdfjs/pdf.worker.min.mjs',
   'vendor/pdfjs/standard_fonts/FoxitDingbats.pfb', 'vendor/pdfjs/standard_fonts/FoxitFixed.pfb',

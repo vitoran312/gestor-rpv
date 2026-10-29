@@ -7,7 +7,7 @@
 (() => {
   // Igual a versao.py (test_celular confere): mostrada na abertura e em Mais, para saber se o aparelho já
   // carregou a última versão publicada.
-  const VERSAO_APP = '0.48.0';
+  const VERSAO_APP = '0.49.0';
   const D = GestorDados;
   const $ = (id) => document.getElementById(id);
   const SITUACOES = { pendente: 'Pendente', atrasada: 'Atrasada', recebida: 'Recebida' };
@@ -41,7 +41,8 @@
   }
 
   function campos(pares) {
-    return el('dl', { class: 'campos' }, pares.filter(([, valor]) => valor !== null && valor !== undefined && valor !== '')
+    // Linhas condicionais (cond && [rótulo, valor]) que não se aplicam chegam como false e são ignoradas.
+    return el('dl', { class: 'campos' }, pares.filter(Boolean).filter(([, valor]) => valor !== null && valor !== undefined && valor !== '')
       .map(([rotulo, valor, classe]) => [el('dt', { texto: rotulo }), el('dd', { texto: String(valor), class: classe })]));
   }
 
@@ -84,18 +85,24 @@
     $('erro').hidden = !texto;
   }
 
+  let guardadoAtual = null;  // O que está guardado no aparelho agora (para não trocar dados do celular sem aviso).
+  let mostrarNovo = false;   // A pessoa tocou em "Começar sem computador".
+
   async function prepararAbertura() {
     const guardado = await Guarda.ler('backup').catch(() => null);
+    guardadoAtual = guardado;
     if (!fonte || !fonte.novo) {
       fonte = guardado ? { ...guardado, novo: false } : null;
     }
     const faceId = fonte && await FaceId.ativo().catch(() => false);
     $('fonte').hidden = !fonte;
     if (fonte) {
-      $('fonte-titulo').textContent = fonte.novo ? 'Backup escolhido agora' : 'Backup guardado neste aparelho';
+      $('fonte-titulo').textContent = fonte.novo ? 'Arquivo escolhido agora'
+        : fonte.independente ? 'Seus dados, guardados neste celular' : 'Backup guardado neste aparelho';
       $('fonte-detalhe').textContent = fonte.criado_em ? `De ${D.dataHora(fonte.criado_em)}` : fonte.nome;
     }
-    $('rotulo-arquivo').textContent = guardado ? 'Backup mais novo (.rpvbackup)' : 'Backup (.rpvbackup)';
+    $('rotulo-arquivo').textContent = guardado ? 'Backup mais novo (.rpvbackup)'
+      : 'Já usa o programa no computador? Abra o backup (.rpvbackup)';
     faceIdAtivo = Boolean(faceId);
     $('abrir-faceid').hidden = !faceId;
     $('abrir').textContent = faceId ? 'Abrir com a senha' : 'Abrir';
@@ -108,6 +115,15 @@
     $('trocar-backup').hidden = !desbloqueio || !$('grupo-arquivo').hidden;
     $('usar-senha').hidden = !faceId || !$('grupo-senha').hidden;
     $('explicacao').hidden = desbloqueio;
+    $('trocar-backup').textContent = guardado && guardado.independente ? 'Restaurar uma cópia de segurança'
+      : 'Trocar por um backup mais novo';
+    // Primeira vez: além de abrir um backup do computador, dá para começar só no celular.
+    $('comecar').hidden = Boolean(guardado || (fonte && fonte.novo)) || mostrarNovo;
+    $('form-novo').hidden = !mostrarNovo || Boolean(guardado);
+    if (mostrarNovo && !guardado) {
+      $('formulario').hidden = true;
+      $('explicacao').hidden = true;
+    }
     return faceId;
   }
 
@@ -117,6 +133,53 @@
     mostrarArquivo = true;
     prepararAbertura();
   });
+  $('comecar').addEventListener('click', () => {
+    // No iPhone, o Safari e o app da Tela de Início guardam dados separados: começar no Safari deixaria os dados
+    // fora do app.
+    const noSafariDoIphone = /iPhone|iPad/.test(navigator.userAgent) && !instalado;
+    if (noSafariDoIphone && !confirm('Você está no Safari. Os dados criados aqui não aparecem no app da Tela de Início. '
+      + 'O certo é tocar em Compartilhar → Adicionar à Tela de Início e começar pelo ícone. Começar aqui mesmo assim?')) {
+      return;
+    }
+    mostrarNovo = true;
+    prepararAbertura().then(() => $('senha-nova').focus());
+  });
+
+  // Dados novos, só no celular: o banco vazio do programa (modelo.sqlite3), empacotado como um backup e trancado
+  // com a senha criada agora. Daí em diante, abre como qualquer backup guardado (Face ID ou senha).
+  $('form-novo').addEventListener('submit', async (evento) => {
+    evento.preventDefault();
+    const senha = $('senha-nova').value;
+    try {
+      D.validarSenha(senha);
+      if (senha !== $('senha-repetida').value) {
+        throw new Error('As duas senhas não são iguais.');
+      }
+    } catch (erro) {
+      mostrarErro(erro.message);
+      return;
+    }
+    mostrarErro('');
+    $('criar').disabled = true;
+    try {
+      const chave = await LeitorBackup.novaChave(senha, (p) => mostrarAndamento('Criando a senha…', p * 0.9));
+      const SQL = await LeitorBackup.sqlJs();
+      const modelo = new SQL.Database(new Uint8Array(await (await fetch('modelo.sqlite3')).arrayBuffer()));
+      const banco = modelo.export();
+      modelo.close();
+      const { bytes, manifesto } = await LeitorBackup.empacotar(banco, chave, VERSAO_APP);
+      fonte = { bytes, nome: 'GestorRPV-celular.rpvbackup', tamanho: bytes.length, criado_em: manifesto.criado_em,
+        novo: true };
+      mostrarNovo = false;
+      $('form-novo').reset();
+      await abrirFonte({ senha, chave });
+    } catch (erro) {
+      mostrarErro('Não foi possível criar os dados neste aparelho: ' + (erro && erro.message ? erro.message : erro));
+    } finally {
+      $('criar').disabled = false;
+    }
+  });
+
   $('usar-senha').addEventListener('click', () => {
     mostrarSenha = true;
     prepararAbertura().then(() => $('senha').focus());
@@ -124,7 +187,14 @@
 
   let faceIdAtivo = false;
 
-  async function abrirFonte({ senha = '', faceId = false, automatico = false }) {
+  let bancoLocal = null;  // Banco aberto (sql.js) de quem usa só o celular: as gravações vão para ele.
+
+  async function abrirFonte({ senha = '', faceId = false, automatico = false, chave: chaveDada = null }) {
+    // Os dados de quem usa só o celular não são trocados por outro arquivo sem a pessoa confirmar.
+    if (fonte && fonte.novo && guardadoAtual && guardadoAtual.independente && !confirm(
+      'Abrir este arquivo substitui os dados guardados neste celular pelos dele. Continuar?')) {
+      return;
+    }
     mostrarErro('');
     $('abrir').disabled = true;
     $('abrir-faceid').disabled = true;
@@ -138,26 +208,32 @@
         liberado = await FaceId.abrir();
         senha = liberado.segredo.senha;
       }
-      const chave = liberado && liberado.segredo.sal
-        ? { sal: FaceId.deB64(liberado.segredo.sal), bruta: FaceId.deB64(liberado.segredo.bruta) } : null;
+      const chave = chaveDada || (liberado && liberado.segredo.sal
+        ? { sal: FaceId.deB64(liberado.segredo.sal), bruta: FaceId.deB64(liberado.segredo.bruta) } : null);
       mostrarAndamento('Abrindo o backup…', 0.05);
       const leitura = await LeitorBackup.ler(new Uint8Array(fonte.bytes), senha, {
         chave,
         // A senha leva alguns segundos de propósito (é o que impede tentativas em massa); a barra mostra o andamento.
         aoProgredir: (etapa, fracao) => mostrarAndamento(`${ETAPAS[etapa]}…`, etapa === 'senha' ? fracao * 0.9 : 0.9 + fracao * 0.1),
       });
+      const independente = leitura.manifesto.origem === 'celular' && leitura.cifrado;
       try {
         dados = D.carregar(leitura.db);
       } finally {
-        leitura.db.close();
+        // Os dados de quem usa só o celular continuam abertos: é neles que o app grava.
+        if (independente) {
+          bancoLocal = leitura.db;
+        } else {
+          leitura.db.close();
+        }
       }
       info = { arquivo: fonte.nome, tamanho: fonte.tamanho, manifesto: leitura.manifesto, cifrado: leitura.cifrado,
-        tempos: leitura.tempos, extrair: leitura.extrair, chave: leitura.chave };
+        tempos: leitura.tempos, extrair: leitura.extrair, chave: leitura.chave, independente };
       await carregarPendentes();
       if (fonte.novo) {
         // O arquivo é guardado como veio do computador: continua trancado pela senha.
         fonte = { bytes: fonte.bytes, nome: fonte.nome, tamanho: fonte.tamanho, criado_em: leitura.manifesto.criado_em,
-          guardado_em: new Date().toISOString(), novo: false };
+          guardado_em: new Date().toISOString(), novo: false, independente };
         await Guarda.gravar('backup', { ...fonte, novo: undefined }).catch(() => {
           info.naoGuardado = true;  // Sem espaço ou sem permissão: funciona agora, mas precisará escolher de novo.
         });
@@ -275,6 +351,10 @@
   // Tranca: apaga os dados da memória e volta à abertura. O backup guardado continua no aparelho, trancado.
   async function fecharDados() {
     liberarDocumento();
+    if (bancoLocal) {
+      bancoLocal.close();
+      bancoLocal = null;
+    }
     dados = null;
     info = null;
     senhaRecente = null;
@@ -348,9 +428,18 @@
     return [
       oferta,
       info.naoGuardado && el('p', { class: 'aviso', texto: 'Não foi possível guardar o backup neste aparelho (falta de espaço?). Na próxima vez, escolha o arquivo de novo.' }),
+      info.independente && localStorageLer('copia_pendente') === '1' && el('a', { class: 'aviso item', href: '#copia' },
+        el('div', { class: 'nome', texto: 'Faça uma cópia de segurança' }),
+        el('div', { class: 'discreto pequeno', texto: 'Há mudanças só neste celular. Toque para salvar uma cópia trancada no iCloud ou no Google Drive.' })),
       dados.demonstracao && el('p', { class: 'aviso', texto: 'Este backup tem dados de demonstração, com nomes e valores fictícios.' }),
-      el('p', { class: 'discreto pequeno', texto: `Dados do backup de ${D.dataHora(info.manifesto.criado_em)}${idade}.` }),
-      dias !== null && dias > 7 && el('p', { class: 'aviso', texto: 'Este backup tem mais de uma semana. Faça um backup novo no computador para ver os dados atuais.' }),
+      el('p', { class: 'discreto pequeno', texto: info.independente ? 'Seus dados, guardados neste celular.'
+        : `Dados do backup de ${D.dataHora(info.manifesto.criado_em)}${idade}.` }),
+      info.independente && !dados.operacoes.length && el('div', { class: 'aviso' },
+        el('div', { class: 'nome', texto: 'Por onde começar' }),
+        el('div', { texto: '1. Cadastre a conta onde você recebe, na aba Contas.' }),
+        el('div', { texto: '2. Cadastre suas entradas na aba Operações (+ Nova entrada).' }),
+        el('div', { texto: '3. Quando receber, abra a operação e toque em "Registrar recebimento".' })),
+      !info.independente && dias !== null && dias > 7 && el('p', { class: 'aviso', texto: 'Este backup tem mais de uma semana. Faça um backup novo no computador para ver os dados atuais.' }),
       el('div', { class: 'indicadores' },
         indicador('Registros', String(ind.registros)),
         indicador('Lucro previsto', D.reais(ind.previsto)),
@@ -462,6 +551,86 @@
     return campo;
   }
 
+  // ---- Quem usa só o celular: gravações direto nos dados do aparelho ---------------------------------------
+  // Cada gravação reempacota os dados como um backup (trancado pela mesma chave) e o guarda no aparelho.
+  async function salvarLocal() {
+    const banco = bancoLocal.export();
+    const { bytes, manifesto } = await LeitorBackup.empacotar(banco, info.chave, VERSAO_APP);
+    fonte = { ...fonte, bytes, tamanho: bytes.length, criado_em: manifesto.criado_em, independente: true };
+    await Guarda.gravar('backup', { bytes, nome: fonte.nome, tamanho: bytes.length, criado_em: manifesto.criado_em,
+      guardado_em: new Date().toISOString(), independente: true });
+    Guarda.persistir();
+    info.manifesto = manifesto;
+    dados = D.carregar(bancoLocal);
+    localStorageGravar('copia_pendente', '1');
+  }
+
+  function inserir(tabela, linha) {
+    const campos = Object.keys(linha);
+    bancoLocal.run(`INSERT INTO ${tabela} (${campos.join(',')}) VALUES (${campos.map(() => '?').join(',')})`,
+      campos.map((k) => linha[k]));
+    return bancoLocal.exec('SELECT last_insert_rowid()')[0].values[0][0];
+  }
+
+  // Como Banco.salvar: nome com iniciais maiúsculas, observação com a primeira maiúscula e a cópia dos dados da
+  // conta guardada na operação.
+  async function gravarEntradaLocal(entrada, conta) {
+    const id = inserir('rpvs', {
+      nome: D.nomeTitulo(entrada.nome), aquisicao: entrada.aquisicao, previsto: entrada.previsto, custo: entrada.custo,
+      conta: conta.identificacao, previsao: entrada.previsao, comissao: entrada.comissao,
+      observacoes: D.primeiraMaiuscula(entrada.observacoes), conta_id: conta.id, conta_snapshot: D.snapshotConta(conta),
+    });
+    await salvarLocal();
+    return id;
+  }
+
+  async function gravarContaLocal(valores) {
+    inserir('contas', D.linhaDaConta(valores));
+    await salvarLocal();
+  }
+
+  // Como Banco.registrar_recebimento (sem anexos, por enquanto).
+  async function registrarRecebimentoLocal(registro, data) {
+    D.validarDataIso(data, 'Data do recebimento');
+    if (data < registro.aquisicao) {
+      throw new Error('O recebimento não pode ser anterior à aquisição.');
+    }
+    if (data > D.hojeIso()) {
+      throw new Error('O recebimento não pode estar no futuro.');
+    }
+    bancoLocal.run('UPDATE rpvs SET recebimento=? WHERE id=? AND lixeira_em IS NULL', [data, registro.id]);
+    await salvarLocal();
+  }
+
+  // Cópia de segurança: o mesmo arquivo trancado, salvo onde a pessoa quiser (Arquivos, iCloud, Google Drive).
+  function telaCopia() {
+    const hoje = D.hojeIso().replaceAll('-', '');
+    const arquivo = new File([new Uint8Array(fonte.bytes)], `GestorRPV-celular-${hoje}.rpvbackup`, { type: 'application/octet-stream' });
+    const podeCompartilhar = navigator.canShare && navigator.canShare({ files: [arquivo] });
+    const resultado = el('p', { class: 'discreto pequeno' });
+    const ultima = localStorageLer('ultima_copia');
+    return [
+      el('p', { texto: 'Seus dados estão só neste celular. Se ele for perdido, trocado ou o app for apagado, eles se vão junto — a cópia de segurança é o que permite recuperar.' }),
+      el('ol', { class: 'passos' },
+        el('li', { texto: 'Toque em "Salvar cópia de segurança".' }),
+        el('li', { texto: 'Escolha "Salvar em Arquivos" e uma pasta do iCloud Drive ou do Google Drive.' }),
+        el('li', { texto: 'Para recuperar num celular novo: instale o app, escolha o arquivo da cópia na primeira tela e digite a senha.' })),
+      podeCompartilhar
+        ? el('button', { type: 'button', class: 'primario', texto: 'Salvar cópia de segurança', onclick: () => {
+          navigator.share({ files: [arquivo] }).then(() => {
+            localStorageGravar('copia_pendente', '0');
+            localStorageGravar('ultima_copia', new Date().toISOString());
+            resultado.textContent = 'Cópia salva. Faça de novo sempre que cadastrar algo importante.';
+          }).catch(() => {});
+        } })
+        : el('a', { class: 'botao-link primario', href: URL.createObjectURL(arquivo), download: arquivo.name,
+          texto: 'Baixar cópia de segurança', onclick: () => localStorageGravar('copia_pendente', '0') }),
+      resultado,
+      el('p', { class: 'discreto pequeno', texto: ultima ? `Última cópia: ${D.dataHora(ultima)}.` : 'Nenhuma cópia feita ainda.' }),
+      el('p', { class: 'discreto pequeno', texto: 'A cópia é trancada com a sua senha: sem ela, ninguém consegue abrir.' }),
+    ];
+  }
+
   // Cifra e guarda no aparelho uma entrada ou conta feita aqui, e abre a tela de envio ao computador.
   async function guardarPendente(tipo, dados) {
     const completa = { id: crypto.randomUUID(), ...dados, criada_em: new Date().toISOString() };
@@ -491,10 +660,11 @@
     if (!info.chave) {
       return [el('p', { class: 'aviso', texto: 'Para cadastrar entradas no celular, abra um backup com senha (feito pelo programa a partir da versão 0.30).' })];
     }
-    const contas = [...dados.contas.filter((c) => c.ativa),
-      ...contasPendentes().map((c) => ({ id: `p:${c.id}`, conta_id: -1, identificacao: c.identificacao, pendente: true }))];
+    const contas = [...dados.contas.filter((c) => c.ativa), ...(info.independente ? [] : contasPendentes()
+      .map((c) => ({ id: `p:${c.id}`, conta_id: -1, identificacao: c.identificacao, pendente: true })))];
     if (!contas.length) {
-      return [el('p', { class: 'aviso', texto: 'Cadastre uma conta de recebimento (aba Contas) antes de cadastrar entradas.' })];
+      return [el('p', { class: 'aviso', texto: 'Cadastre uma conta de recebimento (aba Contas) antes de cadastrar entradas.' }),
+        el('a', { class: 'botao-link primario', href: '#nova-conta', texto: '+ Nova conta' })];
     }
     const valor = campoMoeda;
     const c = {
@@ -559,6 +729,10 @@
       }
       salvar.disabled = true;
       try {
+        if (info.independente) {
+          location.replace(`#operacao/${await gravarEntradaLocal(entrada, conta)}`);
+          return;
+        }
         // Conta ainda não importada: o computador a encontra pelo nome (conta_id -1), importando-a antes.
         await guardarPendente('entrada', { ...entrada, conta_id: conta.pendente ? -1 : conta.id, conta: conta.identificacao });
       } catch (erro) {
@@ -577,7 +751,8 @@
     campoFormulario('Observações (opcional)', c.observacoes),
     erros,
     salvar);
-    return [el('p', { class: 'discreto pequeno', texto: 'A entrada fica guardada neste celular e vai para o computador por um arquivo que você salva na pasta do backup no Google Drive. Ao abrir, o Gestor no computador pergunta se quer importá-la.' }), formulario];
+    return [el('p', { class: 'discreto pequeno', texto: info.independente ? 'A entrada é gravada nos seus dados deste celular.'
+      : 'A entrada fica guardada neste celular e vai para o computador por um arquivo que você salva na pasta do backup no Google Drive. Ao abrir, o Gestor no computador pergunta se quer importá-la.' }), formulario];
   }
 
   function resumoPendente(p) {
@@ -618,7 +793,7 @@
     const formulario = el('form', { class: 'cartao formulario', autocomplete: 'off', onsubmit: async (evento) => {
       evento.preventDefault();
       const valores = Object.fromEntries(Object.entries(c).map(([k, controle]) => [k, controle.value.trim()]));
-      const problemas = D.problemasDaConta(valores, [...dados.contas, ...contasPendentes()]);
+      const problemas = D.problemasDaConta(valores, [...dados.contas, ...(info.independente ? [] : contasPendentes())]);
       if (problemas.length) {
         erros.replaceChildren(...problemas.map((p) => el('div', { texto: p })));
         erros.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -626,6 +801,11 @@
       }
       salvar.disabled = true;
       try {
+        if (info.independente) {
+          await gravarContaLocal(valores);
+          location.replace('#contas');
+          return;
+        }
         await guardarPendente('conta', valores);
       } catch (erro) {
         erros.replaceChildren(el('div', { texto: 'Não foi possível guardar a conta neste aparelho: ' + (erro && erro.message ? erro.message : erro) }));
@@ -635,7 +815,8 @@
     ...Object.entries(D.TITULOS_CONTA).map(([chave, rotulo]) => campoFormulario(
       chave === 'agencia' ? 'Agência (opcional)' : rotulo, c[chave])),
     erros, salvar);
-    return [el('p', { class: 'discreto pequeno', texto: 'A conta fica guardada neste celular e já pode ser escolhida numa entrada nova. Ela vai para o computador do mesmo jeito que as entradas.' }), formulario];
+    return [el('p', { class: 'discreto pequeno', texto: info.independente ? 'A conta é gravada nos seus dados deste celular.'
+      : 'A conta fica guardada neste celular e já pode ser escolhida numa entrada nova. Ela vai para o computador do mesmo jeito que as entradas.' }), formulario];
   }
 
   function telaPendentes() {
@@ -686,6 +867,24 @@
     ];
   }
 
+  // Quem usa só o celular registra o recebimento aqui (no computador, isso é feito no programa).
+  function formularioRecebimento(r) {
+    const data = el('input', { type: 'date', name: 'recebimento', value: D.hojeIso() });
+    const erro = el('div', { class: 'erro', role: 'alert' });
+    const botao = el('button', { type: 'submit', class: 'primario', texto: 'Registrar recebimento' });
+    return el('form', { class: 'cartao formulario recebimento', onsubmit: async (evento) => {
+      evento.preventDefault();
+      botao.disabled = true;
+      try {
+        await registrarRecebimentoLocal(r, data.value);
+        desenhar();
+      } catch (e) {
+        erro.textContent = e.message;
+        botao.disabled = false;
+      }
+    } }, campoFormulario('Data do recebimento', data), erro, botao);
+  }
+
   function telaOperacao(id) {
     const r = dados.operacoes.find((o) => o.id === id) || dados.lixeira.find((o) => o.id === id);
     if (!r) {
@@ -710,6 +909,7 @@
         ['Previsão atual', D.dataBr(r.previsao_atual)],
         ['Recebido em', r.recebimento ? D.dataBr(r.recebimento) : 'Não recebido'],
       ])),
+      info.independente && !r.recebimento && !r.lixeira_em && formularioRecebimento(r),
       el('h2', { texto: 'Conta de destino' }),
       contaRecolhida(r.conta, conta),
       r.observacoes && [el('h2', { texto: 'Observações' }), cartao(el('div', { class: 'observacoes', texto: r.observacoes }))],
@@ -905,6 +1105,8 @@
       opcao('#lixeira', `Lixeira (${dados.lixeira.length})`, 'Operações excluídas, só para consulta'),
       opcao('#backup', 'Sobre este backup', `Arquivo, data e versões · app ${VERSAO_APP}`),
       opcao('#novidades', 'Novidades', 'O que mudou nas últimas versões'),
+      info.independente && opcao('#copia', 'Fazer cópia de segurança', 'Salvar seus dados (trancados) no iCloud ou no Google Drive'),
+      opcao('#convite', 'Convidar alguém', 'Mandar o app para outra pessoa usar com os dados dela'),
       senhaRecente && !faceIdAtivo && el('div', { class: 'cartao' },
         el('div', { texto: 'Ativar o Face ID' }), el('div', { class: 'discreto pequeno', texto: 'Abrir o app com o rosto, sem digitar a senha' }),
         el('div', { class: 'botoes' }, el('button', { type: 'button', class: 'primario', texto: 'Ativar',
@@ -939,12 +1141,46 @@
     return [area];
   }
 
+  // Convite: o link do app, um QR code para quem estiver perto e o passo a passo. Cada pessoa cria a própria
+  // senha e os próprios dados; nada do seu celular vai junto.
+  const ENDERECO_APP = 'https://vitoran312.github.io/gestor-rpv/';
+  const MENSAGEM_CONVITE = 'Use o Gestor RPV no seu iPhone: abra o link no Safari, toque em Compartilhar → '
+    + 'Adicionar à Tela de Início e abra pelo ícone. Depois toque em "Começar sem computador" e crie a sua senha.';
+
+  function telaConvite() {
+    const resultado = el('p', { class: 'discreto pequeno' });
+    const compartilhar = navigator.share
+      ? el('button', { type: 'button', class: 'primario', texto: 'Enviar convite', onclick: () => {
+        navigator.share({ title: 'Gestor RPV', text: MENSAGEM_CONVITE, url: ENDERECO_APP }).catch(() => {});
+      } })
+      : el('button', { type: 'button', class: 'primario', texto: 'Copiar convite', onclick: () => {
+        navigator.clipboard.writeText(`${MENSAGEM_CONVITE}\n${ENDERECO_APP}`)
+          .then(() => { resultado.textContent = 'Convite copiado. Cole no WhatsApp ou no e-mail.'; })
+          .catch(() => { resultado.textContent = ENDERECO_APP; });
+      } });
+    return [
+      el('p', { texto: 'Mande o app para outra pessoa: ela cria a própria senha e começa com os dados vazios. Nada do seu celular vai junto.' }),
+      compartilhar, resultado,
+      el('h2', { texto: 'Ou mostre o QR code' }),
+      el('div', { class: 'cartao qr' }, el('img', { src: 'icones/qr-app.svg', alt: 'QR code com o endereço do app' }),
+        el('div', { class: 'discreto pequeno', texto: ENDERECO_APP })),
+      el('h2', { texto: 'O que a pessoa faz' }),
+      el('ol', { class: 'passos' },
+        el('li', { texto: 'Abre o link (ou aponta a câmera para o QR code) no Safari do iPhone.' }),
+        el('li', { texto: 'Toca em Compartilhar → Adicionar à Tela de Início.' }),
+        el('li', { texto: 'Abre o app pelo ícone novo (não pelo Safari).' }),
+        el('li', { texto: 'Toca em "Começar sem computador", cria a senha e ativa o Face ID.' })),
+    ];
+  }
+
   function telaBackup() {
     const t = info.tempos;
     return [cartao(campos([
       ['Arquivo', info.arquivo],
       ['Criado em', D.dataHora(info.manifesto.criado_em)],
-      ['Feito no computador pela versão', info.manifesto.versao_app || 'não informada'],
+      info.independente ? ['Dados', 'Criados e guardados neste celular']
+        : ['Feito no computador pela versão', info.manifesto.versao_app || 'não informada'],
+      info.independente && ['Última gravação', D.dataHora(info.manifesto.criado_em)],
       ['Versão deste app', VERSAO_APP],
       ['Protegido por senha', info.cifrado ? 'sim' : 'não'],
       ['Tempo para abrir', `${((Object.values(t).reduce((a, b) => a + b, 0)) / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} s`],
@@ -964,6 +1200,8 @@
     backup: { titulo: 'Sobre este backup', aba: 'mais', montar: telaBackup, voltar: true },
     novidades: { titulo: 'Novidades', aba: 'mais', montar: telaNovidades, voltar: true },
     nova: { titulo: 'Nova entrada', aba: 'operacoes', montar: telaNovaEntrada, voltar: true },
+    copia: { titulo: 'Cópia de segurança', aba: 'mais', montar: telaCopia, voltar: true },
+    convite: { titulo: 'Convidar alguém', aba: 'mais', montar: telaConvite, voltar: true },
     'nova-conta': { titulo: 'Nova conta', aba: 'contas', montar: telaNovaConta, voltar: true },
     pendentes: { titulo: 'Aguardando o computador', aba: 'operacoes', montar: telaPendentes, voltar: true },
     enviar: { titulo: 'Enviar ao computador', aba: 'operacoes', montar: telaEnviar, voltar: true, textual: true },

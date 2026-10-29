@@ -1,6 +1,28 @@
 {
   "versoes": [
     {
+      "versao": "0.49.0",
+      "resumo": "4 novidades",
+      "itens": [
+        {
+          "tipo": "novidade",
+          "texto": "Celular: usar o app sem computador — cada pessoa cria a própria senha e começa com os dados vazios."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: sem computador, as contas, as entradas e os recebimentos são gravados no próprio celular."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: cópia de segurança dos dados do celular, trancada com a senha, para guardar no iCloud ou no Google Drive."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: \"Convidar alguém\" em Mais, com link e QR code para mandar o app."
+        }
+      ]
+    },
+    {
       "versao": "0.48.0",
       "resumo": "1 novidade",
       "itens": [
@@ -45,28 +67,6 @@
         {
           "tipo": "correcao",
           "texto": "Celular: a janela do Face ID cobria a animação de abertura; agora o logo aparece primeiro e o Face ID vem logo depois, com o logo ao fundo."
-        }
-      ]
-    },
-    {
-      "versao": "0.44.0",
-      "resumo": "4 novidades",
-      "itens": [
-        {
-          "tipo": "novidade",
-          "texto": "Celular: os valores ganham a pontuação sozinhos enquanto você digita (1.500,00)."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Celular: abertura com o logo do app."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Celular: com o backup guardado, o app abre direto no Face ID ou na senha, sem a tela de escolher arquivo."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Lista do que mudou nas últimas versões, no \"Sobre\" do programa e no app."
         }
       ]
     }

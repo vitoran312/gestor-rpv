@@ -230,6 +230,73 @@ const GestorDados = (() => {
     return [...new Set(problemas)];
   }
 
+  // ---- Gravação direta no celular (quem usa só o app): mesmas transformações de dados.py e cifra.py ------
+  // str.title() do Python: maiúscula depois de tudo o que não é letra ("d'ávila" → "D'Ávila").
+  function titulo(texto) {
+    let anteriorLetra = false;
+    return Array.from(texto).map((c) => {
+      const letra = c.toLowerCase() !== c.toUpperCase();
+      const saida = letra ? (anteriorLetra ? c.toLowerCase() : c.toUpperCase()) : c;
+      anteriorLetra = letra;
+      return saida;
+    }).join('');
+  }
+
+  // dados.nome_formatado: espaços normalizados e iniciais maiúsculas.
+  function nomeTitulo(texto) {
+    return titulo(nomeFormatado(texto));
+  }
+
+  const primeiraMaiuscula = (texto) => texto.slice(0, 1).toUpperCase() + texto.slice(1);
+
+  // Linha da tabela contas como Banco.salvar_conta grava (inclusive as chaves que impedem duplicidade).
+  function linhaDaConta(c) {
+    const d = Object.fromEntries(Object.keys(TITULOS_CONTA).map((k) => [k, (c[k] || '').trim()]));
+    d.estado = d.estado.toUpperCase();
+    d.cpf = validarCpf(d.cpf);
+    for (const campo of ['nome', 'endereco', 'cidade']) {
+      d[campo] = nomeTitulo(d[campo]);
+    }
+    for (const campo of ['identificacao', 'endereco', 'banco']) {
+      d[campo] = primeiraMaiuscula(d[campo]);
+    }
+    return { ...d, identificacao_chave: normalizar(d.identificacao), banco_chave: normalizar(d.banco),
+      agencia_chave: d.agencia ? (normalizar(d.agencia).replace(/^0+/, '') || '0') : '',
+      numero_chave: normalizar(d.numero).replace(/^0+/, '') || '0' };
+  }
+
+  // Banco.snapshot: os dados da conta guardados na operação, no mesmo texto que o json.dumps do Python.
+  function snapshotConta(conta) {
+    return '{' + Object.keys(TITULOS_CONTA).map((k) => `${JSON.stringify(k)}: ${JSON.stringify(conta[k] ?? '')}`)
+      .join(', ') + '}';
+  }
+
+  // cifra.validar_senha.
+  const BASES_OBVIAS = new Set(["", "senha", "minhasenha", "password", "passw", "qwerty", "qwertyuiop", "asdf", "asdfgh", "abc", "abcd", "abcdef", "abcabc", "abcabcab", "iloveyou", "teamo", "brasil", "admin", "teste", "mudar", "mudarsenha", "gestor", "gestorrpv", "rpv", "vitoran", "backup", "dragon", "monkey", "letmein", "welcome"]);
+  const SENHA_MINIMA = 10;
+  const SENHA_MAXIMA = 256;
+
+  function validarSenha(senha) {
+    if (senha !== senha.trim()) {
+      throw new Error('A senha não pode começar nem terminar com espaço.');
+    }
+    const caracteres = Array.from(senha);
+    if (caracteres.length < SENHA_MINIMA || caracteres.length > SENHA_MAXIMA) {
+      throw new Error(`A senha precisa ter de ${SENHA_MINIMA} a ${SENHA_MAXIMA} caracteres.`);
+    }
+    const letras = Array.from(senha.toLowerCase().normalize('NFKD')).filter((c) => /\p{L}/u.test(c)).join('');
+    const minusculo = Array.from(senha.toLowerCase());
+    let passos = 0;
+    for (let i = 1; i < minusculo.length; i += 1) {
+      passos += Math.abs(minusculo[i].codePointAt(0) - minusculo[i - 1].codePointAt(0)) <= 1 ? 1 : 0;
+    }
+    if (new Set(caracteres).size < 4 || BASES_OBVIAS.has(letras) || passos >= caracteres.length - 3) {
+      throw new Error('Essa senha é fácil demais de adivinhar. Use uma frase com palavras que só você liga, '
+        + 'por exemplo "cavalo azul bebe café".');
+    }
+    return senha;
+  }
+
   // ---- Situação e indicadores (dados.situacao e Minhas operações) -------------------------------------
   function situacao(registro, hoje = hojeIso()) {
     if (registro.recebimento) {
@@ -398,6 +465,6 @@ const GestorDados = (() => {
 
   return {
     TITULOS_CONTA, moeda, reais, dataBr, dataHora, hojeIso, cpf, situacao, contarSituacoes, indicadores,
-    centavos, problemasDaEntrada, nomeFormatado, ESTADOS, validarCpf, mesmaChavePix, problemasDaConta, normalizar, chaveTexto, encontra, filtrar, resumoMensal, escala, valoresDoMes, quantidade, rotuloMes, carregar, contaDaOperacao,
+    centavos, problemasDaEntrada, validarDataIso, nomeFormatado, nomeTitulo, linhaDaConta, snapshotConta, validarSenha, primeiraMaiuscula, ESTADOS, validarCpf, mesmaChavePix, problemasDaConta, normalizar, chaveTexto, encontra, filtrar, resumoMensal, escala, valoresDoMes, quantidade, rotuloMes, carregar, contaDaOperacao,
   };
 })();

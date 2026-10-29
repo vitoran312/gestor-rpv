@@ -401,6 +401,98 @@ class TestAppDoCelular(unittest.TestCase):
         self.assertEqual(self.resultados['fechado'], {'abertura': True, 'tela_vazia': True, 'senha_vazia': True})
 
 
+@unittest.skipUnless(os.environ.get('GESTOR_RPV_TESTE_CELULAR') == '1', 'Requer Node.js com Playwright e '
+                     'GESTOR_RPV_TESTE_CELULAR=1')
+class TestQuemUsaSoOCelular(unittest.TestCase):
+    """Começa sem computador: os dados nascem no celular, no mesmo formato de backup do programa."""
+    SENHA = 'cavalo azul bebe cafe'
+    CONTA = {'identificacao': 'nubank pessoal', 'nome': 'maria  de souza', 'cpf': '529.982.247-25',
+             'endereco': 'rua das flores', 'numero_endereco': '12', 'cidade': 'são paulo', 'estado': 'SP',
+             'banco': 'nubank', 'agencia': '0001', 'numero': '12345-6', 'pix': 'maria@example.com'}
+    ENTRADA = {'nome': "joão d'ávila   santos", 'aquisicao': '2026-10-01', 'custo': '500000', 'previsto': '800000',
+               'previsao': '2026-12-01', 'observacoes': 'primeira entrada'}
+    NOMES = ["joão d'ávila", 'MARIA-JOSÉ', '3rd ávila', 'ana  beatriz', "o'neill mcdonald"]
+    SENHAS = ['123456789', 'abcdefghij', ' com espaço ', 'senha@12345', 'cavalo azul bebe cafe', 'Mar1aJ0se!x']
+
+    @classmethod
+    def setUpClass(cls):
+        cls.temp = tempfile.TemporaryDirectory()
+        cls.pasta = Path(cls.temp.name)
+        site = cls.pasta / 'site'
+        shutil.copytree(RAIZ / 'celular', site, ignore=shutil.ignore_patterns('testes'))
+        cls.hoje = date.today().isoformat()
+        servidor = ThreadingHTTPServer(('127.0.0.1', 0), functools.partial(Silencioso, directory=str(site)))
+        threading.Thread(target=servidor.serve_forever, daemon=True).start()
+        try:
+            cls.r = json.loads(rodar_node('independente.cjs', f'http://127.0.0.1:{servidor.server_address[1]}', {
+                'senha': cls.SENHA, 'conta': cls.CONTA, 'entrada': cls.ENTRADA, 'hoje': cls.hoje,
+                'senhas_ruins': [['123', '123'], ['abcdefghij', 'abcdefghij'], [cls.SENHA, cls.SENHA + 'x']],
+                'nomes': cls.NOMES, 'senhas_regra': cls.SENHAS}))
+        finally:
+            servidor.shutdown()
+            servidor.server_close()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.temp.cleanup()
+
+    def test_senha_nova_com_as_regras_do_programa(self):
+        erros = self.r['erros_senha']
+        self.assertIn('de 10 a 256 caracteres', erros[0])
+        self.assertIn('fácil demais', erros[1])
+        self.assertIn('não são iguais', erros[2])
+        import cifra
+        esperado = []
+        for senha in self.SENHAS:
+            try:
+                cifra.validar_senha(senha)
+                esperado.append('ok')
+            except ValueError as erro:
+                esperado.append(str(erro))
+        self.assertEqual(self.r['regras']['senhas'], esperado)
+
+    def test_nomes_como_o_programa_grava(self):
+        from dados import nome_formatado
+        self.assertEqual(self.r['regras']['titulos'], [nome_formatado(n) for n in self.NOMES])
+
+    def test_app_abre_vazio_e_grava_no_celular(self):
+        self.assertEqual(self.r['erros'], [])
+        self.assertIn('Registros\n0', self.r['inicio_vazio'])
+        self.assertIn('Nubank pessoal', self.r['contas'])
+        self.assertIn("João D'Ávila Santos", self.r['detalhe'])
+        self.assertIn('futuro', self.r['erro_recebimento'])
+        self.assertIn('Recebida', self.r['detalhe_recebido'])
+        self.assertIn('Faça uma cópia de segurança', self.r['inicio_com_dados'])
+        self.assertIn('Fazer cópia de segurança', self.r['mais'])
+        self.assertEqual(self.r['abertura'], {'fonte': 'Seus dados, guardados neste celular', 'comecar': False,
+                                              'trocar': 'Restaurar uma cópia de segurança'})
+        self.assertIn("João D'Ávila Santos", self.r['operacoes_depois'])  # Continua depois de trancar e abrir.
+        self.assertIn('cópia de segurança', self.r['copia'])
+        self.assertIn('Começar sem computador', self.r['convite'])
+        self.assertTrue(self.r['guardado']['independente'])
+
+    def test_dados_do_celular_abrem_no_programa_como_o_programa_gravaria(self):
+        import base64
+        from backup import BackupPreparado
+        arquivo = self.pasta / 'GestorRPV-celular.rpvbackup'
+        arquivo.write_bytes(base64.b64decode(self.r['guardado']['bytes']))
+        do_celular = Banco(self.pasta / 'restaurado' / 'gestor.sqlite3')
+        with BackupPreparado(arquivo, self.SENHA) as preparado:
+            self.assertEqual(preparado.resumo['registros'], 1)
+            preparado.restaurar(do_celular, copia_de_seguranca=False)
+        referencia = Banco(self.pasta / 'referencia' / 'gestor.sqlite3')
+        conta_id = referencia.salvar_conta(self.CONTA)
+        rpv = referencia.salvar(dict(self.ENTRADA, custo=500000, previsto=800000, comissao=None, conta_id=conta_id,
+                                     conta=''))
+        referencia.registrar_recebimento(rpv, self.hoje)
+        def linha(banco, tabela):
+            with banco.conectar() as con:
+                return {k: v for k, v in dict(con.execute(f'SELECT * FROM {tabela}').fetchone()).items() if k != 'id'}
+
+        self.assertEqual(linha(do_celular, 'contas'), linha(referencia, 'contas'))
+        self.assertEqual(linha(do_celular, 'rpvs'), linha(referencia, 'rpvs'))
+
+
 class TestArquivosDoApp(unittest.TestCase):
     """Conferências que não precisam de navegador: rodam também no CI."""
 
@@ -424,6 +516,25 @@ class TestArquivosDoApp(unittest.TestCase):
             with self.subTest(arquivo.name):
                 resultado = subprocess.run(['node', '--check', str(arquivo)], capture_output=True, text=True)
                 self.assertEqual(resultado.returncode, 0, resultado.stderr)
+
+    def test_modelo_do_celular_tem_o_esquema_atual_do_banco(self):
+        # Mudou o esquema em dados.py? Rode "python gerar_modelo_celular.py" para o app criar dados iguais.
+        import sqlite3
+        import gerar_modelo_celular
+
+        def esquema(caminho):
+            con = sqlite3.connect(caminho)
+            try:
+                return (sorted(con.execute("SELECT type, name, sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'")),
+                        con.execute('PRAGMA user_version').fetchone()[0],
+                        con.execute('SELECT COUNT(*) FROM configuracoes').fetchone()[0])
+            finally:
+                con.close()
+
+        with tempfile.TemporaryDirectory() as pasta:
+            novo = Path(pasta) / 'modelo.sqlite3'
+            gerar_modelo_celular.gerar(novo)
+            self.assertEqual(esquema(RAIZ / 'celular' / 'modelo.sqlite3'), esquema(novo))
 
     def test_versao_mostrada_no_app_e_a_do_programa(self):
         import re

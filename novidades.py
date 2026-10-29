@@ -10,6 +10,15 @@ from pathlib import Path
 MOSTRAR = 5  # Quantas versões aparecem no "Sobre".
 
 NOVIDADES = [
+    ('0.49.0', [
+        ('novidade', 'Celular: usar o app sem computador — cada pessoa cria a própria senha e começa com os dados '
+                     'vazios.'),
+        ('novidade', 'Celular: sem computador, as contas, as entradas e os recebimentos são gravados no próprio '
+                     'celular.'),
+        ('novidade', 'Celular: cópia de segurança dos dados do celular, trancada com a senha, para guardar no iCloud '
+                     'ou no Google Drive.'),
+        ('novidade', 'Celular: "Convidar alguém" em Mais, com link e QR code para mandar o app.'),
+    ]),
     ('0.48.0', [
         ('novidade', 'Celular: a abertura do app passa a mostrar o nome GESTOR RPV.'),
     ]),
