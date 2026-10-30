@@ -1,5 +1,28 @@
 # Histórico de versões
 
+## 0.61.0
+
+Celular como principal, com backup na nuvem (Cloudflare Workers, plano gratuito) e lembretes:
+- nuvem/worker.js: guarda o último backup (já cifrado pelo celular) no Workers KV, em partes de 20 MiB; a pessoa
+  é um identificador e uma chave de acesso derivados da senha (scrypt com sal fixo "gestor-rpv/nuvem/v1", em
+  nuvem.py e celular/nuvem.js); o resumo da chave fica registrado no primeiro envio. Outro aparelho com a mesma
+  senha (outro sal de cifra) só sobrescreve pedindo. Exclusão apaga tudo. nuvem/publicar.py publica pela API
+  (KV, código, workers.dev e o agendamento diário).
+- Lembretes: o celular manda só as datas das previsões e a assinatura de notificações; às 11h UTC (8h em
+  Brasília) o Worker manda, por Web Push (RFC 8291, VAPID), "Amanhã há N previsões"; assinaturas vencidas saem.
+- Celular: Mais → "Tornar este celular o principal" (com o backup do computador aberto e nada aguardando:
+  reempacota com origem "celular", liga a nuvem e envia); backup automático a cada gravação, com situação,
+  "Enviar agora", "Substituir" (conflito) e "Desligar" (apaga da nuvem); "Recuperar meus dados da nuvem" na
+  abertura; cartão de lembretes; sem "Trancar agora" (os testes trancam por trancarGestor()). CSP liberando só o
+  endereço do Worker.
+- Programa: ao abrir (2,5 s depois, em segundo plano), procura na nuvem o backup do celular com a senha dos
+  backups; na primeira vez pergunta; troca os dados com cópia de segurança e fica só para consulta
+  (Banco.somente_leitura recusa alterações; Nova entrada, recebimento, previsão, exclusão, contas e importações
+  avisam antes). Sem internet, segue com os últimos dados do celular; se o celular desligar a nuvem, volta a
+  aceitar alterações. Estado guardado em nuvem_versao, nuvem_criado_em e nuvem_espelho (configurações locais).
+- Testes: test_nuvem.py (Worker no Node com KV na memória, decifragem do lembrete pela RFC 8291, VAPID, cliente
+  do programa, modo só consulta na interface e o app de ponta a ponta com o Worker desviado).
+
 ## 0.60.0
 
 - Celular: tema escolhido em Mais → Aparência (Automático, Claro, Escuro), guardado no aparelho

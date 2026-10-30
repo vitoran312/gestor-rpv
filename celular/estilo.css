@@ -567,6 +567,13 @@ dl.campos dd { margin: 0; text-align: right; overflow-wrap: anywhere; font-weigh
 .icone-menu.verde { color: var(--verde); background: var(--verde-suave); }
 .icone-menu.ambar { color: var(--ambar); background: var(--ambar-suave); }
 .menu-acoes { display: grid; gap: 4px; margin-top: 22px; }
+/* Nuvem e lembretes: título, situação e as ações no próprio cartão. */
+.cartao.nuvem { display: grid; gap: 12px; }
+.cartao.nuvem .nome { font-weight: 600; }
+.cartao.nuvem .botoes { margin-top: 0; flex-wrap: wrap; }
+.cartao.nuvem .botoes button { flex: 1 1 140px; }
+.cartao.nuvem form { gap: 8px; }
+.cartao.nuvem p:empty { display: none; }  /* A linha de andamento só ocupa espaço quando tem algo a dizer. */
 /* Tema: três opções lado a lado; a escolhida em terracota. */
 .cartao.tema { display: grid; gap: 12px; }
 .cartao.tema .textos > :first-child { font-weight: 600; }

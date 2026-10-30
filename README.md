@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.60.0
+# Gestor de RPV — 0.61.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -476,6 +476,21 @@ teste também em outro computador sem Python ou no Windows Sandbox, se disponív
 Cadastre uma entrada de exemplo, abra a janela Sobre, anexe um documento e teste
 backup/importação usando dados de teste. Em um computador novo, somente o `.exe`
 começa com um banco próprio; transfira os registros usando o backup do aplicativo.
+
+## Celular como principal e nuvem
+
+Com o backup do computador aberto no celular, **Mais → Tornar este celular o principal** (com a senha dos
+backups) passa os dados para o celular: entradas e alterações valem na hora, e a cada gravação o app manda o
+backup, trancado com a senha, para a nuvem do Gestor (um Worker no plano gratuito da Cloudflare,
+`nuvem/worker.js`). Ao abrir, o programa no computador procura esse backup com a senha dos backups, carrega os
+dados mais novos (guardando antes uma cópia de segurança) e fica **só para consulta**. Sem internet, ele segue
+com os últimos dados do celular; se o celular desligar a nuvem (Mais → Desligar), o computador volta a aceitar
+alterações. Num celular novo, **Recuperar meus dados da nuvem**, na abertura, traz tudo de volta com a mesma
+senha. Em Mais também dá para ligar o **lembrete um dia antes da previsão** (às 8h, pelo app da Tela de Início).
+
+A nuvem só vê bytes cifrados: o identificador e a chave de acesso saem da senha (scrypt), em `nuvem.py` e em
+`celular/nuvem.js`, e os lembretes levam só as datas. Para publicar o Worker numa conta:
+`python nuvem/publicar.py --primeira` (depois, sem `--primeira`, para atualizar mantendo as chaves).
 
 ## App do celular (piloto, só consulta)
 

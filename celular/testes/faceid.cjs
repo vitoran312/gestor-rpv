@@ -52,7 +52,7 @@ const { chromium } = require('playwright');
 
     // 2. Trancar e abrir de novo: backup guardado, sem escolher arquivo; o Face ID abre sem senha e sem scrypt.
     await pagina.evaluate(() => { location.hash = '#mais'; });
-    await pagina.click('text=Trancar agora');
+    await pagina.evaluate(() => trancarGestor());
     await pagina.waitForSelector('#abrir-faceid:not([hidden])');
     r.trancado = await estado();
     await pagina.click('#abrir-faceid');
@@ -81,7 +81,7 @@ const { chromium } = require('playwright');
 
     // 4. Backup novo, aberto pelo mesmo Face ID: passa a ser o guardado e a chave nova fica no Face ID.
     await pagina.evaluate(() => { location.hash = '#mais'; });
-    await pagina.click('text=Trancar agora');
+    await pagina.evaluate(() => trancarGestor());
     await pagina.waitForSelector('#abertura:not([hidden])');
     await pagina.setInputFiles('#arquivo', segundo);
     await pagina.waitForFunction(() => document.getElementById('fonte-titulo').textContent.includes('escolhido'));
@@ -103,7 +103,7 @@ const { chromium } = require('playwright');
 
     // 5. Senha errada no backup guardado (sem Face ID) mostra o erro e não abre.
     await pagina.evaluate(() => { location.hash = '#mais'; });
-    await pagina.click('text=Trancar agora');
+    await pagina.evaluate(() => trancarGestor());
     await pagina.waitForSelector('#abertura:not([hidden])');
     await pagina.click('#usar-senha');  // Com Face ID ativo, a senha fica atrás de um toque.
     await pagina.fill('#senha', senha + 'x');

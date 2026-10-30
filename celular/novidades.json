@@ -1,6 +1,36 @@
 {
   "versoes": [
     {
+      "versao": "0.61.0",
+      "resumo": "6 novidades",
+      "itens": [
+        {
+          "tipo": "novidade",
+          "texto": "Celular: \"Tornar este celular o principal\"; entradas e alterações valem na hora, sem o computador."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: backup automático na nuvem a cada gravação, trancado com a sua senha."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: \"Recuperar meus dados da nuvem\" num celular novo, com a mesma senha."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: lembrete às 8h do dia anterior a cada previsão de recebimento."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Programa: ao abrir, carrega sozinho os dados mais novos do celular e fica só para consulta."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: o botão \"Trancar agora\" saiu de Mais; o app continua trancando sozinho."
+        }
+      ]
+    },
+    {
       "versao": "0.60.0",
       "resumo": "3 novidades · 1 correção",
       "itens": [
@@ -61,16 +91,6 @@
         {
           "tipo": "novidade",
           "texto": "Celular: \"Excluir permanentemente\" na lixeira, para quem usa só o celular; a operação sai de vez, com os documentos."
-        }
-      ]
-    },
-    {
-      "versao": "0.56.0",
-      "resumo": "1 novidade",
-      "itens": [
-        {
-          "tipo": "novidade",
-          "texto": "Programa e celular: senha nova com no mínimo 6 caracteres (antes 10), misturando letras, números e símbolos."
         }
       ]
     }

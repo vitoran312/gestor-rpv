@@ -177,6 +177,8 @@ class JanelaContas:
             self.formulario(conta['id'])
 
     def alterar_status(self):
+        if self.app.so_consulta():
+            return
         conta = self.selecionada()
         if conta is None:
             return
@@ -193,6 +195,8 @@ class JanelaContas:
         notificar(self.app.janela, f"Conta {conta['identificacao']} {'desativada' if conta['ativa'] else 'reativada'}.")
 
     def remover(self):
+        if self.app.so_consulta():
+            return
         selecao = self.tabela.selection()
         if not selecao:
             messagebox.showinfo('Remover contas', 'Selecione uma ou mais contas.', parent=self.tela)
@@ -219,6 +223,8 @@ class JanelaContas:
         notificar(self.app.janela, 'Conta removida.' if len(selecao) == 1 else f'{len(selecao)} contas removidas.')
 
     def formulario(self, identificador=None):
+        if identificador is None and self.app.so_consulta():
+            return
         conta = self.banco.obter_conta(identificador) if identificador else None
         tela = tk.Toplevel(self.tela)
         tela.withdraw()
@@ -279,7 +285,10 @@ class JanelaContas:
         fechar = fechar_com_confirmacao(tela, lambda: tuple(variavel.get() for variavel in campos.values()),
                                         'Os dados digitados')
         ttk.Button(botoes, text='Cancelar', command=fechar).pack(side='left', expand=True, fill='x', padx=(0, 8))
-        ttk.Button(botoes, text='Salvar conta', style='Salvar.TButton', command=salvar).pack(side='left', expand=True, fill='x')
+        salvar_conta = ttk.Button(botoes, text='Salvar conta', style='Salvar.TButton', command=salvar)
+        salvar_conta.pack(side='left', expand=True, fill='x')
+        if self.banco.somente_leitura:
+            salvar_conta.state(['disabled'])  # Só consulta: a conta é mostrada, mas mudada só no celular.
         centralizar(tela)
         surgir(tela)
         tela.grab_set()

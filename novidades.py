@@ -10,6 +10,14 @@ from pathlib import Path
 MOSTRAR = 5  # Quantas versões aparecem no "Sobre".
 
 NOVIDADES = [
+    ('0.61.0', [
+        ('novidade', 'Celular: "Tornar este celular o principal"; entradas e alterações valem na hora, sem o computador.'),
+        ('novidade', 'Celular: backup automático na nuvem a cada gravação, trancado com a sua senha.'),
+        ('novidade', 'Celular: "Recuperar meus dados da nuvem" num celular novo, com a mesma senha.'),
+        ('novidade', 'Celular: lembrete às 8h do dia anterior a cada previsão de recebimento.'),
+        ('novidade', 'Programa: ao abrir, carrega sozinho os dados mais novos do celular e fica só para consulta.'),
+        ('novidade', 'Celular: o botão "Trancar agora" saiu de Mais; o app continua trancando sozinho.'),
+    ]),
     ('0.60.0', [
         ('novidade', 'Celular: tema Claro, Escuro ou Automático (o do iPhone), em Mais → Aparência.'),
         ('novidade', 'Celular: "Voltar" em todas as telas, inclusive Operações, Contas e Mais, e nos passos da abertura.'),

@@ -7,7 +7,7 @@
 (() => {
   // Igual a versao.py (test_celular confere): mostrada na abertura e em Mais, para saber se o aparelho já
   // carregou a última versão publicada.
-  const VERSAO_APP = '0.60.0';
+  const VERSAO_APP = '0.61.0';
   const D = GestorDados;
   const $ = (id) => document.getElementById(id);
   const SITUACOES = { pendente: 'Pendente', atrasada: 'Atrasada', recebida: 'Recebida' };
@@ -142,6 +142,7 @@
 
   let guardadoAtual = null;  // O que está guardado no aparelho agora (para não trocar dados do celular sem aviso).
   let mostrarNovo = false;   // A pessoa tocou em "Começar sem computador".
+  let mostrarNuvem = false;  // A pessoa tocou em "Recuperar meus dados da nuvem".
 
   async function prepararAbertura() {
     const guardado = await Guarda.ler('backup').catch(() => null);
@@ -182,6 +183,12 @@
       $('formulario').hidden = true;
       $('explicacao').hidden = true;
     }
+    // Celular novo: recuperar o backup que o app mandava para a nuvem.
+    $('recuperar-nuvem').hidden = Boolean(guardado || (fonte && fonte.novo)) || mostrarNovo || mostrarNuvem;
+    $('form-nuvem').hidden = !mostrarNuvem || Boolean(guardado);
+    if (mostrarNuvem && !guardado) {
+      ['formulario', 'explicacao', 'comecar', 'ver-demonstracao'].forEach((id) => { $(id).hidden = true; });
+    }
     return faceId;
   }
 
@@ -189,7 +196,7 @@
   let mostrarSenha = false;    // A pessoa tocou em "Usar a senha" (com Face ID ativo).
 
   function emPassoDaAbertura() {
-    return Boolean(mostrarNovo || mostrarArquivo || mostrarSenha || (fonte && fonte.novo && guardadoAtual));
+    return Boolean(mostrarNovo || mostrarNuvem || mostrarArquivo || mostrarSenha || (fonte && fonte.novo && guardadoAtual));
   }
 
   // Cada passo da abertura entra no histórico: o gesto ou a tecla de voltar do aparelho também volta dele.
@@ -201,6 +208,7 @@
 
   function sairDoPasso() {
     mostrarNovo = false;
+    mostrarNuvem = false;
     mostrarArquivo = false;
     mostrarSenha = false;
     if (fonte && fonte.novo) {
@@ -275,6 +283,43 @@
       mostrarErro('Não foi possível criar os dados neste aparelho: ' + (erro && erro.message ? erro.message : erro));
     } finally {
       $('criar').disabled = false;
+    }
+  });
+
+  $('recuperar-nuvem').addEventListener('click', () => {
+    entrarNoPasso();
+    mostrarNuvem = true;
+    prepararAbertura().then(() => $('senha-nuvem').focus());
+  });
+
+  $('form-nuvem').addEventListener('submit', async (evento) => {
+    evento.preventDefault();
+    const senha = $('senha-nuvem').value;
+    if (!senha) {
+      mostrarErro('Digite a senha.');
+      return;
+    }
+    mostrarErro('');
+    $('baixar-nuvem').disabled = true;
+    try {
+      const cred = await Nuvem.credenciais(senha, (p) => mostrarAndamento('Conferindo a senha…', p * 0.5));
+      mostrarAndamento('Procurando na nuvem…', 0.5);
+      const meta = await Nuvem.consultar(cred);
+      if (!meta) {
+        throw new Error('Nenhum backup na nuvem com essa senha. Confira a senha (maiúsculas, acentos e espaços contam).');
+      }
+      const bytes = await Nuvem.baixar(cred, meta, (p) => mostrarAndamento('Baixando os dados…', 0.5 + p * 0.4));
+      await guardarNuvem({ ...cred, backup: true, lembretes: false });
+      gravarEstadoNuvem({ criado_em: meta.criado_em });
+      fonte = { bytes, nome: 'GestorRPV-celular.rpvbackup', tamanho: bytes.length, criado_em: meta.criado_em, novo: true };
+      mostrarNuvem = false;
+      $('form-nuvem').reset();
+      await abrirFonte({ senha });
+    } catch (erro) {
+      $('andamento').hidden = true;
+      mostrarErro(erro && erro.message ? erro.message : String(erro));
+    } finally {
+      $('baixar-nuvem').disabled = false;
     }
   });
 
@@ -357,6 +402,7 @@
       } else {
         location.hash = '#inicio';
       }
+      aposAbrirDados();
     } catch (erro) {
       const cancelado = erro && (erro.name === 'NotAllowedError' || erro.name === 'AbortError');
       if (automatico && cancelado) {
@@ -410,6 +456,9 @@
       location.hash = '#inicio';
     }
   }
+
+  // Para os testes automáticos: tranca como o app faz sozinho depois de 5 minutos em segundo plano.
+  window.trancarGestor = () => fecharDados();
 
   function sairDaDemonstracao() {
     demonstracaoDispensada = true;
@@ -512,6 +561,7 @@
 
   // Tranca: apaga os dados da memória e volta à abertura. O backup guardado continua no aparelho, trancado.
   async function fecharDados() {
+    clearTimeout(temporizadorNuvem);
     liberarDocumento();
     if (bancoLocal) {
       bancoLocal.close();
@@ -847,6 +897,136 @@
     Object.assign(info, { manifesto, extrair, todos });
     dados = D.carregar(bancoLocal);
     localStorageGravar('copia_pendente', '1');
+    agendarEnvioNuvem();
+    sincronizarLembretes();
+  }
+
+  // ---- Nuvem: backup automático e lembretes (celular/nuvem.js) ------------------------------------------
+  // `nuvem` ({id, chave, backup, lembretes}) fica guardado no aparelho: as credenciais saem da senha uma vez só.
+  let nuvem = null;
+  let temporizadorNuvem = null;
+  let enviandoNuvem = null;
+
+  const estadoNuvem = () => {
+    try {
+      return JSON.parse(localStorageLer('nuvem_estado') || '{}');
+    } catch (erro) {
+      return {};
+    }
+  };
+  const gravarEstadoNuvem = (estado) => localStorageGravar('nuvem_estado', JSON.stringify(estado));
+
+  async function carregarNuvem() {
+    nuvem = await Guarda.ler('nuvem').catch(() => null) || null;
+  }
+
+  async function guardarNuvem(valor) {
+    nuvem = valor;
+    await Guarda.gravar('nuvem', valor);
+  }
+
+  function redesenharMais() {
+    if (dados && location.hash === '#mais') {
+      const rolagem = window.scrollY;
+      desenhar();
+      window.scrollTo(0, rolagem);
+    }
+  }
+
+  // Um envio por vez, logo depois da última gravação (várias seguidas viram um envio só).
+  function agendarEnvioNuvem(atraso = 1200) {
+    if (!nuvem || !nuvem.backup || !info || !info.independente) {
+      return;
+    }
+    clearTimeout(temporizadorNuvem);
+    temporizadorNuvem = setTimeout(() => enviarNuvem().catch(() => {}), atraso);
+  }
+
+  async function enviarNuvem({ substituir = false } = {}) {
+    if (!info || !info.independente || !nuvem) {
+      return;
+    }
+    if (enviandoNuvem) {
+      await enviandoNuvem.catch(() => {});
+    }
+    const criadoEm = info.manifesto.criado_em;
+    enviandoNuvem = (async () => {
+      try {
+        await Nuvem.enviar(nuvem, new Uint8Array(fonte.bytes), { sal: info.chave.sal, criadoEm, substituir });
+        gravarEstadoNuvem({ enviado_em: LeitorBackup.dataHoraLocal(), criado_em: criadoEm });
+      } catch (erro) {
+        gravarEstadoNuvem({ ...estadoNuvem(), erro: erro.message, conflito: Boolean(erro.conflito), outro_em: erro.criadoEm || null });
+        throw erro;
+      } finally {
+        enviandoNuvem = null;
+        redesenharMais();
+      }
+    })();
+    return enviandoNuvem;
+  }
+
+  // Depois de abrir os dados: o que ficou sem enviar (sem internet na hora) vai agora; os lembretes são conferidos.
+  async function aposAbrirDados() {
+    await carregarNuvem();
+    if (nuvem && nuvem.backup && info.independente && estadoNuvem().criado_em !== info.manifesto.criado_em) {
+      agendarEnvioNuvem(0);
+    }
+    sincronizarLembretes();
+  }
+
+  const lembretesPossiveis = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  const datasDasPrevisoes = () => dados.operacoes.filter((r) => !r.recebimento).map((r) => r.previsao_atual).sort();
+
+  function deB64url(texto) {
+    const base = texto.replace(/-/g, '+').replace(/_/g, '/');
+    return Uint8Array.from(atob(base + '='.repeat((4 - (base.length % 4)) % 4)), (c) => c.charCodeAt(0));
+  }
+
+  // As datas mudaram (entrada nova, previsão alterada, recebimento)? Manda a lista nova para a nuvem.
+  async function sincronizarLembretes({ forcar = false } = {}) {
+    if (!nuvem || !nuvem.lembretes || !dados || !lembretesPossiveis() || Notification.permission !== 'granted') {
+      return;
+    }
+    try {
+      const registro = await navigator.serviceWorker.ready;
+      const assinatura = await registro.pushManager.getSubscription();
+      if (!assinatura) {
+        return;
+      }
+      const previsoes = datasDasPrevisoes();
+      const marca = `${nuvem.id}|${assinatura.endpoint}|${previsoes.join(',')}`;
+      if (!forcar && localStorageLer('lembretes_enviados') === marca) {
+        return;
+      }
+      await Nuvem.guardarLembretes(nuvem, assinatura.toJSON(), previsoes);
+      localStorageGravar('lembretes_enviados', marca);
+    } catch (erro) {
+      // Sem internet agora: a lista vai na próxima gravação ou abertura.
+    }
+  }
+
+  // O pedido de permissão precisa ser a primeira coisa do toque: por isso as credenciais já estão prontas aqui.
+  async function ligarLembretes() {
+    const permissao = await Notification.requestPermission();
+    if (permissao !== 'granted') {
+      throw new Error('As notificações não foram permitidas. Ative em Ajustes → Notificações → Gestor RPV.');
+    }
+    const registro = await navigator.serviceWorker.ready;
+    const assinatura = await registro.pushManager.getSubscription()
+      || await registro.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: deB64url(await Nuvem.chaveVapid()) });
+    await Nuvem.guardarLembretes(nuvem, assinatura.toJSON(), datasDasPrevisoes());
+    await guardarNuvem({ ...nuvem, lembretes: true });
+    localStorageGravar('lembretes_enviados', '');
+  }
+
+  async function desligarLembretes() {
+    const registro = await navigator.serviceWorker.ready.catch(() => null);
+    const assinatura = registro && await registro.pushManager.getSubscription().catch(() => null);
+    if (assinatura) {
+      await assinatura.unsubscribe().catch(() => {});
+    }
+    await Nuvem.apagarLembretes(nuvem).catch(() => {});
+    await guardarNuvem({ ...nuvem, lembretes: false });
   }
 
   function inserir(tabela, linha) {
@@ -2077,6 +2257,189 @@
       icone('seta', 'seta')];
   }
 
+  // Senha num cartão (para ligar a nuvem, os lembretes ou tornar o celular principal); `acao(senha, andamento)` mostra
+  // o andamento no próprio cartão e, se falhar, a mensagem fica ali.
+  function formularioSenha(rotulo, acao) {
+    const campo = el('input', { type: 'password', name: 'senha_nuvem', autocomplete: 'current-password', autocapitalize: 'off',
+      spellcheck: 'false' });
+    const situacao = el('p', { class: 'discreto pequeno', role: 'status' });
+    const botao = el('button', { type: 'submit', class: 'primario', texto: rotulo });
+    return el('form', { class: 'formulario', autocomplete: 'off', onsubmit: async (evento) => {
+      evento.preventDefault();
+      if (!campo.value) {
+        situacao.className = 'erro';
+        situacao.textContent = 'Digite a senha.';
+        return;
+      }
+      botao.disabled = true;
+      situacao.className = 'discreto pequeno';
+      situacao.textContent = 'Conferindo a senha…';
+      try {
+        await acao(campo.value, (texto) => { situacao.textContent = texto; });
+      } catch (erro) {
+        situacao.className = 'erro';
+        situacao.textContent = erro && erro.message ? erro.message : String(erro);
+        botao.disabled = false;
+      }
+    } }, campoFormulario('Senha dos seus dados', campo), situacao, botao);
+  }
+
+  // A senha abre os dados abertos agora? Então as credenciais da nuvem saem dela.
+  async function credenciaisConferidas(senha, andamento) {
+    if (!await LeitorBackup.senhaConfere(senha, info.chave)) {
+      throw new Error('Senha incorreta: use a mesma senha que abre estes dados.');
+    }
+    andamento('Preparando a conexão com a nuvem…');
+    return Nuvem.credenciais(senha);
+  }
+
+  function textosCartao(titulo, detalhe) {
+    return el('div', { class: 'textos' }, el('div', { class: 'nome', texto: titulo }),
+      el('div', { class: 'discreto pequeno', texto: detalhe }));
+  }
+
+  // Backup automático na nuvem: com os dados no celular, liga, mostra o último envio e desliga; com o backup do
+  // computador, leva à tela de tornar este celular o principal.
+  function cartaoNuvem() {
+    if (!info.independente) {
+      return el('a', { class: 'cartao opcao-menu', href: '#principal' }, conteudoOpcao('celular', 'verde',
+        'Tornar este celular o principal', 'Entradas valem na hora; o backup vai sozinho para a nuvem e o computador só consulta'));
+    }
+    if (!nuvem || !nuvem.backup) {
+      return el('div', { class: 'cartao nuvem' },
+        textosCartao('Backup automático na nuvem', 'Desligado. Ligado, a cada gravação o app guarda na nuvem uma cópia '
+          + 'trancada com a sua senha (para o computador ver os dados e para recuperar num celular novo).'),
+        formularioSenha('Ligar backup na nuvem', async (senha, andamento) => {
+          const cred = await credenciaisConferidas(senha, andamento);
+          await guardarNuvem({ ...cred, backup: true, lembretes: Boolean(nuvem && nuvem.lembretes) });
+          andamento('Enviando o primeiro backup…');
+          await enviarNuvem();
+          avisar('Backup na nuvem ligado.');
+        }));
+    }
+    const estado = estadoNuvem();
+    const situacao = enviandoNuvem ? 'Ligado · enviando…'
+      : estado.conflito ? `Há na nuvem um backup de outro aparelho com esta senha${estado.outro_em ? ` (de ${D.dataHora(estado.outro_em)})` : ''}. `
+        + 'Substitua só se aquele aparelho não for mais usado.'
+        : estado.erro ? `O último envio não foi (${estado.erro}). O app tenta de novo na próxima gravação ou abertura.`
+          : estado.enviado_em ? `Ligado · último envio em ${D.dataHora(estado.enviado_em)}`
+            : 'Ligado · em dia com a nuvem';
+    const enviar = (substituir) => async (evento) => {
+      evento.target.disabled = true;
+      await enviarNuvem({ substituir }).then(() => avisar('Backup enviado para a nuvem.')).catch(() => {});
+    };
+    return el('div', { class: 'cartao nuvem' },
+      textosCartao('Backup automático na nuvem', situacao),
+      el('div', { class: 'botoes' },
+        estado.conflito ? el('button', { type: 'button', class: 'secundario perigo', texto: 'Substituir pelo deste celular', onclick: enviar(true) })
+          : el('button', { type: 'button', class: 'secundario', texto: 'Enviar agora', onclick: enviar(false) }),
+        el('button', { type: 'button', class: 'secundario', texto: 'Desligar', onclick: async (evento) => {
+          if (!confirm('Desligar o backup na nuvem? A cópia guardada lá é apagada, e o programa no computador volta a '
+            + 'aceitar alterações na próxima vez que abrir.')) {
+            return;
+          }
+          evento.target.disabled = true;
+          try {
+            await Nuvem.apagar(nuvem);
+            await guardarNuvem({ ...nuvem, backup: false });
+            gravarEstadoNuvem({});
+            avisar('Backup na nuvem desligado.');
+          } catch (erro) {
+            alert('Não foi possível desligar agora: ' + erro.message);
+          }
+          redesenharMais();
+        } })));
+  }
+
+  // Lembrete às 8h do dia anterior a cada previsão (Web Push, pela nuvem do Gestor).
+  function cartaoLembretes() {
+    const titulo = 'Lembrete um dia antes da previsão';
+    if (!lembretesPossiveis()) {
+      return el('div', { class: 'cartao nuvem' }, textosCartao(titulo, 'Para receber lembretes, abra o app pelo ícone da '
+        + 'Tela de Início (iPhone com iOS 16.4 ou mais novo).'));
+    }
+    if (nuvem && nuvem.lembretes && Notification.permission === 'granted') {
+      return el('div', { class: 'cartao nuvem' },
+        textosCartao(titulo, 'Ligado · às 8h do dia anterior, um aviso com quantas previsões caem no dia seguinte.'),
+        el('div', { class: 'botoes' }, el('button', { type: 'button', class: 'secundario', texto: 'Desligar lembretes',
+          onclick: async (evento) => {
+            evento.target.disabled = true;
+            await desligarLembretes();
+            avisar('Lembretes desligados.');
+            redesenharMais();
+          } })));
+    }
+    const detalhe = 'Desligado. O aviso só diz quantas previsões caem no dia seguinte; nomes e valores não saem do celular.';
+    if (!nuvem) {
+      return el('div', { class: 'cartao nuvem' }, textosCartao(titulo, detalhe),
+        formularioSenha('Continuar', async (senha, andamento) => {
+          await guardarNuvem({ ...await credenciaisConferidas(senha, andamento), backup: false, lembretes: false });
+          redesenharMais();
+        }));
+    }
+    const situacao = el('p', { class: 'discreto pequeno', role: 'status' });
+    return el('div', { class: 'cartao nuvem' }, textosCartao(titulo, detalhe), situacao,
+      el('div', { class: 'botoes' }, el('button', { type: 'button', class: 'primario', texto: 'Ligar lembretes',
+        onclick: async (evento) => {
+          evento.target.disabled = true;
+          try {
+            await ligarLembretes();
+            avisar('Lembretes ligados.');
+            redesenharMais();
+          } catch (erro) {
+            situacao.className = 'erro';
+            situacao.textContent = erro && erro.message ? erro.message : String(erro);
+            evento.target.disabled = false;
+          }
+        } })));
+  }
+
+  // Celular principal: o backup do computador vira dados deste celular (com a mesma senha), e daí em diante cada
+  // gravação vai para a nuvem; o programa no computador carrega esses dados ao abrir e fica só para consulta.
+  function telaPrincipal() {
+    if (info.independente) {
+      return [vazio('Este celular já é o principal.')];
+    }
+    if (info.demonstracao || !info.chave) {
+      return [el('p', { class: 'aviso', texto: 'Abra o seu backup (com senha) para tornar este celular o principal.' })];
+    }
+    const passos = el('ol', { class: 'passos' },
+      el('li', { texto: 'Entradas, contas e alterações passam a valer na hora, aqui no celular.' }),
+      el('li', { texto: 'A cada gravação, o app guarda na nuvem uma cópia trancada com a sua senha.' }),
+      el('li', { texto: 'Ao abrir, o programa no computador carrega sozinho os dados mais novos e fica só para consulta.' }));
+    if (listaPendentes.length) {
+      return [passos, el('div', { class: 'aviso' },
+        el('div', { class: 'nome', texto: `Antes, leve ao computador o que ainda aguarda (${listaPendentes.length})` }),
+        el('div', { class: 'pequeno', texto: 'Importe no programa, feche-o (ele grava um backup novo) e abra esse backup aqui, '
+          + 'em Mais → Abrir um backup mais novo. Depois volte a esta tela.' })),
+      el('a', { class: 'botao-link secundario', href: '#pendentes', texto: 'Ver o que aguarda o computador' })];
+    }
+    return [passos, el('p', { class: 'discreto pequeno', texto: `Os dados de agora (backup de ${D.dataHora(info.manifesto.criado_em)}) `
+      + 'viram os dados deste celular. Use a mesma senha dos backups do computador.' }),
+    cartao(formularioSenha('Tornar este celular o principal', async (senha, andamento) => {
+      if (!await LeitorBackup.senhaConfere(senha, info.chave)) {
+        throw new Error('Senha incorreta: use a senha dos backups do computador.');
+      }
+      andamento('Preparando os dados deste celular…');
+      const leitura = await LeitorBackup.ler(new Uint8Array(fonte.bytes), senha, { chave: info.chave });
+      let pacote;
+      try {
+        pacote = await LeitorBackup.empacotar(leitura.db.export(), leitura.chave, VERSAO_APP, await leitura.todos());
+      } finally {
+        leitura.db.close();
+      }
+      andamento('Preparando a conexão com a nuvem…');
+      const cred = await Nuvem.credenciais(senha);
+      await guardarNuvem({ ...cred, backup: true, lembretes: Boolean(nuvem && nuvem.lembretes) });
+      gravarEstadoNuvem({});
+      fonte = { bytes: pacote.bytes, nome: 'GestorRPV-celular.rpvbackup', tamanho: pacote.bytes.length,
+        criado_em: pacote.manifesto.criado_em, novo: true };
+      andamento('Abrindo…');
+      await abrirFonte({ senha, chave: leitura.chave });
+      avisar('Este celular agora é o principal.');
+    }))];
+  }
+
   function telaMais() {
     const opcao = (href, titulo, detalhe, simbolo, tom) => el('a', { class: 'cartao opcao-menu', href },
       conteudoOpcao(simbolo, tom, titulo, detalhe));
@@ -2092,6 +2455,7 @@
         opcao('#convite', 'Convidar alguém', 'Mandar o app para outra pessoa usar com os dados dela', 'convidar', 'azul'),
         opcao('#backup', 'Sobre este backup', `Arquivo, data e versões · app ${VERSAO_APP}`, 'info', 'azul')),
       grupo('Aparência', escolherTema()),
+      !info.demonstracao && info.chave && grupo('Nuvem e lembretes', cartaoNuvem(), cartaoLembretes()),
       grupo('Dados e segurança',
         info.independente && opcao('#copia', 'Fazer cópia de segurança', 'Salvar seus dados (trancados) no iCloud ou no Google Drive', 'escudo', 'verde'),
         escolherBackup(),
@@ -2109,9 +2473,8 @@
         }
         } }, conteudoOpcao('cadeado', 'ambar', 'Desativar o Face ID', 'Voltar a abrir só com a senha'))),
       el('div', { class: 'menu-acoes' },
-        info.demonstracao ? el('button', { type: 'button', class: 'primario', texto: 'Sair da demonstração', onclick: sairDaDemonstracao })
-          : el('button', { type: 'button', class: 'primario', texto: 'Trancar agora', onclick: fecharDados }),
-        !info.demonstracao && el('p', { class: 'discreto pequeno', texto: 'Trancar apaga os dados da memória; o backup guardado continua trancado no aparelho. O app também tranca sozinho depois de 5 minutos em segundo plano.' }),
+        info.demonstracao && el('button', { type: 'button', class: 'primario', texto: 'Sair da demonstração', onclick: sairDaDemonstracao }),
+        !info.demonstracao && el('p', { class: 'discreto pequeno', texto: 'O app tranca sozinho depois de 5 minutos em segundo plano.' }),
         !info.demonstracao && el('button', { type: 'button', class: 'secundario', texto: 'Apagar o backup guardado neste aparelho', onclick: esquecerBackup })),
     ];
   }
@@ -2211,6 +2574,7 @@
     copia: { titulo: 'Cópia de segurança', aba: 'mais', montar: telaCopia, voltar: true },
     convite: { titulo: 'Convidar alguém', aba: 'mais', montar: telaConvite, voltar: true },
     'nova-conta': { titulo: 'Nova conta', aba: 'contas', montar: telaNovaConta, voltar: true },
+    principal: { titulo: 'Celular principal', aba: 'mais', montar: telaPrincipal, voltar: true },
     'editar-conta': { titulo: 'Editar conta', aba: 'contas', montar: telaNovaConta, voltar: true },
     pendentes: { titulo: 'Aguardando o computador', aba: 'operacoes', montar: telaPendentes, voltar: true },
     enviar: { titulo: 'Enviar ao computador', aba: 'operacoes', montar: telaEnviar, voltar: true, textual: true },

@@ -13,6 +13,7 @@ from datetime import date, datetime
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED, BadZipFile
 
 import cifra
+import nuvem
 from documentos import EXTENSOES
 from versao import VERSAO
 from dados import ESQUEMA, PREFIXO_EXCLUSAO, TABELAS_LEGADAS, VERSAO_BANCO, Banco, limitar_backups
@@ -30,7 +31,8 @@ RESTAURACAO = 'restauracao_em_andamento'
 DESCARTAR = 'descartar'
 # Resumo dos dados no último backup: ao fechar o programa, um backup novo só é feito se algo mudou desde então.
 ASSINATURA = 'assinatura_ultimo_backup'
-CONFIGURACOES_LOCAIS = (PASTA_AUTOMATICA, SENHA_BACKUP, RESTAURACAO, ASSINATURA)
+# Pertencem a este computador: uma importação mantém as daqui (inclusive o estado da nuvem, nuvem.py).
+CONFIGURACOES_LOCAIS = (PASTA_AUTOMATICA, SENHA_BACKUP, RESTAURACAO, ASSINATURA) + nuvem.CONFIGURACOES
 
 
 LIMITE_IMPORTACAO = 4 * 1024 ** 3  # Soma dos arquivos descompactados de um backup.

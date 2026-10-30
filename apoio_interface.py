@@ -12,7 +12,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import app
+# Os testes de interface nunca falam com a nuvem de verdade (test_nuvem usa um Worker local).
+os.environ.setdefault('GESTOR_RPV_NUVEM', 'desligada')
+
+import app  # noqa: E402
 from apoio_testes import banco_com_contas
 
 

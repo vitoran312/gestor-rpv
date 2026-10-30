@@ -463,6 +463,8 @@ class OperacoesMixin:
         self.formulario(int(selecao[0]))
 
     def excluir(self):
+        if self.so_consulta():
+            return
         selecao = self.tabela.selection()
         if not selecao:
             messagebox.showinfo('Excluir registro', 'Selecione uma RPV na lista.',

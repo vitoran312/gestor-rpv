@@ -1,14 +1,19 @@
 """Backup, importação, exportação e pasta dos documentos."""
+import os
 import sqlite3
+import tempfile
+import threading
 import tkinter as tk
 from datetime import datetime
+from pathlib import Path
 from tkinter import messagebox, filedialog, simpledialog, ttk
 
 import cifra
 import entradas_celular
+import nuvem
 from backup import (criar_backup, documentos_sem_arquivo, BackupPreparado, aviso_backup, executar_backup_automatico, PASTA_AUTOMATICA,
                     SenhaAusente, SenhaNecessaria, salvar_senha, senha_salva)
-from componentes import centralizar, ocupado
+from componentes import centralizar, notificar, ocupado
 from movimento import surgir
 from visual import px
 from tema import cores
@@ -17,6 +22,14 @@ from exportacao import exportar_excel, nome_sugerido
 from ordenacao import ordenar
 from mensagens import descrever_erro
 from diario import log
+
+
+def data_hora_curta(iso):
+    """'2026-10-30T14:32:05-03:00' → '30/10/2026 às 14:32' (como o celular mostra)."""
+    try:
+        return datetime.fromisoformat(iso).strftime('%d/%m/%Y às %H:%M')
+    except (TypeError, ValueError):
+        return iso or ''
 
 
 class ArquivosMixin:
@@ -69,6 +82,115 @@ class ArquivosMixin:
                 self.agendamento_backup = self.janela.after(6 * 60 * 60 * 1000, self.verificar_backup_automatico)
         return arquivo
 
+    def so_consulta(self, pai=None):
+        """Com o celular como principal, avisa que aqui é só consulta e devolve True (a ação não continua)."""
+        if not self.banco.somente_leitura:
+            return False
+        messagebox.showinfo('Só consulta', nuvem.SO_CONSULTA, parent=pai or self.janela_ativa())
+        return True
+
+    def verificar_nuvem(self):
+        """Ao abrir: quando o app do celular é o principal, o backup mais novo que ele enviou para a nuvem substitui
+        os dados daqui (a conferência e o download correm em segundo plano; a janela não trava)."""
+        self.agendamento_celular = None
+        try:
+            senha = None if nuvem.desligada() else senha_salva(self.banco)
+        except (OSError, ValueError, sqlite3.Error):
+            senha = None
+        if not senha:
+            self.importar_entradas_celular(automatico=True)
+            return
+        aplicada = self.banco.configuracao(nuvem.VERSAO)
+        resultado = {}
+
+        def trabalhar():
+            try:
+                acesso = nuvem.credenciais(senha)
+                meta = resultado['meta'] = nuvem.consultar(acesso)
+                if meta and meta['versao'] != aplicada:
+                    descritor, nome = tempfile.mkstemp(prefix='nuvem-', suffix='.rpvbackup', dir=self.banco.caminho.parent)
+                    os.close(descritor)
+                    try:
+                        resultado['arquivo'] = nuvem.baixar(acesso, meta, nome)
+                    except BaseException:
+                        Path(nome).unlink(missing_ok=True)
+                        raise
+            except nuvem.NuvemIndisponivel as erro:
+                resultado['erro'] = erro
+            except Exception as erro:  # noqa: BLE001 — qualquer falha aqui só adia a atualização.
+                log.warning('Conferência da nuvem falhou.', exc_info=True)
+                resultado['erro'] = erro
+
+        tarefa = threading.Thread(target=trabalhar, daemon=True)
+        tarefa.start()
+
+        def esperar():
+            if not self.janela.winfo_exists():
+                return
+            if tarefa.is_alive():
+                self.agendamento_celular = self.janela.after(200, esperar)
+            else:
+                self.agendamento_celular = None
+                self.aplicar_nuvem(senha, resultado)
+        self.agendamento_celular = self.janela.after(200, esperar)
+
+    def aplicar_nuvem(self, senha, resultado):
+        espelho = self.banco.configuracao(nuvem.ESPELHO) == '1'
+        meta, arquivo = resultado.get('meta'), resultado.get('arquivo')
+        if 'erro' in resultado:
+            if espelho:
+                criado = self.banco.configuracao(nuvem.CRIADO, '')
+                notificar(self.janela, 'Sem conexão com a nuvem: mostrando os dados do celular'
+                          + (f' de {data_hora_curta(criado)}.' if criado else '.'))
+            else:
+                self.importar_entradas_celular(automatico=True)
+            return
+        if meta is None:
+            if espelho:
+                # O celular deixou de ser o principal (apagou o backup da nuvem): este computador volta a editar.
+                for chave in nuvem.CONFIGURACOES:
+                    self.banco.remover_configuracao(chave)
+                self.banco.somente_leitura = False
+                notificar(self.janela, 'O celular parou de enviar backups: este computador voltou a aceitar alterações.')
+            self.importar_entradas_celular(automatico=True)
+            return
+        try:
+            if arquivo is None:
+                self.banco.somente_leitura = True  # Já está com a versão mais nova.
+                return
+            if not espelho and not messagebox.askyesno('Dados do celular',
+                    f'O app do celular passou a ser o principal e enviou os dados de {data_hora_curta(meta["criado_em"])}.\n\n'
+                    'A partir de agora, ao abrir, este computador carrega sozinho os dados mais novos do celular e fica '
+                    'só para consulta (entradas e alterações são feitas no celular). Os dados atuais daqui ficam '
+                    'guardados numa cópia de segurança antes da troca.\n\nUsar os dados do celular?',
+                    parent=self.janela, icon='question'):
+                return
+            with ocupado(self.janela), BackupPreparado(arquivo, senha, pasta_trabalho=self.banco.caminho.parent) as pacote:
+                pacote.restaurar(self.banco)
+            self.banco.salvar_configuracao(nuvem.VERSAO, meta['versao'])
+            self.banco.salvar_configuracao(nuvem.CRIADO, meta['criado_em'])
+            self.banco.salvar_configuracao(nuvem.ESPELHO, '1')
+            self.banco.somente_leitura = True
+        except (OSError, sqlite3.Error, ValueError, RuntimeError) as erro:
+            log.warning('Backup da nuvem não aplicado.', exc_info=True)
+            messagebox.showerror('Dados do celular', 'Não foi possível carregar os dados do celular. '
+                                 + descrever_erro(erro), parent=self.janela)
+            return
+        finally:
+            if arquivo is not None:
+                Path(arquivo).unlink(missing_ok=True)
+        # Formulários abertos não podem continuar editando IDs do banco substituído.
+        for janela in list(self.janela.winfo_children()):
+            if isinstance(janela, tk.Toplevel) and (self.calculadora is None or janela != self.calculadora.tela):
+                janela.destroy()
+        if self.historico is not None and self.historico.winfo_exists():
+            self.reiniciar_filtros()
+        if self.janela_contas is not None and self.janela_contas.tela.winfo_exists():
+            self.janela_contas.atualizar()
+        self.atualizar_aviso_atrasadas()
+        self.atualizar_ultimo_backup()
+        notificar(self.janela, f'Dados do celular de {data_hora_curta(meta["criado_em"])} carregados.')
+
     def importar_entradas_celular(self, automatico=False):
         """Entradas cadastradas no app do celular (arquivos .rpvcelular na pasta do backup automático).
 
@@ -76,6 +198,10 @@ class ArquivosMixin:
         pasta, a pessoa pode escolher os arquivos à mão.
         """
         if not self.janela.winfo_exists():
+            return
+        if self.banco.somente_leitura:
+            if not automatico:
+                self.so_consulta()
             return
         pai = self.janela_ativa()
         try:
@@ -318,6 +444,8 @@ class ArquivosMixin:
         messagebox.showinfo('Backup concluído', f'Backup salvo em:\n{arquivo}{aviso}', parent=pai)
 
     def importar_dados(self):
+        if self.so_consulta():
+            return
         if self.janelas_de_edicao_abertas():
             messagebox.showinfo('Importar dados', 'Salve ou feche os formulários abertos (entrada, recebimento, previsão '
                                 'ou conta) antes de importar um backup.', parent=self.historico)

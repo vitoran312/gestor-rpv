@@ -9,6 +9,7 @@ from tkinter import messagebox, ttk
 import cifra
 import demonstracao
 import novidades
+import nuvem
 import instancia
 from backup import limpar_temporarios, recuperar_interrompidas
 from recuperacao import abrir_banco
@@ -38,6 +39,8 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
         self.janela = janela
         janela.withdraw()
         self.banco = abrir_banco(janela)
+        # Celular como principal: até a conferência da nuvem terminar, os dados daqui já ficam só para consulta.
+        self.banco.somente_leitura = self.banco.configuracao(nuvem.ESPELHO) == '1'
         recuperar_interrompidas(self.banco)
         limpar_temporarios(self.banco.caminho.parent)
         try:
@@ -91,8 +94,9 @@ class Aplicativo(NavegacaoMixin, InicioMixin, OperacoesMixin, RegistroMixin, Arq
         self.agendamento_data = janela.after(60 * 1000, self.vigiar_data)
         self.agendamento_tema = janela.after(1200, self.preparar_outro_tema)
         self.agendamento_backup = janela.after(1500, self.verificar_backup_automatico)
-        # Entradas cadastradas no celular que chegaram pela pasta do backup automático (Google Drive).
-        self.agendamento_celular = janela.after(2500, lambda: self.importar_entradas_celular(automatico=True))
+        # O celular como principal: os dados mais novos dele chegam pela nuvem. Sem isso, entradas cadastradas no
+        # celular chegam pela pasta do backup automático (Google Drive).
+        self.agendamento_celular = janela.after(2500, self.verificar_nuvem)
         janela.bind('<Destroy>', self.cancelar_agendamento_backup, add='+')
         janela.protocol('WM_DELETE_WINDOW', self.fechar_programa)
         centralizar(janela, 1480, 980)

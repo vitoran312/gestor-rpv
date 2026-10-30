@@ -245,6 +245,8 @@ class RegistroMixin:
         # em vez de abrir outro e salvar a mesma entrada duas vezes.
         if self.trazer_se_aberta(self.janela_formulario):
             return
+        if identificador is None and self.so_consulta():
+            return
         registro = self.banco.obter(identificador) if identificador else None
         contas = list(self.banco.contas(somente_ativas=True))
         conta_original = self.banco.obter_conta(registro['conta_id']) if registro and registro['conta_id'] is not None else None
@@ -348,7 +350,11 @@ class RegistroMixin:
             tuple(variavel.get() for variavel in campos.values()), modo_previsao.get(), prazo.get(), tem_comissao.get(),
             valor_comissao.get(), observacoes.get('1.0', 'end-1c'), len(anexos_pendentes)))
         ttk.Button(botoes, text='Cancelar', width=20, command=fechar).grid(row=0, column=1, sticky='ew', padx=pad((4, 4)))
-        ttk.Button(botoes, text='Salvar registro', width=20, style='Salvar.TButton', command=salvar).grid(row=0, column=2, sticky='ew', padx=pad((8, 0)))
+        salvar_registro = ttk.Button(botoes, text='Salvar registro', width=20, style='Salvar.TButton', command=salvar)
+        salvar_registro.grid(row=0, column=2, sticky='ew', padx=pad((8, 0)))
+        if self.banco.somente_leitura:
+            # Só consulta: o formulário mostra a entrada, mas nada é salvo aqui (o celular é o principal).
+            salvar_registro.state(['disabled'])
         ampliar_formulario(tela, self.fonte)
         centralizar(tela)
         surgir(tela)
@@ -509,6 +515,8 @@ class RegistroMixin:
     def abrir_recebimento(self, identificador, variavel=None, atual=False):
         if variavel is not None:
             variavel.set(atual)
+        if self.so_consulta():
+            return
         registro = self.banco.obter(identificador)
         if registro is None:
             self.atualizar()
@@ -574,6 +582,8 @@ class RegistroMixin:
         tela.grab_set()
 
     def editar_previsao(self, identificador):
+        if self.so_consulta():
+            return
         registro = self.banco.obter(identificador)
         if registro is None:
             self.atualizar()

@@ -44,6 +44,11 @@ const LeitorBackup = (() => {
     return a && b && a.length === b.length && a.every((x, i) => x === b[i]);
   }
 
+  // A senha digitada é a dos dados abertos (mesma chave, com o sal deles)?
+  async function senhaConfere(senha, chave, aoProgredir) {
+    return iguais(Uint8Array.from(await derivarChave(senha, chave.sal, aoProgredir)), Uint8Array.from(chave.bruta));
+  }
+
   // `acesso` traz a senha ou a chave já calculada deste backup ({sal, bruta}, guardada pelo Face ID): com a
   // chave, a conferência demorada da senha (scrypt) é pulada. Devolve o conteúdo e a chave usada.
   async function decifrar(bytes, acesso, aoProgredir = () => {}) {
@@ -254,5 +259,6 @@ const LeitorBackup = (() => {
     return { db, manifesto, cifrado: ehCifrado, tempos, arquivos, ...anexosDo(zip, manifesto), chave: chaveUsada };
   }
 
-  return { ler, decifrar, cifrar, empacotar, novaChave, salDe, cifrado, sqlJs, dataHoraLocal, ErroBackup, SenhaIncorreta };
+  return { ler, decifrar, cifrar, empacotar, novaChave, senhaConfere, salDe, cifrado, sqlJs, dataHoraLocal, ErroBackup,
+    SenhaIncorreta };
 })();

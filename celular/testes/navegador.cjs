@@ -222,7 +222,7 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
         await Guarda.gravar('pendentes', [...lista, { id, arquivo: 'antiga.rpvcelular', criada_em: '2026-10-01T10:00:00Z', bytes: new Uint8Array([1, 2, 3]) }]);
       }, n.ja_importada);
       await pagina.evaluate(() => { location.hash = '#mais'; });
-      await pagina.getByText('Trancar agora').click();
+      await pagina.evaluate(() => trancarGestor());
       await pagina.waitForSelector('#abertura:not([hidden])');
       await pagina.setInputFiles('#arquivo', n.backup_com_importada);
       await pagina.fill('#senha', telas.senha);
@@ -387,7 +387,7 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
 
     await pagina.evaluate(() => { location.hash = '#mais'; });
     resultados.blob_liberado = await pagina.evaluate(() => !document.querySelector('.documento'));
-    await pagina.getByText('Trancar agora').click();
+    await pagina.evaluate(() => trancarGestor());
     resultados.fechado = await pagina.evaluate(() => ({
       abertura: !document.getElementById('abertura').hidden,
       tela_vazia: document.getElementById('tela').childElementCount === 0,

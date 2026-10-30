@@ -254,9 +254,25 @@ def mesma_chave_pix(uma, outra):
     return tipo_a == tipo_b or 'numero' in (tipo_a, tipo_b)
 
 
+class SomenteLeitura(ValueError):
+    """Alteração recusada: este computador mostra os dados do celular, só para consulta."""
+
+
+def altera_dados(metodo):
+    """Recusa a alteração quando o banco está só para consulta (nuvem.ESPELHO)."""
+    def alterar(self, *args, **kwargs):
+        if self.somente_leitura:
+            raise SomenteLeitura('Este computador está só para consulta: faça a alteração no app do celular.')
+        return metodo(self, *args, **kwargs)
+    alterar.__name__, alterar.__doc__ = metodo.__name__, metodo.__doc__
+    return alterar
+
+
 class Banco:
     def __init__(self, caminho=None):
         self.caminho = Path(caminho) if caminho else pasta_dados() / 'gestor.sqlite3'
+        # Com o celular como principal (nuvem.py), os dados chegam de lá e aqui nada é alterado.
+        self.somente_leitura = False
         self.novo = not self.caminho.exists()  # Banco criado agora: instalação nova neste computador.
         self.caminho.parent.mkdir(parents=True, exist_ok=True)
         with self.conectar() as con:
@@ -436,6 +452,7 @@ class Banco:
         with self.conectar() as con:
             return con.execute('SELECT * FROM contas WHERE id=?', (identificador,)).fetchone()
 
+    @altera_dados
     def salvar_conta(self, dados, identificador=None):
         dados = {k: dados.get(k, '').strip() for k in CAMPOS_CONTA}
         # Tudo o que falta ou está errado vai numa mensagem só, com o nome de cada campo.
@@ -480,6 +497,7 @@ class Banco:
             con.execute(f'UPDATE contas SET {atribuicoes} WHERE id=:id', dict(dados, id=identificador))
             return identificador
 
+    @altera_dados
     def ativar_conta(self, identificador, ativa):
         with self.conectar() as con:
             con.execute('UPDATE contas SET ativa=? WHERE id=?', (int(ativa), identificador))
@@ -490,6 +508,7 @@ class Banco:
         with self.conectar() as con:
             return con.execute(f'SELECT COUNT(*) FROM rpvs WHERE conta_id IN ({",".join("?" * len(ids))})', ids).fetchone()[0]
 
+    @altera_dados
     def remover_contas(self, identificadores):
         ids = list(dict.fromkeys(int(i) for i in identificadores))
         with self.conectar() as con:
@@ -497,6 +516,7 @@ class Banco:
             con.executemany('UPDATE rpvs SET conta_id=NULL WHERE conta_id=?', [(i,) for i in ids])
             con.executemany('DELETE FROM contas WHERE id=?', [(i,) for i in ids])
 
+    @altera_dados
     def salvar(self, dados, identificador=None, anexos=()):
         criados = []
         try:
@@ -608,9 +628,11 @@ class Banco:
         with self.conectar() as con:
             return con.execute(CONSULTA_RPVS + ' WHERE r.id=?', (identificador,)).fetchone()
 
+    @altera_dados
     def excluir(self, identificador):
         self.excluir_varios([identificador])
 
+    @altera_dados
     def excluir_varios(self, identificadores):
         ids = list(dict.fromkeys(int(i) for i in identificadores))
         with self.conectar() as con:
@@ -631,9 +653,11 @@ class Banco:
         with self.conectar() as con:
             return con.execute(CONSULTA_RPVS + ' WHERE r.lixeira_em IS NOT NULL ORDER BY lixeira_em DESC,id DESC').fetchall()
 
+    @altera_dados
     def restaurar(self, identificador):
         self.restaurar_varios([identificador])
 
+    @altera_dados
     def restaurar_varios(self, identificadores):
         ids = list(dict.fromkeys(int(i) for i in identificadores))
         with self.conectar() as con:
@@ -641,6 +665,7 @@ class Banco:
             self.conferir_lixeira(con, ids, True, 'Uma entrada não está mais na lixeira. Reabra a lista e tente novamente.')
             con.executemany('UPDATE rpvs SET lixeira_em=NULL WHERE id=?', [(i,) for i in ids])
 
+    @altera_dados
     def registrar_recebimento(self, identificador, data, anexos=()):
         criados = []
         try:
@@ -668,6 +693,7 @@ class Banco:
             con.execute('UPDATE rpvs SET recebimento=? WHERE id=?', (data, identificador))
             self.copiar_anexos(con, identificador, anexos, criados, tipo='recebimento')
 
+    @altera_dados
     def atualizar_previsao(self, identificador, nova_data):
         nova_data = data_iso(data_br(nova_data))
         with self.conectar() as con:
@@ -683,6 +709,7 @@ class Banco:
                             (identificador, atual, nova_data, datetime.now().astimezone().isoformat(timespec='seconds')))
             con.execute('UPDATE rpvs SET previsao_atual_definida=? WHERE id=?', (nova_data, identificador))
 
+    @altera_dados
     def anexar(self, identificador, anexos):
         """Documentos novos numa entrada já cadastrada (por exemplo, fotografados no app do celular)."""
         criados = []
@@ -796,6 +823,7 @@ class Banco:
                     os.replace(movido, original)
                     log.warning('Anexo de uma exclusão interrompida devolvido à pasta de documentos.')
 
+    @altera_dados
     def remover_documento(self, identificador):
         with self.arquivos_para_excluir() as preparar:
             with self.conectar() as con:
@@ -806,6 +834,7 @@ class Banco:
                 preparar([documento])
                 con.execute('DELETE FROM documentos WHERE id=?', (identificador,))
 
+    @altera_dados
     def excluir_permanentemente(self, identificadores):
         ids = list(dict.fromkeys(int(i) for i in identificadores))
         with self.arquivos_para_excluir() as preparar:
