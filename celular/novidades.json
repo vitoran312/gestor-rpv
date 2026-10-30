@@ -1,6 +1,28 @@
 {
   "versoes": [
     {
+      "versao": "0.60.0",
+      "resumo": "3 novidades · 1 correção",
+      "itens": [
+        {
+          "tipo": "novidade",
+          "texto": "Celular: tema Claro, Escuro ou Automático (o do iPhone), em Mais → Aparência."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: \"Voltar\" em todas as telas, inclusive Operações, Contas e Mais, e nos passos da abertura."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: tocar de novo na aba acesa também volta (do detalhe para a lista; da lista, para a tela anterior)."
+        },
+        {
+          "tipo": "correcao",
+          "texto": "Celular: contraste reforçado no tema claro (terracota, vermelho e setas)."
+        }
+      ]
+    },
+    {
       "versao": "0.59.0",
       "resumo": "4 novidades",
       "itens": [
@@ -49,28 +71,6 @@
         {
           "tipo": "novidade",
           "texto": "Programa e celular: senha nova com no mínimo 6 caracteres (antes 10), misturando letras, números e símbolos."
-        }
-      ]
-    },
-    {
-      "versao": "0.55.0",
-      "resumo": "4 novidades",
-      "itens": [
-        {
-          "tipo": "novidade",
-          "texto": "Celular: nova identidade visual Ledger, igual à do programa: porcelana e nanquim no claro, nanquim e marfim no escuro, acento champanhe e títulos em serifa."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Celular: Início com a data por extenso e o panorama num cartão em nanquim, com o lucro previsto em destaque."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Celular: barra de abas flutuante, translúcida e com ícones; cabeçalho translúcido."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Celular: operações com filete colorido pela situação e selos em pílula; resumo em imagem com as novas cores."
         }
       ]
     }

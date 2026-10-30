@@ -10,6 +10,13 @@ from pathlib import Path
 MOSTRAR = 5  # Quantas versões aparecem no "Sobre".
 
 NOVIDADES = [
+    ('0.60.0', [
+        ('novidade', 'Celular: tema Claro, Escuro ou Automático (o do iPhone), em Mais → Aparência.'),
+        ('novidade', 'Celular: "Voltar" em todas as telas, inclusive Operações, Contas e Mais, e nos passos da abertura.'),
+        ('novidade', 'Celular: tocar de novo na aba acesa também volta (do detalhe para a lista; da lista, para a '
+                     'tela anterior).'),
+        ('correcao', 'Celular: contraste reforçado no tema claro (terracota, vermelho e setas).'),
+    ]),
     ('0.59.0', [
         ('novidade', 'Celular: novo visual em creme, terracota e azul-marinho, com ícones, cartões mais claros e '
                      'tema escuro combinando.'),

@@ -7,7 +7,7 @@
 (() => {
   // Igual a versao.py (test_celular confere): mostrada na abertura e em Mais, para saber se o aparelho já
   // carregou a última versão publicada.
-  const VERSAO_APP = '0.59.0';
+  const VERSAO_APP = '0.60.0';
   const D = GestorDados;
   const $ = (id) => document.getElementById(id);
   const SITUACOES = { pendente: 'Pendente', atrasada: 'Atrasada', recebida: 'Recebida' };
@@ -175,6 +175,8 @@
       : 'Trocar por um backup mais novo';
     // Primeira vez: além de abrir um backup do computador, dá para começar só no celular.
     $('comecar').hidden = Boolean(guardado || (fonte && fonte.novo)) || mostrarNovo;
+    // Num passo da abertura (criar a senha, digitar a senha, escolher outro arquivo), dá para voltar ao início dela.
+    $('voltar-abertura').hidden = !emPassoDaAbertura();
     $('form-novo').hidden = !mostrarNovo || Boolean(guardado);
     if (mostrarNovo && !guardado) {
       $('formulario').hidden = true;
@@ -185,7 +187,46 @@
 
   let mostrarArquivo = false;  // A pessoa tocou em "Trocar por um backup mais novo".
   let mostrarSenha = false;    // A pessoa tocou em "Usar a senha" (com Face ID ativo).
+
+  function emPassoDaAbertura() {
+    return Boolean(mostrarNovo || mostrarArquivo || mostrarSenha || (fonte && fonte.novo && guardadoAtual));
+  }
+
+  // Cada passo da abertura entra no histórico: o gesto ou a tecla de voltar do aparelho também volta dele.
+  function entrarNoPasso() {
+    if (!emPassoDaAbertura()) {
+      history.pushState({ passo: true }, '', location.pathname + location.search + '#passo');
+    }
+  }
+
+  function sairDoPasso() {
+    mostrarNovo = false;
+    mostrarArquivo = false;
+    mostrarSenha = false;
+    if (fonte && fonte.novo) {
+      fonte = null;
+    }
+    mostrarErro('');
+    $('form-novo').reset();
+    $('arquivo').value = '';
+    return prepararAbertura();
+  }
+
+  $('voltar-abertura').addEventListener('click', () => {
+    if (history.state && history.state.passo) {
+      history.back();  // O popstate abaixo desfaz o passo.
+    } else {
+      sairDoPasso();
+    }
+  });
+  window.addEventListener('popstate', () => {
+    if (!$('abertura').hidden && emPassoDaAbertura()) {
+      sairDoPasso();
+    }
+  });
+
   $('trocar-backup').addEventListener('click', () => {
+    entrarNoPasso();
     mostrarArquivo = true;
     prepararAbertura();
   });
@@ -197,6 +238,7 @@
       + 'O certo é tocar em Compartilhar → Adicionar à Tela de Início e começar pelo ícone. Começar aqui mesmo assim?')) {
       return;
     }
+    entrarNoPasso();
     mostrarNovo = true;
     prepararAbertura().then(() => $('senha-nova').focus());
   });
@@ -237,6 +279,7 @@
   });
 
   $('usar-senha').addEventListener('click', () => {
+    entrarNoPasso();
     mostrarSenha = true;
     prepararAbertura().then(() => $('senha').focus());
   });
@@ -309,6 +352,8 @@
       $('aplicativo').hidden = false;
       if (location.hash === '#inicio') {
         desenhar();
+      } else if (location.hash === '#passo') {
+        location.replace('#inicio');  // O passo da abertura não fica no histórico do app aberto.
       } else {
         location.hash = '#inicio';
       }
@@ -483,6 +528,9 @@
     estado.mes = null;
     estado.dia = null;
     $('tela').replaceChildren();
+    caminho.length = 0;
+    telaAnimada = null;
+    telaAnterior = null;
     $('aplicativo').hidden = true;
     $('abertura').hidden = false;
     history.replaceState(null, '', location.pathname);
@@ -1648,7 +1696,7 @@
   // Só o que não é sensível: titular, situação e datas. Sem CPF, conta, banco ou Pix; o Valor Total RPV só se a
   // pessoa marcar (e nunca no modo discreto).
   // Identidade Terracota: creme, terracota e azul-marinho; situação com as mesmas cores do app.
-  const CORES_SITUACAO = { pendente: ['#8a5d24', '#f7ead6'], atrasada: ['#b5444f', '#f8e3e3'], recebida: ['#2f7560', '#e4f0ea'] };
+  const CORES_SITUACAO = { pendente: ['#8a5d24', '#f7ead6'], atrasada: ['#a83c47', '#f8e3e3'], recebida: ['#2f7560', '#e4f0ea'] };
   const SERIFA = '"New York", ui-serif, Georgia, "Times New Roman", serif';
   const FONTE = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
   let logoCarregado = null;
@@ -2043,6 +2091,7 @@
         opcao('#novidades', 'Novidades', 'O que mudou nas últimas versões', 'megafone'),
         opcao('#convite', 'Convidar alguém', 'Mandar o app para outra pessoa usar com os dados dela', 'convidar', 'azul'),
         opcao('#backup', 'Sobre este backup', `Arquivo, data e versões · app ${VERSAO_APP}`, 'info', 'azul')),
+      grupo('Aparência', escolherTema()),
       grupo('Dados e segurança',
         info.independente && opcao('#copia', 'Fazer cópia de segurança', 'Salvar seus dados (trancados) no iCloud ou no Google Drive', 'escudo', 'verde'),
         escolherBackup(),
@@ -2207,7 +2256,7 @@
     $('titulo').textContent = tela.titulo;
     // A barra de zoom dos documentos fica logo abaixo do cabeçalho fixo.
     document.documentElement.style.setProperty('--altura-topo', `${document.querySelector('.topo').offsetHeight}px`);
-    $('voltar').hidden = !tela.voltar;
+    $('voltar').hidden = tela === TELAS.inicio;
     document.querySelectorAll('.abas a').forEach((a) => a.classList.toggle('ativa', a.dataset.aba === tela.aba));
     document.querySelector('.abas').style.setProperty('--aba', String(Math.max(0, ABAS.indexOf(tela.aba))));
     document.body.dataset.tela = TELAS[nome] ? nome : 'inicio';
@@ -2230,13 +2279,84 @@
     window.scrollTo(0, 0);
   }
 
-  $('voltar').addEventListener('click', () => history.back());
+  // Voltar (o botão do topo, o gesto ou a tecla de voltar do aparelho): para a tela anterior, se houver; senão,
+  // de um detalhe para a aba dele e de uma aba para o Início.
+  function telaAtual() {
+    return TELAS[location.hash.slice(1).split('/')[0]] || TELAS.inicio;
+  }
+
+  function voltar() {
+    const tela = telaAtual();
+    if (caminho.length > 1) {
+      history.back();
+    } else {
+      location.hash = tela === TELAS[tela.aba] ? '#inicio' : `#${tela.aba}`;
+    }
+  }
+
+  $('voltar').addEventListener('click', voltar);
+
+  // Tocar de novo na aba que já está acesa também volta: de um detalhe para a tela principal da aba; na tela
+  // principal, para a tela anterior.
+  document.querySelectorAll('.abas a').forEach((a) => a.addEventListener('click', (evento) => {
+    const tela = telaAtual();
+    const raiz = `#${a.dataset.aba}`;
+    if (!dados || a.dataset.aba !== tela.aba) {
+      return;
+    }
+    evento.preventDefault();
+    if (tela === TELAS[a.dataset.aba]) {
+      if (caminho.length > 1 || a.dataset.aba !== 'inicio') {
+        voltar();
+      }
+    } else if (caminho.length > 1 && caminho[caminho.length - 2] === raiz) {
+      history.back();
+    } else {
+      location.hash = raiz;
+    }
+  }));
 
   function mostrarDiscreto() {
     $('discreto').setAttribute('aria-pressed', String(discreto));
     $('discreto').setAttribute('aria-label', discreto ? 'Mostrar valores' : 'Esconder valores');
     $('discreto').classList.toggle('ligado', discreto);
   }
+
+  // Tema: automático (segue o iPhone), claro (diurno) ou escuro. Fica guardado neste aparelho.
+  const TEMAS = [['auto', 'Automático'], ['claro', 'Claro'], ['escuro', 'Escuro']];
+  const COR_DO_TOPO = { claro: '#f7f3ee', escuro: '#121519' };
+
+  function aplicarTema(tema) {
+    const raiz = document.documentElement;
+    if (tema === 'claro' || tema === 'escuro') {
+      raiz.dataset.tema = tema;
+    } else {
+      delete raiz.dataset.tema;
+    }
+    // A cor da barra de status acompanha o tema escolhido (no automático, cada meta vale para um modo do iPhone).
+    document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
+      const modo = meta.media.includes('dark') ? 'escuro' : 'claro';
+      meta.content = COR_DO_TOPO[raiz.dataset.tema || modo];
+    });
+  }
+
+  function escolherTema() {
+    const atual = localStorageLer('tema') || 'auto';
+    return el('div', { class: 'cartao tema' },
+      el('div', { class: 'textos' }, el('div', { texto: 'Tema' }),
+        el('div', { class: 'discreto pequeno', texto: 'Claro para o dia, escuro para a noite, ou o mesmo do iPhone' })),
+      el('div', { class: 'segmentos', role: 'radiogroup', 'aria-label': 'Tema' }, TEMAS.map(([chave, rotulo]) => el('button', {
+        type: 'button', role: 'radio', 'aria-checked': String(chave === atual), class: chave === atual ? 'ativo' : '',
+        texto: rotulo, onclick: () => {
+          localStorageGravar('tema', chave);
+          aplicarTema(chave);
+          const rolagem = window.scrollY;
+          desenhar();
+          window.scrollTo(0, rolagem);
+        } }))));
+  }
+
+  aplicarTema(localStorageLer('tema'));
 
   discreto = localStorageLer('discreto') === '1';
   mostrarDiscreto();

@@ -1,5 +1,16 @@
 # Histórico de versões
 
+## 0.60.0
+
+- Celular: tema escolhido em Mais → Aparência (Automático, Claro, Escuro), guardado no aparelho
+  (localStorage "tema"); o CSS aplica os tokens escuros com `:root[data-tema="escuro"]` ou com o iPhone no modo
+  escuro sem `data-tema="claro"`; `color-scheme` e a cor da barra de status acompanham.
+- Celular: "‹ Voltar" em todas as telas menos o Início: volta à tela anterior ou, sem histórico, do detalhe
+  para a aba e da aba para o Início. Tocar de novo na aba acesa volta também. Na abertura, os passos (criar
+  senha, usar a senha, trocar o backup) têm Voltar e entram no histórico (o gesto/tecla de voltar desfaz).
+- Celular: contraste AA no claro: destaque #A04B31, vermelho #A83C47, cinza das setas #8D867C (3:1), cartão do
+  lucro previsto em #B9593D→#A94F35 com rótulo branco; no escuro, cinza #767D89.
+
 ## 0.59.0
 
 Novo visual do app do celular, **Terracota** (só apresentação; dados, regras, backups, senha e Face ID iguais):

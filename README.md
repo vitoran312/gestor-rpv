@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.59.0
+# Gestor de RPV — 0.60.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -496,7 +496,7 @@ tudo da memória do celular. O endereço é https://vitoran312.github.io/gestor-
 
 **Visual do app (identidade Terracota).** Creme quente (`#F7F3EE`), superfícies `#FFFDF9`, ação principal em
 terracota (`#B95A3F`, texto branco com contraste AA), texto azul-marinho (`#20334D`), verde suave nas formas da
-abertura e nos valores realizados; tema escuro com os mesmos papéis. Títulos em serifa (New York), valores com
+abertura e nos valores realizados; tema escuro com os mesmos papéis, escolhido em Mais → Aparência (Automático, Claro ou Escuro). Títulos em serifa (New York), valores com
 algarismos de largura igual. Os tokens de cor, espaço, raio e movimento ficam no topo de `celular/estilo.css`.
 Abas numa barra clara com a pílula terracota que desliza até a aba escolhida; Início com "Seu panorama", o
 lucro previsto num cartão terracota e cartões com ícone; Operações com avatar de iniciais, faixa da situação e

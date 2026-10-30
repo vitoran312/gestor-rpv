@@ -15,11 +15,11 @@
   --marca-pressionada: #a44e35;
   --marca-texto: #ffffff;
   --marca-suave: #f6e4dc;     /* Fundo do item escolhido e de ícones em terracota. */
-  --destaque: #ad5236;        /* Links e detalhes em terracota sobre o creme. */
+  --destaque: #a04b31;        /* Links e detalhes em terracota sobre o creme. */
   --secundaria: #71978e;      /* Verde-acinzentado das formas decorativas. */
   --verde: #2f7560;
   --verde-suave: #e4f0ea;
-  --vermelho: #b5444f;
+  --vermelho: #a83c47;
   --vermelho-suave: #f8e3e3;
   --ambar: #8a5d24;
   --ambar-suave: #f7ead6;
@@ -28,8 +28,8 @@
   --atraso: var(--vermelho-suave);
   --recebida: var(--verde-suave);
   --realce: var(--marca-suave);
-  --neutro: #b9b2a8;
-  --heroi: linear-gradient(135deg, #c96548 0%, #b4553a 100%);
+  --neutro: #8d867c;
+  --heroi: linear-gradient(135deg, #b9593d 0%, #a94f35 100%);
   --heroi-texto: #ffffff;
   --vidro: rgba(247, 243, 238, 0.86);
   --vidro-abas: rgba(255, 253, 249, 0.92);
@@ -54,10 +54,13 @@
   --ease-mola: cubic-bezier(0.3, 1.15, 0.55, 1);  /* Mola bem amortecida: um fio de passagem, sem oscilar. */
   font-family: var(--sem-serifa);
   -webkit-text-size-adjust: 100%;
+  color-scheme: light dark;
 }
 
+/* Escuro: com o tema "Escuro" escolhido em Mais, ou no automático com o iPhone no modo escuro. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-tema="claro"]) {
+    color-scheme: dark;
     --fundo: #121519;
     --superficie: #1b1f26;
     --superficie-2: #232831;
@@ -80,7 +83,7 @@
     --ambar-suave: #30261a;
     --azul: #9dbbe0;
     --azul-suave: #1c2533;
-    --neutro: #59606c;
+    --neutro: #767d89;
     --heroi: linear-gradient(135deg, #a9573d 0%, #8b432e 100%);
     --vidro: rgba(18, 21, 25, 0.84);
     --vidro-abas: rgba(30, 34, 41, 0.92);
@@ -89,6 +92,39 @@
     --sombra-marca: 0 8px 22px rgba(0, 0, 0, 0.35);
   }
 }
+:root[data-tema="escuro"] {
+  color-scheme: dark;
+  --fundo: #121519;
+  --superficie: #1b1f26;
+  --superficie-2: #232831;
+  --campo: #161a20;
+  --texto: #f1ece4;
+  --secundario: #a7adb8;
+  --borda: #313741;
+  --borda-suave: #262b33;
+  --marca: #e07f62;
+  --marca-pressionada: #cf6f53;
+  --marca-texto: #1d120d;
+  --marca-suave: #3a251e;
+  --destaque: #ec9a80;
+  --secundaria: #8fb3aa;
+  --verde: #78c9a8;
+  --verde-suave: #18291f;
+  --vermelho: #f2909a;
+  --vermelho-suave: #331b1e;
+  --ambar: #e2b673;
+  --ambar-suave: #30261a;
+  --azul: #9dbbe0;
+  --azul-suave: #1c2533;
+  --neutro: #767d89;
+  --heroi: linear-gradient(135deg, #a9573d 0%, #8b432e 100%);
+  --vidro: rgba(18, 21, 25, 0.84);
+  --vidro-abas: rgba(30, 34, 41, 0.92);
+  --sombra: 0 0 0 1px rgba(255, 255, 255, 0.02), 0 8px 22px rgba(0, 0, 0, 0.3);
+  --sombra-alta: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 16px 36px rgba(0, 0, 0, 0.45);
+  --sombra-marca: 0 8px 22px rgba(0, 0, 0, 0.35);
+}
+:root[data-tema="claro"] { color-scheme: light; }
 
 * { box-sizing: border-box; }
 /* "hidden" sempre esconde, mesmo em elementos com display próprio (grid, flex). */
@@ -178,14 +214,20 @@ svg.icone { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 220'%3E%3Cpath d='M0 0h220c-20 50-70 60-120 80S20 140 0 200z' fill='%23e8d9cb' fill-opacity='.55'/%3E%3C/svg%3E") left top / min(70%, 300px) auto no-repeat,
     var(--fundo);
 }
+/* No escuro, só as duas formas de baixo, mais apagadas. */
 @media (prefers-color-scheme: dark) {
-  /* No escuro, só as duas formas de baixo, mais apagadas. */
-  .abertura {
+  :root:not([data-tema="claro"]) .abertura {
     background:
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Cpath d='M0 120C70 90 120 150 170 210s90 90 0 90H0z' fill='%23c96548' fill-opacity='.2'/%3E%3Cpath d='M0 190c50-20 90 10 120 50s40 60 0 60H0z' fill='%23c96548' fill-opacity='.14'/%3E%3C/svg%3E") left bottom / min(100%, 420px) auto no-repeat,
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Cpath d='M400 70c-70 10-110 60-140 120s-70 110 0 110h140z' fill='%2371978e' fill-opacity='.22'/%3E%3Cpath d='M400 170c-50 0-80 40-100 80s-30 50 0 50h100z' fill='%2371978e' fill-opacity='.16'/%3E%3C/svg%3E") right bottom / min(90%, 380px) auto no-repeat,
       var(--fundo);
   }
+}
+:root[data-tema="escuro"] .abertura {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Cpath d='M0 120C70 90 120 150 170 210s90 90 0 90H0z' fill='%23c96548' fill-opacity='.2'/%3E%3Cpath d='M0 190c50-20 90 10 120 50s40 60 0 60H0z' fill='%23c96548' fill-opacity='.14'/%3E%3C/svg%3E") left bottom / min(100%, 420px) auto no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Cpath d='M400 70c-70 10-110 60-140 120s-70 110 0 110h140z' fill='%2371978e' fill-opacity='.22'/%3E%3Cpath d='M400 170c-50 0-80 40-100 80s-30 50 0 50h100z' fill='%2371978e' fill-opacity='.16'/%3E%3C/svg%3E") right bottom / min(90%, 380px) auto no-repeat,
+    var(--fundo);
 }
 .logo-abertura { display: block; width: 84px; height: 84px; margin: 28px auto 14px; filter: drop-shadow(0 10px 18px rgba(169, 51, 51, 0.22)); }
 .abertura h1 { text-align: center; font-size: 2rem; letter-spacing: 0.03em; margin: 0; }
@@ -230,6 +272,7 @@ button.link {
 #ver-demonstracao { display: block; margin: 4px auto; }
 #explicacao { text-align: center; margin: 14px 8px 0; }
 #instalar { margin-top: 16px; }
+#voltar-abertura { align-self: flex-start; margin: -12px 0 0; }
 #versao-app { margin: auto 0 0; padding-top: 28px; color: var(--secundario); font-size: 0.8rem; }
 
 /* ---- Logo ao abrir (splash) ---- */
@@ -384,7 +427,7 @@ body[data-tela="inicio"] .topo { min-height: calc(max(14px, env(safe-area-inset-
   color: var(--heroi-texto);
   box-shadow: var(--sombra-marca);
 }
-.indicador.principal .rotulo { color: rgba(255, 255, 255, 0.88); font-size: 0.85rem; }
+.indicador.principal .rotulo { color: #ffffff; font-size: 0.85rem; }
 .indicador.principal .valor { font-size: 2rem; letter-spacing: -0.01em; color: #ffffff; }
 .indicador.principal .icone-indicador { width: 48px; height: 48px; border-radius: 50%; color: #ffffff; background: rgba(255, 255, 255, 0.16); }
 .indicador.verde { grid-column: 1 / -1; background: var(--verde-suave); border-color: transparent; }
@@ -524,6 +567,12 @@ dl.campos dd { margin: 0; text-align: right; overflow-wrap: anywhere; font-weigh
 .icone-menu.verde { color: var(--verde); background: var(--verde-suave); }
 .icone-menu.ambar { color: var(--ambar); background: var(--ambar-suave); }
 .menu-acoes { display: grid; gap: 4px; margin-top: 22px; }
+/* Tema: três opções lado a lado; a escolhida em terracota. */
+.cartao.tema { display: grid; gap: 12px; }
+.cartao.tema .textos > :first-child { font-weight: 600; }
+.segmentos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border-radius: 14px; background: var(--superficie-2); }
+.segmentos button { min-height: 40px; padding: 8px 4px; border: 0; border-radius: 10px; background: none; color: var(--secundario); font-size: 0.9rem; font-weight: 600; }
+.segmentos button.ativo { background: var(--marca); color: var(--marca-texto); box-shadow: var(--sombra-marca); }
 .vazio { color: var(--secundario); text-align: center; padding: 32px 0; font-family: var(--serifa); font-size: 1.05rem; }
 
 /* ---- Gráfico ---- */
