@@ -52,6 +52,13 @@
     </div>
     <!-- Primeira vez neste celular: o nome e a senha que a pessoa escolher. -->
     <form id="form-novo" class="cartao formulario" autocomplete="off" hidden>
+      <!-- Quem recebeu um código entra nos dados de quem convidou; criar dados novos é para quem começa do zero. -->
+      <div class="aviso convite-primeiro">
+        <div class="nome">Alguém da casa já usa o app?</div>
+        <div class="pequeno">Se te mandaram um código de convite, entre com ele para ver e alterar os mesmos dados.</div>
+        <button id="tenho-convite" class="secundario" type="button">Tenho um código de convite</button>
+      </div>
+      <p class="nome">Ou comece do zero, com dados só seus:</p>
       <p class="discreto pequeno">A senha tranca os seus dados neste celular e na nuvem. Anote em lugar seguro: sem ela não
         há como abrir os dados.</p>
       <label for="nome-novo">Nome</label>

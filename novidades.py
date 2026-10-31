@@ -10,6 +10,11 @@ from pathlib import Path
 MOSTRAR = 5  # Quantas versões aparecem no "Sobre".
 
 NOVIDADES = [
+    ('0.64.2', [
+        ('novidade', 'Celular: quem já criou dados próprios entra nos dados da casa em Mais → Compartilhar → "Recebeu um código?".'),
+        ('novidade', 'Celular: na primeira vez, "Tenho um código de convite" aparece em destaque, antes de criar dados novos.'),
+        ('correcao', 'Celular: entrar pelo convite com uma senha que já tinha dados próprios não dá mais "senha já usada".'),
+    ]),
     ('0.64.1', [
         ('correcao', 'Celular: "Compartilhar" não diz mais "senha já usada" depois de uma tentativa que parou no meio.'),
         ('correcao', 'Celular: o texto de "Compartilhar" deixa claro que a senha pedida é a sua; a dela, ela cria no celular dela.'),

@@ -1,5 +1,15 @@
 # Histórico de versões
 
+## 0.64.2
+
+- Abertura: no passo de criar dados (Nome + Senha), um aviso em destaque "Alguém da casa já usa o app?" com o botão
+  "Tenho um código de convite"; o link pequeno saiu desse passo. Quem é convidado não começa mais do zero sem querer.
+- Compartilhar: "Recebeu um código?" (código + a sua senha) troca os dados deste celular pelos de quem convidou; o
+  cadastro da pessoa vai para aquele cofre (provando o cofre de antes pelo envelope) e o cofre antigo sai da nuvem se
+  ficou sem ninguém. A entrada pelo convite na abertura usa o mesmo caminho (`entrarPeloConvite`), e com uma senha
+  que já tinha dados próprios pergunta antes, em vez de dar "senha já usada".
+- `cofreDoCadastro` e `apagarSeSemNinguem` também servem à troca de chave interrompida (0.64.1).
+
 ## 0.64.1
 
 - Compartilhar: se a troca de chave antes do primeiro convite parava depois de a nuvem gravar o cadastro da pessoa

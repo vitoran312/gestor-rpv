@@ -318,7 +318,7 @@ class TestAppDoCelular(unittest.TestCase):
     def test_primeira_vez_pede_nome_e_senha(self):
         abertura = self.resultados['abertura_nova']
         self.assertTrue(abertura['nome'])
-        for texto in ('Nome', 'Repita a senha', 'Recebi um código de convite', 'Já tenho dados: recuperar da nuvem'):
+        for texto in ('Nome', 'Repita a senha', 'Tenho um código de convite', 'Já tenho dados: recuperar da nuvem'):
             self.assertIn(texto, abertura['texto'])
         self.assertNotIn('computador', abertura['texto'])
 

@@ -127,7 +127,7 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
 
     // 3. Ana entra pelo código (errado antes), com o nome e a senha dela, e vê os dados do Vitor.
     const b = await aparelho('ana');
-    await b.pagina.click('#recebi-convite');
+    await b.pagina.click('#tenho-convite');
     await b.pagina.waitForSelector('#form-convite:not([hidden])');
     await b.pagina.fill('#codigo-convite', 'AAAAA-BBBBB');
     await b.pagina.fill('#nome-convite', 'Ana');
@@ -145,7 +145,7 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
 
     // 4. O mesmo código não serve de novo.
     const c = await aparelho('outro');
-    await c.pagina.click('#recebi-convite');
+    await c.pagina.click('#tenho-convite');
     await c.pagina.fill('#codigo-convite', codigo);
     await c.pagina.fill('#nome-convite', 'Intruso');
     await c.pagina.fill('#senha-convite', 'outra senha 77');
@@ -164,6 +164,34 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
     await a.pagina.waitForFunction(() => document.getElementById('tela').innerText.includes('Entrada Da Ana'), null,
       { timeout: 30000 });
     r.operacoes_vitor = await a.texto();
+
+    // 5b. Lilian começou com dados próprios (nome e senha, sem o código) e depois recebe um código: em Compartilhar,
+    //     com a senha dela, passa a usar os dados da casa; o cofre dela, vazio, sai da nuvem.
+    await a.ir('#compartilhar');
+    await a.pagina.click('text=Gerar código de convite');
+    await a.pagina.waitForSelector('.codigo-convite', { timeout: 30000 });
+    const codigoLilian = await a.pagina.textContent('.codigo-convite');
+    const cofresAntesDela = chaves('meta:').length;
+    const l = await aparelho('lilian');
+    r.abertura_convite_em_destaque = await l.pagina.isVisible('#tenho-convite');
+    await l.pagina.fill('#nome-novo', 'Lilian');
+    await l.pagina.fill('#senha-nova', 'lilian propria 55');
+    await l.pagina.fill('#senha-repetida', 'lilian propria 55');
+    await l.pagina.click('#criar');
+    await l.pagina.waitForSelector('#aplicativo:not([hidden])', { timeout: 120000 });
+    await esperar(() => chaves('meta:').length === cofresAntesDela + 1);
+    await l.ir('#compartilhar');
+    await l.pagina.fill('[name="codigo_convite"]', codigoLilian);
+    await l.pagina.fill('[name="senha_confirmar"]', 'lilian propria 55');
+    await l.pagina.click('text=Entrar nos dados de quem convidou');
+    await l.pagina.waitForFunction(() => location.hash === '#inicio' || !document.getElementById('erro').hidden,
+      null, { timeout: 120000 });
+    await l.pagina.waitForSelector('#aplicativo:not([hidden])', { timeout: 120000 });
+    r.operacoes_lilian = await l.operacoes();
+    r.membros_com_lilian = json(`membros:${r.cofre}`).map((m) => m.nome);
+    await esperar(() => chaves('meta:').length === cofresAntesDela);
+    r.cofre_da_lilian_apagado = true;
+    await l.contexto.close();
 
     // 6. Os dois gravam quase ao mesmo tempo: a Ana primeiro; o Vitor sem conseguir conferir a nuvem antes. A nuvem
     //    recusa o envio dele (desatualizado), o app traz o da Ana, refaz a entrada dele por cima e manda: as duas ficam.

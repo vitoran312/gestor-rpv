@@ -7,7 +7,7 @@
 (() => {
   // Igual a versao.py (test_celular confere): mostrada na abertura e em Mais, para saber se o aparelho já
   // carregou a última versão publicada.
-  const VERSAO_APP = '0.64.1';
+  const VERSAO_APP = '0.64.2';
   const D = GestorDados;
   const $ = (id) => document.getElementById(id);
   const SITUACOES = { pendente: 'Pendente', atrasada: 'Atrasada', recebida: 'Recebida' };
@@ -176,7 +176,7 @@
     $('form-convite').hidden = desbloqueio || passo !== 'convite';
     $('form-nuvem').hidden = desbloqueio || passo !== 'nuvem';
     $('outras-entradas').hidden = desbloqueio;
-    $('recebi-convite').hidden = passo === 'convite';
+    $('recebi-convite').hidden = passo !== 'nuvem';  // No primeiro passo, o convite já aparece em destaque.
     $('recuperar-nuvem').hidden = passo === 'nuvem';
     $('ver-demonstracao').hidden = desbloqueio || passo !== 'novo';
     $('voltar-abertura').hidden = !emPassoDaAbertura();
@@ -222,6 +222,7 @@
     }
   });
   $('recebi-convite').addEventListener('click', () => irParaPasso('convite', 'codigo-convite'));
+  $('tenho-convite').addEventListener('click', () => irParaPasso('convite', 'codigo-convite'));
   $('recuperar-nuvem').addEventListener('click', () => irParaPasso('nuvem', 'senha-nuvem'));
   $('usar-senha').addEventListener('click', () => irParaPasso('senha', 'senha'));
 
@@ -251,6 +252,51 @@
     if (nome) {
       localStorageGravar('nome', nome.trim());
     }
+  }
+
+  // O cofre para onde o cadastro desta pessoa aponta na nuvem (null se ainda não tem cadastro). Pode não ser o
+  // deste celular: uma troca de chave que parou no meio, ou dados próprios criados antes de usar um convite. O
+  // envelope, aberto com a senha, dá a chave desse cofre, que prova à nuvem que é a mesma pessoa mudando o cadastro.
+  async function cofreDoCadastro(pessoa) {
+    const registrado = await Nuvem.lerMembro(pessoa);
+    return registrado ? (await Nuvem.abrirEnvelope(pessoa.envelope, registrado.envelope)).cofre : null;
+  }
+
+  // Um cofre que ficou sem ninguém (depois de a pessoa ir para outro) sai da nuvem.
+  async function apagarSeSemNinguem(cofre) {
+    if (cofre && !(await Nuvem.listarMembros(cofre).catch(() => [{}])).length) {
+      await Nuvem.apagar(cofre).catch(() => {});
+    }
+  }
+
+  // Entra nos dados de quem convidou: baixa os dados, fecha o envelope desta pessoa e passa o cadastro dela para
+  // aquele cofre (o convite vale uma vez). Se a senha já tinha dados próprios, `largar` decide se ela os deixa.
+  async function entrarPeloConvite(codigo, pessoa, nome, andamento, largar) {
+    const convite = await Nuvem.chavesDoConvite(codigo);
+    if (!convite.valido) {
+      throw new Error('O código tem 10 letras e números, como K7P2Q-9XMRT.');
+    }
+    andamento('Conferindo o código…', 0.6);
+    const envelopeConvite = await Nuvem.lerConvite(convite);
+    if (!envelopeConvite) {
+      throw new Error('Código inválido ou vencido. Peça um código novo a quem convidou.');
+    }
+    const conteudo = await Nuvem.abrirEnvelope(convite.chave, envelopeConvite);
+    andamento('Baixando os dados…', 0.65);
+    const meta = await Nuvem.consultar(conteudo.cofre);
+    if (!meta) {
+      throw new Error('Os dados de quem convidou ainda não estão na nuvem. Peça para abrir o app e gerar outro código.');
+    }
+    const bytes = await Nuvem.baixar(conteudo.cofre, meta, (p) => andamento('Baixando os dados…', 0.65 + p * 0.25));
+    const envelope = await Nuvem.fecharEnvelope(pessoa.envelope, conteudo);
+    const antigo = await cofreDoCadastro(pessoa);
+    const deixar = antigo && antigo.id !== conteudo.cofre.id ? antigo : null;
+    if (deixar && !await largar()) {
+      throw new Error('Nada mudou.');
+    }
+    await Nuvem.guardarMembro(pessoa, conteudo.cofre, { envelope, nome: nome.trim(), convite: convite.id, anterior: deixar });
+    await apagarSeSemNinguem(deixar);
+    return { conteudo, envelope, meta, bytes };
   }
 
   async function executarNaAbertura(botao, tarefa) {
@@ -298,31 +344,19 @@
   $('form-convite').addEventListener('submit', (evento) => {
     evento.preventDefault();
     executarNaAbertura('entrar-convite', async () => {
-      const convite = await Nuvem.chavesDoConvite($('codigo-convite').value);
-      if (!convite.valido) {
-        throw new Error('O código tem 10 letras e números, como K7P2Q-9XMRT.');
-      }
       const nome = $('nome-convite').value;
       const senha = $('senha-convite').value;
       conferirNomeESenha(nome, senha, $('senha-convite-repetida').value);
       if (!confirmarForaDoSafari()) {
         return;
       }
-      mostrarAndamento('Conferindo o código…', 0.05);
-      const envelopeConvite = await Nuvem.lerConvite(convite);
-      if (!envelopeConvite) {
-        throw new Error('Código inválido ou vencido. Peça um código novo a quem convidou.');
+      if (!(await Nuvem.chavesDoConvite($('codigo-convite').value)).valido) {
+        throw new Error('O código tem 10 letras e números, como K7P2Q-9XMRT.');
       }
-      const conteudo = await Nuvem.abrirEnvelope(convite.chave, envelopeConvite);
-      const pessoa = await Nuvem.credenciais(senha, (p) => mostrarAndamento('Preparando a senha…', 0.1 + p * 0.5));
-      mostrarAndamento('Baixando os dados…', 0.65);
-      const meta = await Nuvem.consultar(conteudo.cofre);
-      if (!meta) {
-        throw new Error('Os dados de quem convidou ainda não estão na nuvem. Peça para abrir o app e gerar outro código.');
-      }
-      const bytes = await Nuvem.baixar(conteudo.cofre, meta, (p) => mostrarAndamento('Baixando os dados…', 0.65 + p * 0.25));
-      const envelope = await Nuvem.fecharEnvelope(pessoa.envelope, conteudo);
-      await Nuvem.guardarMembro(pessoa, conteudo.cofre, { envelope, nome: nome.trim(), convite: convite.id });
+      const pessoa = await Nuvem.credenciais(senha, (p) => mostrarAndamento('Preparando a senha…', 0.05 + p * 0.5));
+      const { conteudo, envelope, meta, bytes } = await entrarPeloConvite($('codigo-convite').value, pessoa, nome,
+        mostrarAndamento, async () => confirm('Você já tinha dados próprios com esta senha. Ao entrar no convite, passa a usar '
+          + 'os dados de quem convidou, e os seus deixam de ser usados. Continuar?'));
       await guardarAcesso({ pessoa, conteudo, envelope, nome });
       gravarEstadoNuvem({ versao: meta.versao, criado_em: meta.criado_em, sincronizado_em: LeitorBackup.dataHoraLocal() });
       fonte = { bytes, nome: 'GestorRPV-celular.rpvbackup', tamanho: bytes.length, criado_em: meta.criado_em, novo: true };
@@ -2429,9 +2463,8 @@
     // aponta para um cofre que este celular não chegou a guardar. O envelope dela, aberto com a senha, prova esse
     // cofre, e a troca continua dele; o cofre que sobrou é apagado no fim.
     andamento('Conferindo a nuvem…');
-    const registrado = await Nuvem.lerMembro(pessoa);
-    const sobra = registrado && anterior && registrado.cofre !== anterior.id
-      ? (await Nuvem.abrirEnvelope(pessoa.envelope, registrado.envelope)).cofre : null;
+    const doCadastro = await cofreDoCadastro(pessoa);
+    const sobra = doCadastro && anterior && doCadastro.id !== anterior.id ? doCadastro : null;
     const novaChave = { sal: crypto.getRandomValues(new Uint8Array(16)), bruta: crypto.getRandomValues(new Uint8Array(32)) };
     const novoCofre = Nuvem.cofreNovo();
     await emOrdem(async () => {
@@ -2445,9 +2478,7 @@
         await Nuvem.apagarMembro(id, anterior).catch(() => {});
       }
       await Nuvem.apagar(anterior).catch(() => {});
-      if (sobra && !(await Nuvem.listarMembros(sobra).catch(() => [{}])).length) {
-        await Nuvem.apagar(sobra).catch(() => {});  // Só se ninguém mais usa aquele cofre.
-      }
+      await apagarSeSemNinguem(sobra);
       await Guarda.gravar('envelope', envelope);
       await guardarNuvem({ ...nuvem, id: novoCofre.id, chave: novoCofre.chave, backup: true,
         membro: { id: pessoa.id, chave: pessoa.chave }, membroPendente: null });
@@ -2513,7 +2544,7 @@
     };
     const mostrarCodigo = (codigo) => {
       const texto = `Use o Gestor RPV comigo: abra ${ENDERECO_APP} no Safari, toque em Compartilhar → Adicionar à Tela de `
-        + `Início e abra pelo ícone. Depois toque em "Começar a usar com meus dados" → "Recebi um código de convite" e `
+        + `Início e abra pelo ícone. Depois toque em "Começar a usar com meus dados" → "Tenho um código de convite" e `
         + `digite: ${codigo} (vale por 15 minutos).`;
       area.replaceChildren(
         el('div', { class: 'codigo-convite', texto: codigo }),
@@ -2558,12 +2589,49 @@
       area.append(el('button', { type: 'button', class: 'primario', texto: 'Gerar código de convite', onclick: gerar }));
       mostrarPessoas();
     }
+    // Quem começou com dados próprios e depois recebeu um código: entra nos dados de quem convidou daqui mesmo.
+    const campoCodigo = el('input', { name: 'codigo_convite', autocomplete: 'one-time-code', autocapitalize: 'characters',
+      spellcheck: 'false', placeholder: 'K7P2Q-9XMRT' });
+    const receber = formularioSenha('Entrar nos dados de quem convidou', (senha, andamento) =>
+      entrarNosDadosDeOutro(campoCodigo.value, senha, andamento), { botao: 'secundario' });
+    receber.prepend(campoFormulario('Código do convite', campoCodigo));
     return [
       el('p', { class: 'discreto pequeno', texto: 'Quem você convidar vê e altera os mesmos dados, com o nome e a senha dela. '
         + 'O que um muda aparece no celular do outro.' }),
       !antigos && [el('h2', { texto: 'Pessoas com acesso' }), pessoas],
       el('h2', { texto: 'Convite' }), cartao(area, situacao),
+      el('h2', { texto: 'Recebeu um código?' }),
+      cartao(el('p', { class: 'discreto pequeno', texto: 'Se outra pessoa da casa te mandou um código, digite-o com a sua senha: '
+        + 'este celular passa a usar os dados dela, e os que estão aqui deixam de ser usados.' }), receber),
     ];
+  }
+
+  async function entrarNosDadosDeOutro(codigo, senha, andamento) {
+    if (!(await Nuvem.chavesDoConvite(codigo)).valido) {
+      throw new Error('O código tem 10 letras e números, como K7P2Q-9XMRT.');
+    }
+    const pessoa = await confirmarSenha(senha);
+    const total = dados.operacoes.length + dados.contas.length;
+    if (total && !confirm(`Os dados deste celular (${D.quantidade(dados.operacoes.length, 'operação', 'operações')}) deixam de `
+      + 'ser usados, e este celular passa a usar os dados de quem convidou. Continuar?')) {
+      return;
+    }
+    const proprio = cofreAtual();
+    const { conteudo, envelope, meta, bytes } = await entrarPeloConvite(codigo, pessoa, nomeDono(), andamento, async () => true);
+    if (proprio && proprio.id !== conteudo.cofre.id) {
+      await apagarSeSemNinguem(proprio);
+    }
+    await emOrdem(async () => {
+      if (faceIdAtivo) {
+        await FaceId.desativar().catch(() => {});  // Guardava a chave dos dados antigos.
+        faceIdAtivo = false;
+      }
+      await guardarAcesso({ pessoa, conteudo, envelope });
+      gravarEstadoNuvem({ versao: meta.versao, criado_em: meta.criado_em, sincronizado_em: LeitorBackup.dataHoraLocal() });
+    });
+    await fecharDados();
+    fonte = { bytes, nome: 'GestorRPV-celular.rpvbackup', tamanho: bytes.length, criado_em: meta.criado_em, novo: true };
+    await abrirFonte({ chave: { sal: conteudo.sal, bruta: conteudo.bruta } });
   }
 
   function telaMais() {

@@ -967,3 +967,7 @@ details[open] > :not(summary) { animation: abrir-detalhe 240ms var(--ease-padrao
   .splash img, .splash-nome { animation-duration: 0.3s; }
   details::details-content { transition: none; }
 }
+
+/* Abertura: o convite em destaque antes de criar dados novos (quem divide os dados não deve começar do zero). */
+.aviso.convite-primeiro { display: grid; gap: 4px; margin-bottom: 4px; }
+.aviso.convite-primeiro button { margin-top: 8px; }
