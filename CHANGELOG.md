@@ -1,5 +1,13 @@
 # Histórico de versões
 
+## 0.64.1
+
+- Compartilhar: se a troca de chave antes do primeiro convite parava depois de a nuvem gravar o cadastro da pessoa
+  num cofre novo (resposta perdida, app fechado), as tentativas seguintes davam "Esta senha já é usada por outra
+  pessoa". Agora o app lê o cadastro, abre o envelope com a senha e usa aquele cofre como prova do anterior; no fim,
+  apaga o cofre que sobrou (se ninguém mais o usa). Teste: troca interrompida e dados antigos sem cadastro na nuvem.
+- Texto de Compartilhar: a senha pedida é a de quem abre o app; a da outra pessoa é criada no celular dela.
+
 ## 0.64.0
 
 Celular, organização das telas:

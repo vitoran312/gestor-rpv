@@ -10,6 +10,10 @@ from pathlib import Path
 MOSTRAR = 5  # Quantas versões aparecem no "Sobre".
 
 NOVIDADES = [
+    ('0.64.1', [
+        ('correcao', 'Celular: "Compartilhar" não diz mais "senha já usada" depois de uma tentativa que parou no meio.'),
+        ('correcao', 'Celular: o texto de "Compartilhar" deixa claro que a senha pedida é a sua; a dela, ela cria no celular dela.'),
+    ]),
     ('0.64.0', [
         ('novidade', 'Celular: Início mais limpo, com atalhos grandes (Nova entrada, Pendentes, Gráfico) no lugar da '
                      '"Situação das operações".'),

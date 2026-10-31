@@ -22,7 +22,7 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
 
   async function aparelho(nome) {
     const contexto = await navegador.newContext();
-    const estado = { falharConsulta: false };
+    const estado = { falharConsulta: false, semCadastro: false, perderResposta: false };
     // Os pedidos ao endereço da nuvem vão para o Worker local (a página continua vendo o endereço de sempre).
     await contexto.route(/workers\.dev/, async (rota) => {
       const pedido = rota.request();
@@ -32,9 +32,18 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
         await rota.abort();
         return;
       }
+      if (estado.semCadastro && pedido.method() === 'PUT' && url.pathname.startsWith('/v1/membro/')) {
+        await rota.abort();  // Como pelo Face ID antigo: os dados não mudaram, e o cadastro da pessoa não chegou à nuvem.
+        return;
+      }
       const resposta = await fetch(`http://127.0.0.1:${porta}${url.pathname}${url.search}`, {
         method: pedido.method(), headers: pedido.headers(), body: pedido.postDataBuffer() || undefined,
       });
+      if (estado.perderResposta && pedido.method() === 'PUT' && url.pathname.startsWith('/v1/membro/')) {
+        estado.perderResposta = false;  // A nuvem gravou, mas a resposta não chegou (internet caiu, app fechado).
+        await rota.abort();
+        return;
+      }
       await rota.fulfill({ status: resposta.status, headers: Object.fromEntries(resposta.headers),
         body: Buffer.from(await resposta.arrayBuffer()) });
     });
@@ -213,6 +222,7 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
 
     // 9. Dados antigos (de antes do envelope, a senha era a chave): ganham envelope e vão para a nuvem sozinhos.
     const f = await aparelho('antigos');
+    f.estado.semCadastro = true;
     await f.pagina.evaluate(async ({ url, senhaPc }) => {
       await abrirArquivoGestor(new Uint8Array(await (await fetch(url)).arrayBuffer()), senhaPc);
     }, { url: backupPc, senhaPc });
@@ -220,13 +230,23 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
     const cofresAntes = chaves('meta:').length;
     await esperar(() => chaves('meta:').length === cofresAntes + 1, 60000);
     r.cofre_antigo = chaves('meta:').find((k) => k !== `meta:${r.cofre_novo}`).slice('meta:'.length);
-    await esperar(() => kv.has(`membro:${r.cofre_antigo}`), 30000);
+    await f.pagina.waitForTimeout(1500);
+    r.antigos_sem_cadastro = !kv.has(`membro:${r.cofre_antigo}`);
+    f.estado.semCadastro = false;
     // Antes do primeiro convite, a senha é confirmada e os dados ganham uma chave só deles (cofre novo).
     await f.ir('#compartilhar');
     r.compartilhar_antigos = await f.texto();
+    // A primeira troca para no meio: o cadastro já foi para um cofre novo, que este celular não guardou.
+    f.estado.perderResposta = true;
     await f.pagina.fill('[name="senha_confirmar"]', senhaPc);
     await f.pagina.click('button:has-text("Continuar")');
+    await f.pagina.waitForSelector('#tela form p.erro', { timeout: 60000 });
+    r.troca_interrompida = await f.pagina.textContent('#tela form p.erro');
+    const cofresInterrompidos = chaves('meta:').length;
+    // Na segunda, o app continua de onde parou (sem "senha já usada") e apaga o cofre que sobrou.
+    await f.pagina.click('button:has-text("Continuar")');
     await f.pagina.waitForSelector('text=Gerar código de convite', { timeout: 60000 });
+    r.cofres_depois_da_retomada = chaves('meta:').length - cofresInterrompidos;
     await esperar(() => !kv.has(`meta:${r.cofre_antigo}`), 30000);
     r.antigos_migrados = { cadastro_continua: kv.has(`membro:${r.cofre_antigo}`),
       cofre_novo: json(`membro:${r.cofre_antigo}`).cofre !== r.cofre_antigo };

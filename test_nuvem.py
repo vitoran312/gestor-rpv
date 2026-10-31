@@ -363,6 +363,10 @@ class TestNuvemPeloCelular(unittest.TestCase):
     def test_dados_antigos_ganham_envelope_e_chave_propria(self):
         # Antes do envelope, o cofre era a própria pessoa (como o programa no computador procura).
         self.assertEqual(self.r['cofre_antigo'], nuvem.credenciais(self.senha_pc)[0])
+        self.assertTrue(self.r['antigos_sem_cadastro'])  # O caso do Face ID antigo: sem cadastro da pessoa na nuvem.
         self.assertIn('confirme a sua senha', self.r['compartilhar_antigos'])
         self.assertEqual(self.r['antigos_migrados'], {'cadastro_continua': True, 'cofre_novo': True})
+        # Troca interrompida (a resposta da nuvem se perdeu): a próxima tentativa continua, sem "senha já usada".
+        self.assertIn('conexão', self.r['troca_interrompida'])
+        self.assertEqual(self.r['cofres_depois_da_retomada'], -1)  # Saem o antigo e o que sobrou; entra um novo.
         self.assertIn('Do Computador', self.r['operacoes_antigos'])

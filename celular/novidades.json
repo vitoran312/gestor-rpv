@@ -1,6 +1,20 @@
 {
   "versoes": [
     {
+      "versao": "0.64.1",
+      "resumo": "2 correções",
+      "itens": [
+        {
+          "tipo": "correcao",
+          "texto": "Celular: \"Compartilhar\" não diz mais \"senha já usada\" depois de uma tentativa que parou no meio."
+        },
+        {
+          "tipo": "correcao",
+          "texto": "Celular: o texto de \"Compartilhar\" deixa claro que a senha pedida é a sua; a dela, ela cria no celular dela."
+        }
+      ]
+    },
+    {
       "versao": "0.64.0",
       "resumo": "3 novidades",
       "itens": [
@@ -89,28 +103,6 @@
         {
           "tipo": "novidade",
           "texto": "Celular: o botão \"Trancar agora\" saiu de Mais; o app continua trancando sozinho."
-        }
-      ]
-    },
-    {
-      "versao": "0.60.0",
-      "resumo": "3 novidades · 1 correção",
-      "itens": [
-        {
-          "tipo": "novidade",
-          "texto": "Celular: tema Claro, Escuro ou Automático (o do iPhone), em Mais → Aparência."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Celular: \"Voltar\" em todas as telas, inclusive Operações, Contas e Mais, e nos passos da abertura."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Celular: tocar de novo na aba acesa também volta (do detalhe para a lista; da lista, para a tela anterior)."
-        },
-        {
-          "tipo": "correcao",
-          "texto": "Celular: contraste reforçado no tema claro (terracota, vermelho e setas)."
         }
       ]
     }

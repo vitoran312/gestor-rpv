@@ -7,7 +7,7 @@
 (() => {
   // Igual a versao.py (test_celular confere): mostrada na abertura e em Mais, para saber se o aparelho já
   // carregou a última versão publicada.
-  const VERSAO_APP = '0.64.0';
+  const VERSAO_APP = '0.64.1';
   const D = GestorDados;
   const $ = (id) => document.getElementById(id);
   const SITUACOES = { pendente: 'Pendente', atrasada: 'Atrasada', recebida: 'Recebida' };
@@ -2425,6 +2425,13 @@
   async function trocarChaveDaCasa(senha, { remover = [] } = {}, andamento = () => {}) {
     const pessoa = await confirmarSenha(senha);
     const anterior = cofreAtual();
+    // Uma troca anterior pode ter parado no meio (internet caiu, app fechado): o cadastro da pessoa na nuvem já
+    // aponta para um cofre que este celular não chegou a guardar. O envelope dela, aberto com a senha, prova esse
+    // cofre, e a troca continua dele; o cofre que sobrou é apagado no fim.
+    andamento('Conferindo a nuvem…');
+    const registrado = await Nuvem.lerMembro(pessoa);
+    const sobra = registrado && anterior && registrado.cofre !== anterior.id
+      ? (await Nuvem.abrirEnvelope(pessoa.envelope, registrado.envelope)).cofre : null;
     const novaChave = { sal: crypto.getRandomValues(new Uint8Array(16)), bruta: crypto.getRandomValues(new Uint8Array(32)) };
     const novoCofre = Nuvem.cofreNovo();
     await emOrdem(async () => {
@@ -2433,11 +2440,14 @@
       andamento('Enviando para a nuvem…');
       const meta = await Nuvem.enviar(novoCofre, pacote.bytes, { sal: novaChave.sal, criadoEm: pacote.manifesto.criado_em });
       const envelope = await Nuvem.fecharEnvelope(pessoa.envelope, { ...novaChave, cofre: novoCofre });
-      await Nuvem.guardarMembro(pessoa, novoCofre, { envelope, nome: nomeDono(), anterior });
+      await Nuvem.guardarMembro(pessoa, novoCofre, { envelope, nome: nomeDono(), anterior: sobra || anterior });
       for (const id of remover) {
         await Nuvem.apagarMembro(id, anterior).catch(() => {});
       }
       await Nuvem.apagar(anterior).catch(() => {});
+      if (sobra && !(await Nuvem.listarMembros(sobra).catch(() => [{}])).length) {
+        await Nuvem.apagar(sobra).catch(() => {});  // Só se ninguém mais usa aquele cofre.
+      }
       await Guarda.gravar('envelope', envelope);
       await guardarNuvem({ ...nuvem, id: novoCofre.id, chave: novoCofre.chave, backup: true,
         membro: { id: pessoa.id, chave: pessoa.chave }, membroPendente: null });
@@ -2537,8 +2547,9 @@
       }
     }
     if (antigos) {
-      area.append(el('p', { class: 'discreto pequeno', texto: 'Antes do primeiro convite, confirme a sua senha: os dados ganham '
-        + 'uma chave só deles, e a sua senha continua só sua.' }),
+      area.append(el('p', { class: 'discreto pequeno', texto: 'Antes do primeiro convite, confirme a sua senha (a mesma com que '
+        + 'você abre o app): os dados ganham uma chave só deles, e a sua senha continua só sua. A senha dela, ela cria no '
+        + 'celular dela, ao entrar com o código.' }),
       formularioSenha('Continuar', async (senha, andamento) => {
         await trocarChaveDaCasa(senha, {}, andamento);
         desenhar();
