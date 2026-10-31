@@ -12,6 +12,7 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
   const r = {};
   try {
     const pagina = await (await navegador.newContext()).newPage();
+    await pagina.route(/workers\.dev/, (rota) => rota.abort());  // Sem a nuvem de verdade (ver test_nuvem).
     const erros = [];
     pagina.on('pageerror', (erro) => erros.push(String(erro)));
     const texto = () => pagina.evaluate(() => document.getElementById('tela').innerText);
@@ -27,7 +28,7 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
     }), { nomes, senhasRegra });
 
     // 0. Primeira vez, sem dados: a demonstração abre sozinha, com o aviso de dados fictícios em todas as telas.
-    await pagina.waitForSelector('text=Começar com meus dados', { timeout: 30000 });
+    await pagina.waitForSelector('.aviso.demonstracao button', { timeout: 30000 });
     r.demonstracao = {};
     for (const hash of ['#inicio', '#operacoes', '#contas', '#mais', '#nova', '#agenda']) {
       await ir(hash);
@@ -36,13 +37,16 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
     await pagina.evaluate(() => { location.hash = '#operacao/1'; });
     await pagina.waitForSelector('text=Compartilhar resumo em imagem');
     r.demonstracao.operacao = await texto();
-    await pagina.click('text=Começar com meus dados');
+    await pagina.click('.aviso.demonstracao button');
     await pagina.waitForSelector('#abertura:not([hidden])');
     r.depois_da_demonstracao = await pagina.evaluate(() => ({ app: !document.getElementById('aplicativo').hidden,
-      comecar: !document.getElementById('comecar').hidden, demonstracao: !document.getElementById('ver-demonstracao').hidden }));
+      novo: !document.getElementById('form-novo').hidden, demonstracao: !document.getElementById('ver-demonstracao').hidden }));
 
-    // 1. "Começar sem computador", com senhas ruins antes da boa.
-    await pagina.click('#comecar');
+    // 1. Primeira vez: nome e senha, com senhas ruins antes da boa.
+    await pagina.click('#criar');
+    await pagina.waitForSelector('#erro:not([hidden])');
+    r.erro_sem_nome = await pagina.textContent('#erro');
+    await pagina.fill('#nome-novo', 'Maria');
     r.erros_senha = [];
     for (const [nova, repetida] of senhasRuins) {
       await pagina.fill('#senha-nova', nova);
@@ -56,6 +60,7 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
     await pagina.click('#criar');
     await pagina.waitForSelector('#aplicativo:not([hidden])', { timeout: 120000 });
     r.inicio_vazio = await texto();
+    r.nome_guardado = await pagina.evaluate(() => localStorage.getItem('nome'));
 
     // 2. Conta e entrada gravadas direto no celular.
     await ir('#nova-conta');
@@ -160,8 +165,8 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
       && !document.getElementById('abertura').hidden);
     r.abertura = await pagina.evaluate(() => ({
       fonte: document.getElementById('fonte-titulo').textContent,
-      comecar: !document.getElementById('comecar').hidden,
-      trocar: document.getElementById('trocar-backup').textContent,
+      novo: !document.getElementById('form-novo').hidden,
+      outras: !document.getElementById('outras-entradas').hidden,
     }));
     await pagina.fill('#senha', senha);
     await pagina.click('#abrir');
@@ -172,10 +177,14 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
     r.documentos_depois = await documentos();
     await ir('#convite');
     r.convite = await texto();
-    r.guardado = await pagina.evaluate(async () => {
+    // O arquivo guardado e a chave dos dados (que a senha abre no envelope), para o Python abrir no programa.
+    r.guardado = await pagina.evaluate(async (senha) => {
       const g = await Guarda.ler('backup');
-      return { independente: g.independente, bytes: btoa(Array.from(new Uint8Array(g.bytes), (b) => String.fromCharCode(b)).join('')) };
-    });
+      const pessoa = await Nuvem.credenciais(senha);
+      const conteudo = await Nuvem.abrirEnvelope(pessoa.envelope, await Guarda.ler('envelope'));
+      return { independente: g.independente, bytes: btoa(Array.from(new Uint8Array(g.bytes), (b) => String.fromCharCode(b)).join('')),
+        chave: Nuvem.paraB64(conteudo.bruta) };
+    }, senha);
     // 5. Excluir permanentemente da lixeira: some de vez, com os anexos fora do pacote guardado.
     const tamanho = () => pagina.evaluate(async () => (await Guarda.ler('backup')).bytes.byteLength);
     const antes = await tamanho();

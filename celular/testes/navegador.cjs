@@ -13,9 +13,13 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
   const navegador = await playwright[NAVEGADOR].launch();
   try {
     const pagina = await navegador.newPage();
+    // A nuvem de verdade nunca é usada aqui (test_nuvem testa com o Worker local): os pedidos a ela falham, e o app
+    // segue com os dados no aparelho, como sem internet.
+    await pagina.route(/workers\.dev/, (rota) => rota.abort());
     const erros = [];
     pagina.on('pageerror', (erro) => erros.push(String(erro)));
-    pagina.on('console', (m) => m.type() === 'error' && erros.push(m.text()));
+    // Os pedidos à nuvem, bloqueados de propósito acima, não contam como erro; qualquer outro arquivo que falhe, sim.
+    pagina.on('console', (m) => m.type() === 'error' && !(m.location().url || '').includes('workers.dev') && erros.push(m.text()));
     await pagina.goto(endereco + '/index.html');
     const resultados = { leituras: {} };
     for (const caso of casos) {
@@ -97,14 +101,19 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
     }, regras);
 
     // Sem nada guardado, a demonstração abre sozinha: sai dela para abrir o backup de teste.
-    await pagina.waitForSelector('text=Começar com meus dados', { timeout: 30000 });
-    await pagina.click('text=Começar com meus dados');
+    await pagina.waitForSelector('.aviso.demonstracao button', { timeout: 30000 });
+    await pagina.click('.aviso.demonstracao button');
     await pagina.waitForSelector('#abertura:not([hidden])');
+    resultados.abertura_nova = await pagina.evaluate(() => ({
+      nome: !document.getElementById('form-novo').hidden && Boolean(document.getElementById('nome-novo')),
+      texto: document.getElementById('abertura').innerText,
+    }));
 
-    // As telas: abre o backup pelo formulário e passa por todas, guardando o texto de cada uma.
-    await pagina.setInputFiles('#arquivo', telas.arquivo);
-    await pagina.fill('#senha', telas.senha);
-    await pagina.click('#abrir');
+    // As telas: o backup do computador, aberto com a senha, vira os dados deste celular; passa por todas as telas.
+    const abrirArquivo = (url, senha) => pagina.evaluate(async ({ url, senha }) => {
+      await abrirArquivoGestor(new Uint8Array(await (await fetch(url)).arrayBuffer()), senha);
+    }, { url, senha });
+    await abrirArquivo(telas.arquivo, telas.senha);
     await pagina.waitForSelector('#aplicativo:not([hidden])', { timeout: 120000 });
     resultados.telas = {};
     for (const endereco of telas.enderecos) {
@@ -156,8 +165,7 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
         }
       }
     }
-    // Nova entrada no celular: primeiro com um erro (a regra aparece), depois certa; o arquivo cifrado que o
-    // app guardou volta em base64 para o Python importar como o programa importa.
+    // Nova entrada no celular: primeiro com um erro (a regra aparece), depois certa; grava nos dados do celular.
     if (telas.nova) {
       const n = telas.nova;
       await pagina.evaluate(() => { location.hash = '#nova'; });
@@ -186,7 +194,8 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
       await pagina.fill('[name="custo"]', n.custo);
       resultados.nova_lucro = await pagina.evaluate(() => document.querySelector('#tela form p.discreto').textContent);
       await pagina.click('text=Salvar entrada');
-      await pagina.waitForFunction(() => location.hash.startsWith('#enviar/'));
+      await pagina.waitForFunction(() => location.hash.startsWith('#operacao/'));
+      await pagina.waitForSelector('text=Registrar recebimento');
       resultados.nova_tela = await pagina.evaluate(() => document.getElementById('tela').innerText);
       // Conta nova no celular: primeiro com erros (apelido repetido, CPF inválido), depois certa.
       const contaNova = telas.conta;
@@ -206,50 +215,28 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
       await pagina.fill('[name="cpf"]', contaNova.cpf);
       resultados.cpf_mascara = await pagina.inputValue('[name="cpf"]');
       await pagina.click('text=Salvar conta');
-      await pagina.waitForFunction(() => location.hash.startsWith('#enviar/'));
+      await pagina.waitForFunction(() => location.hash === '#contas');
       await pagina.evaluate(() => { location.hash = '#nova'; });
       await pagina.waitForSelector('form [name="conta"]');
       resultados.opcoes_conta = await pagina.evaluate(() => Array.from(document.querySelectorAll('[name="conta"] option'), (o) => o.textContent));
-      await pagina.evaluate(() => { location.hash = '#contas'; });
-      await pagina.waitForSelector('text=aguarda o computador');
-      resultados.nova_arquivos = await pagina.evaluate(async () => (await Guarda.ler('pendentes')).map((p) => ({
-        id: p.id, tipo: p.tipo, arquivo: p.arquivo, bytes: btoa(String.fromCharCode(...new Uint8Array(p.bytes))) })));
-      await pagina.evaluate(() => { location.hash = '#operacoes'; });
-      await pagina.waitForSelector('text=aguarda o computador');
-      // Entrada já importada no computador (o backup novo traz a lista): some do celular ao abrir esse backup.
-      await pagina.evaluate(async (id) => {
-        const lista = await Guarda.ler('pendentes');
-        await Guarda.gravar('pendentes', [...lista, { id, arquivo: 'antiga.rpvcelular', criada_em: '2026-10-01T10:00:00Z', bytes: new Uint8Array([1, 2, 3]) }]);
-      }, n.ja_importada);
-      await pagina.evaluate(() => { location.hash = '#mais'; });
-      await pagina.evaluate(() => trancarGestor());
-      await pagina.waitForSelector('#abertura:not([hidden])');
-      await pagina.setInputFiles('#arquivo', n.backup_com_importada);
-      await pagina.fill('#senha', telas.senha);
-      await pagina.click('#abrir');
-      await pagina.waitForSelector('#aplicativo:not([hidden])', { timeout: 120000 });
-      resultados.pendentes_depois = await pagina.evaluate(async () => (await Guarda.ler('pendentes')).map((p) => p.id));
     }
 
-    // Mudanças em operações do computador: editar, alterar a previsão, excluir e anexar uma foto. Cada uma vira um
-    // arquivo para o computador; o Python importa e confere.
+    // Mudanças nas operações: editar, alterar a previsão, excluir e anexar uma foto, gravadas no celular; no fim, o
+    // arquivo guardado volta em base64 para o Python abrir no programa.
     if (telas.mudancas) {
       const m = telas.mudancas;
       const ir = async (hash, seletor) => {
         await pagina.evaluate((h) => { location.hash = h; }, hash);
         await pagina.waitForSelector(seletor);
       };
-      const esperarEnvio = () => pagina.waitForFunction(() => location.hash.startsWith('#enviar/'));
       await ir(`#editar/${m.editar}`, 'form [name="nome"]');
-      await pagina.click('text=Salvar alterações');
-      await pagina.waitForFunction(() => document.querySelector('form .erro').textContent.length > 0);
-      resultados.editar_sem_mudar = await pagina.textContent('form .erro');
       resultados.editar_valores = await pagina.evaluate(() => Object.fromEntries(['nome', 'custo', 'previsto', 'previsao', 'conta']
         .map((n) => [n, document.querySelector(`[name="${n}"]`).value])));
       await pagina.fill('[name="previsto"]', '3000000');
       await pagina.fill('[name="observacoes"]', 'editada no celular');
       await pagina.click('text=Salvar alterações');
-      await esperarEnvio();
+      await pagina.waitForFunction((id) => location.hash === `#operacao/${id}`, m.editar);
+      await pagina.waitForSelector('text=Editada no celular');
       resultados.editar_tela = await pagina.evaluate(() => document.getElementById('tela').innerText);
 
       await ir(`#operacao/${m.previsao}`, 'details.acao');
@@ -260,35 +247,32 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
       resultados.previsao_erro = await pagina.textContent('details.acao .erro');
       await pagina.fill('[name="nova_previsao"]', m.nova_previsao);
       await pagina.click('text=Salvar nova previsão');
-      await esperarEnvio();
+      await pagina.waitForSelector('text=A previsão nunca foi alterada.', { state: 'detached' });
 
       await ir(`#operacao/${m.excluir}`, 'text=Excluir operação');
       pagina.once('dialog', (d) => d.accept());
       await pagina.click('text=Excluir operação');
-      await esperarEnvio();
+      await pagina.waitForFunction(() => location.hash === '#operacoes');
 
       await ir(`#operacao/${m.anexar}`, '[name="anexar"]');
+      const anexosAntes = await pagina.evaluate(() => document.querySelectorAll('#tela a[href^="#documento/"]').length);
       await pagina.setInputFiles('[name="anexar"]', { name: 'image.png', mimeType: 'image/png', buffer: Buffer.from(m.png, 'base64') });
-      await pagina.waitForFunction(() => location.hash.startsWith('#enviar/') || document.querySelector('p.erro[role="status"]'));
+      await pagina.waitForFunction((antes) => document.querySelectorAll('#tela a[href^="#documento/"]').length > antes
+        || document.querySelector('p.erro[role="status"]'), anexosAntes);
       const erroAnexo = await pagina.evaluate(() => (document.querySelector('p.erro[role="status"]') || {}).textContent);
       if (erroAnexo) {
         throw new Error('Anexo recusado: ' + erroAnexo);
       }
       resultados.anexo_tela = await pagina.evaluate(() => document.getElementById('tela').innerText);
-
-      await ir(`#operacao/${m.editar}`, 'text=Excluir operação');
-      resultados.operacao_com_pendente = await pagina.evaluate(() => document.getElementById('tela').innerText);
-      await ir('#pendentes', '.menu');
-      resultados.pendentes_tela = await pagina.evaluate(() => document.getElementById('tela').innerText);
-      resultados.mudancas_arquivos = await pagina.evaluate(async () => (await Guarda.ler('pendentes'))
-        .filter((p) => !['entrada', 'conta'].includes(p.tipo)).map((p) => {
-          const bytes = new Uint8Array(p.bytes);
-          let texto = '';
-          for (let i = 0; i < bytes.length; i += 0x8000) {
-            texto += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-          }
-          return { id: p.id, tipo: p.tipo, arquivo: p.arquivo, bytes: btoa(texto) };
-        }));
+      // O arquivo guardado no celular, como ficou depois de tudo isso.
+      resultados.guardado_final = await pagina.evaluate(async () => {
+        const bytes = new Uint8Array((await Guarda.ler('backup')).bytes);
+        let texto = '';
+        for (let i = 0; i < bytes.length; i += 0x8000) {
+          texto += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+        }
+        return btoa(texto);
+      });
       // Agenda: no Início e no calendário, com as atrasadas de hoje (pelo relógio do aparelho).
       await ir('#inicio', '.agenda-resumo');
       resultados.inicio_agenda = await pagina.evaluate(() => document.querySelector('.agenda-resumo').innerText);

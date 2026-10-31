@@ -55,6 +55,43 @@ class TestWorker(unittest.TestCase):
         self.assertEqual(self.r['sem_previsao'], {'avisados': 0, 'removidos': 0})
         self.assertEqual(self.r['assinatura_vencida'], {'avisados': 0, 'removidos': 1, 'restou': False})
 
+    def test_lembretes_de_cada_aparelho_atraso_e_calendario(self):
+        self.assertEqual(self.r['lembretes_aparelhos'], 2)
+        self.assertEqual(self.r['dois_aparelhos'], {'avisados': 4, 'removidos': 0, 'destinos': 2})
+        self.assertEqual(self.r['avisos_do_dia'], [
+            {'tipo': 'amanha', 'texto': 'Amanhã há 1 previsão de recebimento. Toque para ver na agenda.', 'endereco': '#agenda',
+             'selo': 3},
+            {'tipo': 'atraso', 'texto': '2 operações passaram da previsão. Toque para marcar como recebidas.',
+             'endereco': '#atrasadas', 'selo': 3}])
+        calendario = self.r['calendario']
+        self.assertEqual((calendario['status'], calendario['tipo']), (200, 'text/calendar; charset=utf-8'))
+        self.assertIn('DTSTART;VALUE=DATE:20261029', calendario['texto'])
+        self.assertIn('SUMMARY:Previsão de recebimento (2)', calendario['texto'])
+        self.assertNotIn('Ana', calendario['texto'])  # Só datas e quantidades.
+        self.assertEqual(self.r['calendario_desconhecido'], 404)
+        self.assertEqual((self.r['apagar_lembrete'], self.r['lembretes_depois']), (200, 1))
+
+    def test_versao_base_recusa_quem_gravou_por_cima_de_outro(self):
+        self.assertEqual(self.r['base_velha'], {'status': 409, 'desatualizado': True, 'versao': True})
+        self.assertEqual(self.r['base_certa'], 200)
+
+    def test_membros_convite_e_troca_de_cofre(self):
+        r = self.r
+        self.assertEqual((r['membro_sem_cofre'], r['membro_dona']), (403, 200))
+        self.assertEqual(r['membro_lido'], {'status': 200, 'nome': 'Vitor', 'cofre': True, 'envelope': 'bbbb'})
+        self.assertEqual(r['membro_chave_errada'], 404)
+        self.assertEqual((r['convite_sem_cofre'], r['convite'], r['convite_lido'], r['convite_errado']), (403, 200, 'bbbb', 404))
+        self.assertEqual((r['entrou'], r['convite_usado']), (200, 404))
+        self.assertEqual(r['membros'], ['Vitor', 'Ana'])
+        self.assertEqual(r['membros_sem_chave'], 404)
+        self.assertEqual(r['mesma_senha_outro_cofre'], 409)
+        self.assertEqual((r['remover'], r['removida']), (200, 404))
+        self.assertEqual((r['trocar_sem_provar'], r['trocar'], r['dona_no_novo']), (409, 200, True))
+        self.assertEqual((r['apagar_antigo'], r['antigo_sobrou']), (200, []))
+
+    def test_limite_de_tentativas(self):
+        self.assertEqual(self.r['limite'], {'primeiras': [404] * 5, 'ultimas': [429] * 3})
+
     def test_lembrete_decifra_pela_rfc_8291(self):
         from cryptography.hazmat.primitives import hashes, hmac
         from cryptography.hazmat.primitives.asymmetric import ec
@@ -243,14 +280,12 @@ class TestCelularPrincipalNoPrograma(TesteDeInterface):
 @unittest.skipUnless(os.environ.get('GESTOR_RPV_TESTE_CELULAR') == '1', 'Requer Node.js com Playwright e '
                      'GESTOR_RPV_TESTE_CELULAR=1')
 class TestNuvemPeloCelular(unittest.TestCase):
-    """O app com o Worker de verdade (desviado para o computador): ligar, enviar a cada gravação, recuperar num
-    celular novo, desligar e tornar principal; o programa abre o que o celular mandou."""
+    """O app com o Worker de verdade (desviado para o computador): dois celulares dividindo os dados."""
     SENHA = 'jardim de inverno 4'
+    SENHA_ANA = 'mar azul de abril 9'
     CONTA = {'identificacao': 'conta da nuvem', 'nome': 'ana paula lima', 'cpf': '529.982.247-25', 'endereco': 'rua b',
              'numero_endereco': '5', 'cidade': 'recife', 'estado': 'PE', 'banco': 'inter', 'agencia': '0001',
              'numero': '998877', 'pix': 'ana@example.com'}
-    ENTRADA = {'nome': 'entrada pela nuvem', 'aquisicao': '2026-10-01', 'custo': '500000', 'previsto': '800000',
-               'previsao': '2026-12-01'}
 
     @classmethod
     def setUpClass(cls):
@@ -266,13 +301,13 @@ class TestNuvemPeloCelular(unittest.TestCase):
         shutil.copytree(RAIZ / 'celular', site, ignore=shutil.ignore_patterns('testes'))
         banco = banco_com_contas(pasta / 'pc.sqlite3')
         banco.salvar(dados_rpv(nome='do computador'))
-        backup_pc = criar_backup(banco, pasta, registrar=False)
+        backup_pc = criar_backup(banco, site / 'backups', registrar=False)
         servidor = ThreadingHTTPServer(('127.0.0.1', 0), functools.partial(Silencioso, directory=str(site)))
         threading.Thread(target=servidor.serve_forever, daemon=True).start()
         try:
             cls.r = json.loads(rodar_node('nuvem.cjs', f'http://127.0.0.1:{servidor.server_address[1]}', {
-                'senha': cls.SENHA, 'conta': cls.CONTA, 'entrada': cls.ENTRADA, 'backup_pc': str(backup_pc),
-                'senha_pc': SENHA_TESTE}))
+                'senha': cls.SENHA, 'senha_ana': cls.SENHA_ANA, 'conta': cls.CONTA,
+                'backup_pc': 'backups/' + backup_pc.name, 'senha_pc': SENHA_TESTE}))
         finally:
             servidor.shutdown()
             servidor.server_close()
@@ -285,44 +320,48 @@ class TestNuvemPeloCelular(unittest.TestCase):
     def test_sem_erros_na_pagina(self):
         self.assertEqual(self.r['erros'], [])
 
-    def test_mesmo_identificador_que_o_programa(self):
-        self.assertEqual(self.r['id'], nuvem.credenciais(self.SENHA)[0])
-        self.assertEqual(self.r['principal_id'], nuvem.credenciais(self.senha_pc)[0])
+    def test_criar_com_nome_e_senha(self):
+        # A pessoa é reconhecida pela senha (a mesma conta do programa); os dados ficam num cofre sorteado.
+        self.assertEqual(self.r['membro_vitor'], nuvem.credenciais(self.SENHA)[0])
+        self.assertNotEqual(self.r['cofre'], self.r['membro_vitor'])
+        self.assertIn('Olá, Vitor!', self.r['inicio_vitor'])
+        self.assertIn('Sincronizado às', self.r['inicio_vitor'])
+        self.assertIn('Backup na nuvem', self.r['mais_vitor'])
+        self.assertIn('Compartilhar com outra pessoa', self.r['mais_vitor'])
+        self.assertNotIn('computador', self.r['mais_vitor'])
 
-    def test_ligar_confere_a_senha_e_envia_a_cada_gravacao(self):
-        self.assertIn('Ligar backup na nuvem', self.r['mais_desligado'])
-        self.assertNotIn('Trancar agora', self.r['mais_desligado'])
-        self.assertIn('Senha incorreta', self.r['senha_errada'])
-        self.assertIn('Ligado · último envio em', self.r['mais_ligado'])
-        self.assertNotIn('Ligue o backup automático na nuvem', self.r['inicio_ligado'])
-        self.assertTrue(self.r['reenviado'])
-        self.assertTrue(self.r['guardado_igual'])  # A nuvem tem exatamente o arquivo guardado no celular.
+    def test_convite_por_codigo_para_uma_pessoa_so(self):
+        self.assertRegex(self.r['codigo'], r'^[A-Z2-9]{5}-[A-Z2-9]{5}$')
+        self.assertIn('inválido ou vencido', self.r['convite_errado'])
+        self.assertIn('Olá, Ana!', self.r['inicio_ana'])
+        self.assertIn('Entrada Do Vitor', self.r['operacoes_ana'])
+        self.assertEqual(self.r['membros'], ['Vitor', 'Ana'])
+        self.assertIn('inválido ou vencido', self.r['convite_usado'])
 
-    def test_programa_abre_o_backup_enviado(self):
-        from apoio_testes import banco_com_contas
-        from backup import BackupPreparado
-        pasta = Path(self.temp.name)
-        arquivo = pasta / 'da-nuvem.rpvbackup'
-        arquivo.write_bytes(base64.b64decode(self.r['backup']))
-        banco = banco_com_contas(pasta / 'outro-pc.sqlite3')
-        with BackupPreparado(arquivo, self.SENHA, pasta_trabalho=pasta / 'trabalho') as pacote:
-            pacote.restaurar(banco, copia_de_seguranca=False)
-        self.assertEqual([r['nome'] for r in banco.listar()], ['Entrada Pela Nuvem'])
+    def test_o_que_um_grava_chega_no_outro(self):
+        self.assertIn('Entrada Da Ana', self.r['operacoes_vitor'])
 
-    def test_celular_novo_recupera_e_desligar_apaga(self):
-        self.assertTrue(self.r['abertura_recuperar'])
-        self.assertEqual(self.r['passo_recuperar'], {'form': True, 'comecar': False})
-        self.assertIn('Nenhum backup na nuvem com essa senha', self.r['recuperar_senha_errada'])
-        self.assertIn('Entrada Pela Nuvem', self.r['recuperado'])
-        self.assertIn('Backup automático na nuvem', self.r['recuperado_mais'])
-        self.assertIn('Ligado', self.r['recuperado_mais'])
-        self.assertTrue(self.r['desligado'])
+    def test_gravar_ao_mesmo_tempo_nao_perde_nada(self):
+        for tela in (self.r['vitor_depois_de_juntar'], self.r['ana_depois_de_juntar']):
+            self.assertIn('Ana Ao Mesmo Tempo', tela)
+            self.assertIn('Vitor Ao Mesmo Tempo', tela)
 
-    def test_celular_do_backup_do_computador_vira_principal(self):
-        self.assertIn('Tornar este celular o principal', self.r['mais_pc'])
-        self.assertIn('o programa no computador carrega sozinho', self.r['tela_principal'])
-        self.assertIn('Senha incorreta', self.r['principal_senha_errada'])
-        self.assertTrue(self.r['principal_guardado'])
-        self.assertIn('Do Computador', self.r['principal_operacoes'])
-        self.assertIn('Ligado', self.r['principal_mais'])
-        self.assertNotIn('Tornar este celular o principal', self.r['principal_mais'])
+    def test_celular_novo_recupera_com_a_senha(self):
+        self.assertIn('Vitor Ao Mesmo Tempo', self.r['recuperado_ana'])
+        self.assertEqual(self.r['ola_recuperado'], 'Olá, Ana!')
+
+    def test_remover_acesso_troca_a_chave(self):
+        self.assertIn('Este celular', self.r['pessoas'])
+        self.assertIn('Ana', self.r['pessoas'])
+        self.assertNotEqual(self.r['cofre_novo'], self.r['cofre'])
+        self.assertTrue(self.r['vitor_no_novo'])
+        self.assertEqual(self.r['membros_depois'], ['Vitor'])
+        self.assertIn('Nenhum dado na nuvem', self.r['ana_removida'])
+        self.assertIn('Vitor Ao Mesmo Tempo', self.r['vitor_depois_de_remover'])
+
+    def test_dados_antigos_ganham_envelope_e_chave_propria(self):
+        # Antes do envelope, o cofre era a própria pessoa (como o programa no computador procura).
+        self.assertEqual(self.r['cofre_antigo'], nuvem.credenciais(self.senha_pc)[0])
+        self.assertIn('confirme a sua senha', self.r['compartilhar_antigos'])
+        self.assertEqual(self.r['antigos_migrados'], {'cadastro_continua': True, 'cofre_novo': True})
+        self.assertIn('Do Computador', self.r['operacoes_antigos'])

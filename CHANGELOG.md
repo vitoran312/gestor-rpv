@@ -1,5 +1,27 @@
 # Histórico de versões
 
+## 0.63.0
+
+App só de celular, dados divididos entre pessoas e sincronização:
+- Chave da casa: os dados criados no celular são trancados por uma chave sorteada; a senha de cada pessoa tranca
+  um envelope com ela (scrypt da senha com o sal do app → identificador, chave de acesso e chave do envelope), no
+  aparelho e na nuvem. Dados antigos ganham o envelope na primeira abertura com a senha (e, pelo Face ID antigo,
+  com a senha que ele guardava; daí em diante o Face ID guarda só a chave).
+- Worker: cofres (backup) com versão base (409 "desatualizado"), membros (envelope por pessoa; trocar de cofre
+  exige provar o anterior; mesma senha de outra pessoa é recusada), convites de 15 minutos e uso único, lista de
+  quem tem acesso, lembretes por aparelho, agenda e calendário ICS por token, aviso de atraso (dia seguinte à
+  previsão) e número do ícone; limitador de tentativas da Cloudflare (e contagem própria, sem ele).
+- App: abertura nova (Nome + Senha; "Recebi um código de convite"; "Já tenho dados: recuperar da nuvem"); sai
+  tudo do computador (abrir arquivo, Tornar principal, pendências e envio, restaurar arquivo); nuvem sempre
+  ligada; gravações em fila (puxa antes de gravar, refaz depois de 409, escolha só no conflito sem como refazer);
+  "Sincronizado às" no Início; Compartilhar (convite, pessoas, remover acesso com troca de chave); lembretes e
+  calendário num toque; #atrasadas abre o recebimento; setAppBadge; Copiar chave Pix; nome em Mais → Aparência;
+  demonstração com cartão em destaque; gráfico 3D; logo com o papel de parede e 2,7 s antes do Face ID.
+- Testes: navegador/Face ID/só celular abrindo arquivos por abrirArquivoGestor (sem a nuvem); nuvem.cjs com dois
+  celulares, convite, sincronização, gravação simultânea, recuperar, remover acesso e dados antigos;
+  teste_worker.mjs com membros, convite, versão base, calendário, atraso e limite. cifra.decifrar_arquivo aceita a
+  chave pronta.
+
 ## 0.62.0
 
 - Celular: "Fazer cópia de segurança" (salvar o arquivo no aparelho) e a tela #copia saíram; a cópia de segurança

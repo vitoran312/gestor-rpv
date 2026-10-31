@@ -1,6 +1,36 @@
 {
   "versoes": [
     {
+      "versao": "0.63.0",
+      "resumo": "6 novidades",
+      "itens": [
+        {
+          "tipo": "novidade",
+          "texto": "Celular: compartilhe os dados com outra pessoa por um código de convite; cada um com seu nome e senha."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: o que um muda aparece no celular do outro, sem perder nada se os dois gravarem juntos."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: primeira vez com \"Começar a usar com meus dados\", nome e senha; \"Olá\" com o seu nome."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: lembrete também quando uma previsão passa da data, previsões no Calendário do iPhone e número no ícone."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: gráfico mensal em 3D, \"Copiar chave Pix\" e o logo com o papel de parede da abertura."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: só o app do celular; as opções do computador saíram, e a nuvem fica sempre ligada."
+        }
+      ]
+    },
+    {
       "versao": "0.62.0",
       "resumo": "2 novidades",
       "itens": [
@@ -85,16 +115,6 @@
         {
           "tipo": "novidade",
           "texto": "Celular: transições suaves entre telas e um aviso rápido depois de gravar algo no celular."
-        }
-      ]
-    },
-    {
-      "versao": "0.58.0",
-      "resumo": "1 novidade",
-      "itens": [
-        {
-          "tipo": "novidade",
-          "texto": "Celular: editar, desativar, reativar e remover contas de recebimento, para quem usa só o celular."
         }
       ]
     }

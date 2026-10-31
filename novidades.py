@@ -10,6 +10,15 @@ from pathlib import Path
 MOSTRAR = 5  # Quantas versões aparecem no "Sobre".
 
 NOVIDADES = [
+    ('0.63.0', [
+        ('novidade', 'Celular: compartilhe os dados com outra pessoa por um código de convite; cada um com seu nome e senha.'),
+        ('novidade', 'Celular: o que um muda aparece no celular do outro, sem perder nada se os dois gravarem juntos.'),
+        ('novidade', 'Celular: primeira vez com "Começar a usar com meus dados", nome e senha; "Olá" com o seu nome.'),
+        ('novidade', 'Celular: lembrete também quando uma previsão passa da data, previsões no Calendário do iPhone '
+                     'e número no ícone.'),
+        ('novidade', 'Celular: gráfico mensal em 3D, "Copiar chave Pix" e o logo com o papel de parede da abertura.'),
+        ('novidade', 'Celular: só o app do celular; as opções do computador saíram, e a nuvem fica sempre ligada.'),
+    ]),
     ('0.62.0', [
         ('novidade', 'Celular: a cópia de segurança agora é só a da nuvem; saiu a opção de salvar um arquivo à mão.'),
         ('novidade', 'Celular: o Início lembra de ligar o backup na nuvem e avisa se um envio não chegou.'),

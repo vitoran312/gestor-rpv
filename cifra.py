@@ -155,23 +155,27 @@ def cifrar_arquivo(origem, destino, senha):
             indice, atual = indice + 1, seguinte
 
 
-def decifrar_arquivo(origem, destino, senha):
-    """Decifra para `destino`; se algo não conferir, o destino é apagado: nada decifrado pela metade fica no disco."""
+def decifrar_arquivo(origem, destino, senha, chave=None):
+    """Decifra para `destino`; se algo não conferir, o destino é apagado: nada decifrado pela metade fica no disco.
+
+    `chave`: a chave de 32 bytes já pronta, no lugar da senha (os dados criados no app do celular são trancados por
+    uma chave sorteada, que a senha de cada pessoa abre num envelope).
+    """
     try:
-        _decifrar(origem, destino, senha)
+        _decifrar(origem, destino, senha, chave)
     except BaseException:
         Path(destino).unlink(missing_ok=True)
         raise
 
 
-def _decifrar(origem, destino, senha):
+def _decifrar(origem, destino, senha, chave=None):
     with open(origem, 'rb') as entrada:
         cabecalho = entrada.read(CABECALHO)
         if len(cabecalho) != CABECALHO or not cabecalho.startswith(MAGICO):
             raise ValueError('O arquivo não é um backup com senha do Gestor de RPV.')
         sal = cabecalho[len(MAGICO):len(MAGICO) + TAMANHO_SAL]
         prefixo = cabecalho[len(MAGICO) + TAMANHO_SAL:]
-        aes = _aesgcm(derivar_chave(senha, sal))
+        aes = _aesgcm(chave if chave is not None else derivar_chave(senha, sal))
         from cryptography.exceptions import InvalidTag  # Depois de _aesgcm, que explica se o pacote faltar.
         with open(destino, 'wb') as saida:
             indice, atual = 0, entrada.read(BLOCO + ETIQUETA)

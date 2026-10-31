@@ -163,20 +163,15 @@ class TestAppDoCelular(unittest.TestCase):
         documentos = {d['nome']: d['id'] for r in (cls.ana, cls.maria) for t in ('entrada', 'recebimento')
                       for d in banco.documentos(r, t)}
         cls.endereco_pdf, cls.endereco_png = (f'#documento/{documentos[n]}' for n in ('contrato.pdf', 'comprovante.png'))
-        telas = {'arquivo': str(cifrado), 'senha': SENHA_TESTE, 'enderecos': TELAS + [f'#operacao/{cls.antiga}'],
+        telas = {'arquivo': endereco(cifrado), 'senha': SENHA_TESTE, 'enderecos': TELAS + [f'#operacao/{cls.antiga}'],
                  'documentos': [cls.endereco_pdf, cls.endereco_png]}
-        # Entrada feita no celular: os dados do formulário e um backup que já traz outra entrada como importada.
-        cls.ja_importada = '11111111-2222-4333-8444-555555555555'
+        # Entrada feita no celular: os dados do formulário.
         banco.salvar_configuracao('senha_backup', SENHA_TESTE)  # Tirada acima para o backup antigo, sem senha.
-        banco.salvar_configuracao('entradas_celular_importadas', json.dumps([cls.ja_importada]))
-        com_importada = criar_backup(banco, cls.pasta / 'com-importada')
-        banco.remover_configuracao('entradas_celular_importadas')
         cls.conta_vitor = next(c['id'] for c in banco.contas() if c['identificacao'] == 'Vitor')
         # Valores digitados como no celular: só números, que entram pelos centavos (800000 = R$ 8.000,00).
         telas['nova'] = {'nome': '  entrada   do celular ', 'aquisicao': '2026-10-20', 'custo': '500000',
                          'previsto': '800000', 'conta_id': cls.conta_vitor, 'previsao': '2026-12-15', 'comissao': '10000',
-                         'observacoes': 'veio do celular', 'ja_importada': cls.ja_importada,
-                         'backup_com_importada': str(com_importada)}
+                         'observacoes': 'veio do celular'}
         telas['conta'] = dict(CONTA_VALIDA, identificacao='Conta Do Celular', cpf='52998224725', pix='celular@example.com')
         telas['extras'] = {'operacao': cls.bruno, 'mensagem': MENSAGENS[1]}
         telas['mudancas'] = {'editar': cls.bruno, 'previsao': cls.carlos, 'nova_previsao': '2027-01-30',
@@ -184,7 +179,8 @@ class TestAppDoCelular(unittest.TestCase):
         outro = banco_com_contas(cls.pasta / 'outro' / 'gestor.sqlite3')
         outro.salvar(dados_rpv(nome='Só No Segundo Backup'))
         segundo = criar_backup(outro, cls.pasta / 'segundo')
-        cls.entrada_faceid = {'primeiro': str(cifrado), 'segundo': str(segundo), 'senha': SENHA_TESTE}
+        segundo = shutil.copy(segundo, cls.site / 'backups' / 'segundo.rpvbackup')
+        cls.entrada_faceid = {'primeiro': endereco(cifrado), 'segundo': 'backups/segundo.rpvbackup', 'senha': SENHA_TESTE}
         return {'casos': casos, 'regras': regras, 'telas': telas}
 
     # ---- Leitura do backup ------------------------------------------------------------------------------
@@ -283,7 +279,7 @@ class TestAppDoCelular(unittest.TestCase):
         self.assertIn('Na Lixeira', telas['#lixeira'])
         self.assertNotIn('Na Lixeira', telas['#operacoes'])
         self.assertIn('Gráfico mensal', telas['#mais'])
-        self.assertIn('Protegido por senha', telas['#backup'])
+        self.assertIn('trancados com a senha', telas['#backup'])
         import novidades
         versao, itens = novidades.NOVIDADES[0]
         self.assertIn(f'Versão {versao}', telas['#novidades'])
@@ -311,62 +307,29 @@ class TestAppDoCelular(unittest.TestCase):
     def test_nova_entrada_confere_as_regras_e_mostra_o_lucro(self):
         self.assertIn('O valor de aquisição não pode superar o Valor Total RPV.', self.resultados['nova_erro'])
         self.assertEqual(self.resultados['nova_lucro'], 'Lucro previsto: R$ 3.000,00')
-        self.assertIn('Como levar ao computador', self.resultados['nova_tela'])
         self.assertIn('Entrada Do Celular'.lower(), self.resultados['nova_tela'].lower())
+        self.assertIn('Registrar recebimento', self.resultados['nova_tela'])  # Já é dos dados do celular.
 
-    def test_arquivo_feito_no_celular_e_importado_pelo_programa(self):
-        import base64
-        import entradas_celular
-        from backup import PASTA_AUTOMATICA
-        (feita,) = [a for a in self.resultados['nova_arquivos'] if a['tipo'] == 'entrada']
-        self.assertTrue(feita['arquivo'].startswith('GestorRPV-celular-') and feita['arquivo'].endswith('.rpvcelular'))
-        copia = self.pasta / 'copia-para-importar.sqlite3'
-        shutil.copy(self.banco.caminho, copia)
-        destino = Banco(copia)
-        drive = self.pasta / 'drive-importacao'
-        drive.mkdir()
-        destino.salvar_configuracao(PASTA_AUTOMATICA, str(drive))
-        (drive / feita['arquivo']).write_bytes(base64.b64decode(feita['bytes']))
-        encontradas, problemas = entradas_celular.procurar(destino)
-        self.assertEqual(problemas, [])
-        self.assertEqual(entradas_celular.importar(destino, encontradas), (1, []))
+    def test_primeira_vez_pede_nome_e_senha(self):
+        abertura = self.resultados['abertura_nova']
+        self.assertTrue(abertura['nome'])
+        for texto in ('Nome', 'Repita a senha', 'Recebi um código de convite', 'Já tenho dados: recuperar da nuvem'):
+            self.assertIn(texto, abertura['texto'])
+        self.assertNotIn('computador', abertura['texto'])
+
+    def test_tudo_que_o_celular_grava_abre_no_programa(self):
+        # O arquivo guardado no celular depois de entrada, conta, edição, previsão, exclusão e anexo: o programa abre.
+        from backup import BackupPreparado
+        arquivo = self.pasta / 'guardado-no-celular.rpvbackup'
+        arquivo.write_bytes(base64.b64decode(self.resultados['guardado_final']))
+        destino = banco_com_contas(self.pasta / 'outro-pc' / 'gestor.sqlite3')
+        with BackupPreparado(arquivo, SENHA_TESTE, pasta_trabalho=self.pasta / 'trabalho-final') as pacote:
+            pacote.restaurar(destino, copia_de_seguranca=False)
         nova = next(r for r in destino.listar() if r['nome'] == 'Entrada Do Celular')
         self.assertEqual((nova['aquisicao'], nova['custo'], nova['previsto'], nova['comissao'], nova['previsao'],
-                          nova['conta_id'], nova['observacoes']),
-                         ('2026-10-20', 500000, 800000, 10000, '2026-12-15', self.conta_vitor, 'Veio do celular'))
-        self.assertIn(feita['id'], entradas_celular.importadas(destino))
-
-    # ---- Mudanças em operações do computador -------------------------------------------------------------
-    def test_editar_e_alterar_previsao_conferem_as_regras(self):
-        r = self.resultados
-        self.assertEqual(r['editar_sem_mudar'], 'Nada foi alterado.')
-        lilian = next(c['id'] for c in self.banco.contas() if c['identificacao'] == 'Lilian')
-        self.assertEqual(r['editar_valores'], {'nome': 'Bruno Lima', 'custo': moeda(1200000), 'previsto': moeda(2000000),
-                                               'previsao': '2026-12-01', 'conta': str(lilian)})
-        self.assertIn('não pode ser anterior à aquisição', r['previsao_erro'])
-        self.assertIn('Mudou: Valor Total RPV, observações', r['editar_tela'])
-        self.assertIn('Documento: Ana', r['anexo_tela'])
-        self.assertIn('Alteração: Bruno Lima', r['operacao_com_pendente'])
-        self.assertIn('aguarda o computador', r['operacao_com_pendente'])
-        self.assertIn('Exclusão: Operação Antiga', r['pendentes_tela'])
-
-    def test_mudancas_feitas_no_celular_sao_importadas_pelo_programa(self):
-        import entradas_celular
-        from backup import PASTA_AUTOMATICA
-        arquivos = self.resultados['mudancas_arquivos']
-        self.assertEqual(sorted(a['tipo'] for a in arquivos), ['alteracao', 'anexo', 'exclusao', 'previsao'])
-        pasta = self.pasta / 'mudancas'
-        drive = pasta / 'drive'
-        drive.mkdir(parents=True)
-        shutil.copy(self.banco.caminho, pasta / 'gestor.sqlite3')
-        destino = Banco(pasta / 'gestor.sqlite3')
-        destino.salvar_configuracao(PASTA_AUTOMATICA, str(drive))
-        for arquivo in arquivos:
-            (drive / arquivo['arquivo']).write_bytes(base64.b64decode(arquivo['bytes']))
-        encontradas, problemas = entradas_celular.procurar(destino)
-        self.assertEqual(problemas, [])
-        self.assertEqual(entradas_celular.contar(encontradas), '1 alteração, 1 nova previsão, 1 documento e 1 exclusão')
-        self.assertEqual(entradas_celular.importar(destino, encontradas), (4, []))
+                          nova['observacoes']), ('2026-10-20', 500000, 800000, 10000, '2026-12-15', 'Veio do celular'))
+        conta = next(c for c in destino.contas() if c['identificacao'] == 'Conta Do Celular')
+        self.assertEqual((conta['cpf'], conta['pix'], conta['estado']), ('52998224725', 'celular@example.com', 'SP'))
         bruno = destino.obter(self.bruno)
         self.assertEqual((bruno['previsto'], bruno['custo'], bruno['observacoes']), (3000000, 1200000, 'Editada no celular'))
         self.assertEqual(destino.obter(self.carlos)['previsao_atual'], '2027-01-30')
@@ -374,6 +337,17 @@ class TestAppDoCelular(unittest.TestCase):
         (foto,) = [d for d in destino.documentos(self.ana) if d['nome'].endswith('.jpg')]
         self.assertTrue(foto['nome'].startswith('Foto '))
         self.assertEqual(destino.caminho_documento(foto['id']).read_bytes()[:2], b'\xff\xd8')  # Virou JPEG.
+
+    # ---- Mudanças nas operações ---------------------------------------------------------------------------
+    def test_editar_e_alterar_previsao_conferem_as_regras(self):
+        r = self.resultados
+        lilian = next(c['id'] for c in self.banco.contas() if c['identificacao'] == 'Lilian')
+        self.assertEqual(r['editar_valores'], {'nome': 'Bruno Lima', 'custo': moeda(1200000), 'previsto': moeda(2000000),
+                                               'previsao': '2026-12-01', 'conta': str(lilian)})
+        self.assertIn('não pode ser anterior à aquisição', r['previsao_erro'])
+        self.assertIn('Editada no celular', r['editar_tela'])
+        self.assertIn('R$ 30.000,00', r['editar_tela'])
+        self.assertIn('Foto ', r['anexo_tela'])
 
     # ---- Agenda -------------------------------------------------------------------------------------------
     def test_agenda_igual_ao_que_o_programa_calcula(self):
@@ -461,10 +435,6 @@ class TestAppDoCelular(unittest.TestCase):
         self.assertIn('Mostrar o Valor Total RPV', resumo['texto'])
         self.assertTrue(self.resultados['resumo_trocou'])
 
-    def test_entrada_ja_importada_some_do_celular(self):
-        feitas = [a['id'] for a in self.resultados['nova_arquivos'] if a['id'] != self.ja_importada]
-        self.assertEqual(self.resultados['pendentes_depois'], feitas)
-
     # ---- Conta feita no celular -------------------------------------------------------------------------------
     def test_regras_de_cpf_e_de_conta_iguais_as_do_programa(self):
         from dados import validar_cpf
@@ -489,22 +459,7 @@ class TestAppDoCelular(unittest.TestCase):
         # Como no computador: primeiro os campos mal preenchidos; a duplicidade é conferida depois deles.
         self.assertEqual(self.resultados['conta_erro'], 'CPF inválido.')
         self.assertEqual(self.resultados['cpf_mascara'], '529.982.247-25')
-        self.assertIn('Conta Do Celular (aguardando o computador)', self.resultados['opcoes_conta'])
-
-    def test_conta_feita_no_celular_e_importada_pelo_programa(self):
-        import base64
-        import entradas_celular
-        (feita,) = [a for a in self.resultados['nova_arquivos'] if a['tipo'] == 'conta']
-        copia = self.pasta / 'copia-conta.sqlite3'
-        shutil.copy(self.banco.caminho, copia)
-        destino = Banco(copia)
-        arquivo = self.pasta / feita['arquivo']
-        arquivo.write_bytes(base64.b64decode(feita['bytes']))
-        encontradas, problemas = entradas_celular.conferir(destino, [arquivo])
-        self.assertEqual(problemas, [])
-        self.assertEqual(entradas_celular.importar(destino, encontradas), (1, []))
-        conta = next(c for c in destino.contas() if c['identificacao'] == 'Conta Do Celular')
-        self.assertEqual((conta['cpf'], conta['pix'], conta['estado']), ('52998224725', 'celular@example.com', 'SP'))
+        self.assertIn('Conta Do Celular', self.resultados['opcoes_conta'])
 
     # ---- Backup guardado e Face ID (autenticador virtual com PRF) --------------------------------------------
     def setUp(self):
@@ -518,24 +473,20 @@ class TestAppDoCelular(unittest.TestCase):
         self.assertEqual(f['erros'], [])
         self.assertEqual(f['inicial'], {'app': False, 'faceid_visivel': False, 'fonte': '', 'erro': ''})
         self.assertTrue(f['ativado'])
-        self.assertEqual(f['trancado'], {'app': False, 'faceid_visivel': True, 'fonte': 'Backup guardado neste aparelho',
+        self.assertEqual(f['trancado'], {'app': False, 'faceid_visivel': True, 'fonte': 'Seus dados, guardados neste celular',
                                          'erro': ''})
         self.assertTrue(f['faceid_abriu'])
         # Ao abrir o app de novo, o Face ID é pedido sozinho e os dados aparecem, sem escolher arquivo.
         self.assertTrue(f['reabriu_sozinho']['app'])
         self.assertIn('Tempo para abrir\n0 s', f['tempo_com_faceid'])  # Com a chave guardada, sem o scrypt.
         # O logo aparece sozinho primeiro: o Face ID (janela do iPhone) só é pedido depois da animação.
-        self.assertGreaterEqual(f['splash']['pedido_em'], 1150)
+        self.assertGreaterEqual(f['splash']['pedido_em'], 2650)  # O logo fica um instante a mais (2,7 s).
         self.assertTrue(f['splash']['logo_ao_abrir'])
 
-    def test_backup_novo_aberto_pelo_face_id_passa_a_ser_o_guardado(self):
+    def test_outros_dados_pelo_face_id_pedem_a_senha_uma_vez(self):
         self.assertIn('Só No Segundo Backup', self.faceid['segundo_nomes'])
+        self.assertIn('chave antiga', self.faceid['faceid_chave_antiga']['erro'])
         self.assertIn('Só No Segundo Backup', self.faceid['segundo_guardado'])
-
-    def test_backup_escolhido_em_mais_abre_pelo_face_id(self):
-        self.assertIn('Abrir um backup mais novo', self.faceid['mais_escolher'])
-        self.assertNotIn('Só No Segundo Backup', self.faceid['pelo_mais'])
-        self.assertIn('Bruno Lima', self.faceid['pelo_mais'])
 
     def test_senha_errada_e_apagar_o_backup_guardado(self):
         self.assertFalse(self.faceid['senha_errada']['app'])
@@ -589,21 +540,23 @@ class TestQuemUsaSoOCelular(unittest.TestCase):
         d = self.r['demonstracao']
         for hash, texto in d.items():
             self.assertIn('meramente sugestivos', texto, hash)
-            self.assertIn('Começar com meus dados', texto, hash)
+            self.assertIn('Começar a usar com meus dados', texto, hash)
         import demonstracao
         self.assertIn(f'Registros\n{len(demonstracao.OPERACOES)}', d['#inicio'])
+        self.assertIn('Estes dados são de exemplo', d['#inicio'])  # O convite para começar, em destaque.
         self.assertIn('Helena Batista Correia', d['#operacoes'])
         self.assertIn('Conta principal', d['#contas'])
-        self.assertIn('Abrir meu backup', d['#mais'])
-        self.assertIn('Sair da demonstração', d['#mais'])
-        self.assertNotIn('Apagar o backup guardado', d['#mais'])
+        self.assertNotIn('Abrir meu backup', d['#mais'])
+        self.assertNotIn('computador', d['#mais'])
+        self.assertNotIn('Apagar os dados deste celular', d['#mais'])
         self.assertIn('Na demonstração não dá para cadastrar', d['#nova'])
         self.assertIn('Atrasadas', d['#agenda'])
         self.assertNotIn('Mudar esta operação', d['operacao'])  # Só consulta.
-        self.assertEqual(self.r['depois_da_demonstracao'], {'app': False, 'comecar': True, 'demonstracao': True})
+        self.assertEqual(self.r['depois_da_demonstracao'], {'app': False, 'novo': True, 'demonstracao': True})
 
     def test_senha_nova_com_as_regras_do_programa(self):
         erros = self.r['erros_senha']
+        self.assertEqual(self.r['erro_sem_nome'], 'Digite o seu nome.')
         self.assertIn('de 6 a 256 caracteres', erros[0])
         self.assertIn('fácil demais', erros[1])
         self.assertIn('não são iguais', erros[2])
@@ -624,17 +577,21 @@ class TestQuemUsaSoOCelular(unittest.TestCase):
     def test_app_abre_vazio_e_grava_no_celular(self):
         self.assertEqual(self.r['erros'], [])
         self.assertIn('Registros\n0', self.r['inicio_vazio'])
+        self.assertIn('Olá, Maria!', self.r['inicio_vazio'])
+        self.assertEqual(self.r['nome_guardado'], 'Maria')
         self.assertIn('Nubank pessoal', self.r['contas'])
         self.assertIn("João D'Ávila Santos", self.r['detalhe'])
         self.assertIn('futuro', self.r['erro_recebimento'])
         self.assertIn('Recebida', self.r['detalhe_recebido'])
-        self.assertIn('Ligue o backup automático na nuvem', self.r['inicio_com_dados'])
+        # Sem internet (a nuvem é bloqueada neste teste): nenhum aviso chamativo, só o texto pequeno.
+        self.assertNotIn('Ligue o backup', self.r['inicio_com_dados'])
+        self.assertIn('sincroniza ao voltar a internet', self.r['inicio_com_dados'])
         self.assertNotIn('Fazer cópia de segurança', self.r['mais'])  # A cópia é a da nuvem.
-        self.assertIn('Backup automático na nuvem', self.r['mais'])
-        self.assertEqual(self.r['abertura'], {'fonte': 'Seus dados, guardados neste celular', 'comecar': False,
-                                              'trocar': 'Restaurar uma cópia de segurança'})
+        self.assertIn('Backup na nuvem', self.r['mais'])
+        self.assertNotIn('computador', self.r['mais'])
+        self.assertEqual(self.r['abertura'], {'fonte': 'Seus dados, guardados neste celular', 'novo': False, 'outras': False})
         self.assertIn("João D'Ávila Santos", self.r['operacoes_depois'])  # Continua depois de trancar e abrir.
-        self.assertIn('Começar sem computador', self.r['convite'])
+        self.assertIn('Começar a usar com meus dados', self.r['convite'])
         self.assertTrue(self.r['guardado']['independente'])
 
     def test_editar_previsao_documentos_e_lixeira_no_celular(self):
@@ -672,10 +629,14 @@ class TestQuemUsaSoOCelular(unittest.TestCase):
 
     def test_dados_do_celular_abrem_no_programa_como_o_programa_gravaria(self):
         from backup import BackupPreparado
+        import cifra
         arquivo = self.pasta / 'GestorRPV-celular.rpvbackup'
         arquivo.write_bytes(base64.b64decode(self.r['guardado']['bytes']))
+        # Dados criados no celular: trancados pela chave sorteada (a senha abre o envelope dela, no app).
+        pacote = self.pasta / 'GestorRPV-celular.zip'
+        cifra.decifrar_arquivo(arquivo, pacote, None, chave=base64.b64decode(self.r['guardado']['chave']))
         do_celular = Banco(self.pasta / 'restaurado' / 'gestor.sqlite3')
-        with BackupPreparado(arquivo, self.SENHA) as preparado:
+        with BackupPreparado(pacote, None) as preparado:
             self.assertEqual((preparado.resumo['registros'], preparado.resumo['documentos']), (2, 3))
             preparado.restaurar(do_celular, copia_de_seguranca=False)
         referencia = Banco(self.pasta / 'referencia' / 'gestor.sqlite3')

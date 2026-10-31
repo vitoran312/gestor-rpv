@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.62.0
+# Gestor de RPV — 0.63.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -477,20 +477,30 @@ Cadastre uma entrada de exemplo, abra a janela Sobre, anexe um documento e teste
 backup/importação usando dados de teste. Em um computador novo, somente o `.exe`
 começa com um banco próprio; transfira os registros usando o backup do aplicativo.
 
-## Celular como principal e nuvem
+## App do celular, nuvem e compartilhamento
 
-Com o backup do computador aberto no celular, **Mais → Tornar este celular o principal** (com a senha dos
-backups) passa os dados para o celular: entradas e alterações valem na hora, e a cada gravação o app manda o
-backup, trancado com a senha, para a nuvem do Gestor (um Worker no plano gratuito da Cloudflare,
-`nuvem/worker.js`). Ao abrir, o programa no computador procura esse backup com a senha dos backups, carrega os
-dados mais novos (guardando antes uma cópia de segurança) e fica **só para consulta**. Sem internet, ele segue
-com os últimos dados do celular; se o celular desligar a nuvem (Mais → Desligar), o computador volta a aceitar
-alterações. Num celular novo, **Recuperar meus dados da nuvem**, na abertura, traz tudo de volta com a mesma
-senha. Em Mais também dá para ligar o **lembrete um dia antes da previsão** (às 8h, pelo app da Tela de Início).
+O app do celular é o principal (o programa no computador deixou de ser uma opção no app). Na primeira vez, ele
+abre com dados de exemplo e o cartão **Começar a usar com meus dados**, que leva a **Nome + Senha**: os dados
+nascem trancados por uma chave sorteada no celular, e a senha da pessoa tranca o "envelope" dessa chave. A cada
+gravação, o app manda os dados para a nuvem do Gestor (um Worker no plano gratuito da Cloudflare,
+`nuvem/worker.js`), sempre ligada; na tela, só "Sincronizado às 14:32", em texto pequeno.
 
-A nuvem só vê bytes cifrados: o identificador e a chave de acesso saem da senha (scrypt), em `nuvem.py` e em
-`celular/nuvem.js`, e os lembretes levam só as datas. Para publicar o Worker numa conta:
-`python nuvem/publicar.py --primeira` (depois, sem `--primeira`, para atualizar mantendo as chaves).
+- **Compartilhar** (Mais): um código de convite de 10 letras e números, válido por 15 minutos e para uma pessoa;
+  ela entra com o código, o nome e a senha dela e vê e altera os mesmos dados. **Remover acesso** sorteia uma chave
+  nova e apaga da nuvem os dados antigos.
+- **Sincronização**: antes de gravar e ao voltar ao app, o celular puxa o que o outro mudou; cada envio diz de que
+  versão partiu, e, se outro aparelho gravou nesse meio-tempo, o app traz a versão nova, refaz as próprias
+  gravações por cima e manda de novo. Só no raro caso de mudanças antigas, feitas sem internet antes de o app ser
+  fechado, a pessoa escolhe quais ficam.
+- **Celular novo**: "Já tenho dados: recuperar da nuvem", com a senha.
+- **Lembretes e calendário** (Mais, um toque): às 8h, aviso no dia anterior a cada previsão e quando uma passa da
+  data ("Toque para marcar como recebida", que abre o recebimento); as datas também no Calendário do iPhone
+  (assinatura ICS). O número no ícone mostra as previsões vencidas ou de hoje.
+
+A nuvem só vê bytes cifrados e, nos lembretes, só datas. Os identificadores de pessoa saem da senha (scrypt) em
+`celular/nuvem.js` e `nuvem.py`; o servidor limita as tentativas. Os dados antigos (de antes do envelope, em que a
+senha era a chave) ganham o envelope na primeira abertura com a senha, e uma chave própria antes do primeiro
+convite. Para publicar o Worker numa conta: `python nuvem/publicar.py --primeira` (depois, sem `--primeira`).
 
 ## App do celular (piloto, só consulta)
 

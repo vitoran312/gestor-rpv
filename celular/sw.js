@@ -50,7 +50,8 @@ self.addEventListener('fetch', (evento) => {
   }).catch(() => caches.match(endereco.href).then((guardada) => guardada || Response.error())));
 });
 
-// Lembrete das previsões de amanhã, mandado pela nuvem do Gestor (só o texto do aviso; nada dos dados).
+// Avisos mandados pela nuvem do Gestor (previsões de amanhã e as que passaram da data): só o texto e o número do
+// ícone; nada dos dados.
 self.addEventListener('push', (evento) => {
   let aviso = {};
   try {
@@ -58,15 +59,18 @@ self.addEventListener('push', (evento) => {
   } catch (erro) {
     aviso = {};
   }
-  evento.waitUntil(self.registration.showNotification(aviso.titulo || 'Gestor RPV', {
+  // O número no ícone acompanha o aviso: previsões vencidas ou de hoje.
+  const selo = Number.isInteger(aviso.selo) && self.navigator.setAppBadge
+    ? (aviso.selo ? self.navigator.setAppBadge(aviso.selo) : self.navigator.clearAppBadge()).catch(() => {}) : Promise.resolve();
+  evento.waitUntil(Promise.all([selo, self.registration.showNotification(aviso.titulo || 'Gestor RPV', {
     body: aviso.texto || 'Há previsões de recebimento amanhã.',
     icon: 'icones/icone-192.png',
-    tag: 'previsoes-de-amanha',
+    tag: aviso.tag || 'previsoes-de-amanha',
     data: { endereco: aviso.endereco || '#agenda' },
-  }));
+  })]));
 });
 
-// Tocar no aviso abre o app (ou traz o que já está aberto) na agenda.
+// Tocar no aviso abre o app (ou traz o que já está aberto) na agenda ou no recebimento da que atrasou.
 self.addEventListener('notificationclick', (evento) => {
   evento.notification.close();
   const endereco = new URL((evento.notification.data && evento.notification.data.endereco) || '#agenda', self.registration.scope).href;

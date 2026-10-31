@@ -208,6 +208,9 @@ svg.icone { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-
   min-height: 100vh;
   min-height: 100dvh;
   padding: max(40px, calc(env(safe-area-inset-top) + 24px)) max(24px, calc((100% - 480px) / 2)) max(20px, env(safe-area-inset-bottom));
+}
+/* O mesmo papel de parede na abertura e atrás do logo, enquanto o app se prepara (e o Face ID é pedido). */
+.abertura, .splash {
   background:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Cpath d='M0 120C70 90 120 150 170 210s90 90 0 90H0z' fill='%23c96548' fill-opacity='.16'/%3E%3Cpath d='M0 190c50-20 90 10 120 50s40 60 0 60H0z' fill='%23c96548' fill-opacity='.12'/%3E%3C/svg%3E") left bottom / min(100%, 420px) auto no-repeat,
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Cpath d='M400 70c-70 10-110 60-140 120s-70 110 0 110h140z' fill='%2371978e' fill-opacity='.3'/%3E%3Cpath d='M400 170c-50 0-80 40-100 80s-30 50 0 50h100z' fill='%2371978e' fill-opacity='.22'/%3E%3C/svg%3E") right bottom / min(90%, 380px) auto no-repeat,
@@ -216,14 +219,14 @@ svg.icone { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-
 }
 /* No escuro, só as duas formas de baixo, mais apagadas. */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-tema="claro"]) .abertura {
+  :root:not([data-tema="claro"]) .abertura, :root:not([data-tema="claro"]) .splash {
     background:
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Cpath d='M0 120C70 90 120 150 170 210s90 90 0 90H0z' fill='%23c96548' fill-opacity='.2'/%3E%3Cpath d='M0 190c50-20 90 10 120 50s40 60 0 60H0z' fill='%23c96548' fill-opacity='.14'/%3E%3C/svg%3E") left bottom / min(100%, 420px) auto no-repeat,
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Cpath d='M400 70c-70 10-110 60-140 120s-70 110 0 110h140z' fill='%2371978e' fill-opacity='.22'/%3E%3Cpath d='M400 170c-50 0-80 40-100 80s-30 50 0 50h100z' fill='%2371978e' fill-opacity='.16'/%3E%3C/svg%3E") right bottom / min(90%, 380px) auto no-repeat,
       var(--fundo);
   }
 }
-:root[data-tema="escuro"] .abertura {
+:root[data-tema="escuro"] .abertura, :root[data-tema="escuro"] .splash {
   background:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Cpath d='M0 120C70 90 120 150 170 210s90 90 0 90H0z' fill='%23c96548' fill-opacity='.2'/%3E%3Cpath d='M0 190c50-20 90 10 120 50s40 60 0 60H0z' fill='%23c96548' fill-opacity='.14'/%3E%3C/svg%3E") left bottom / min(100%, 420px) auto no-repeat,
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Cpath d='M400 70c-70 10-110 60-140 120s-70 110 0 110h140z' fill='%2371978e' fill-opacity='.22'/%3E%3Cpath d='M400 170c-50 0-80 40-100 80s-30 50 0 50h100z' fill='%2371978e' fill-opacity='.16'/%3E%3C/svg%3E") right bottom / min(90%, 380px) auto no-repeat,
@@ -284,20 +287,19 @@ button.link {
   place-content: center;
   justify-items: center;
   gap: 14px;
-  background: var(--fundo);
   pointer-events: none;  /* Só visual: nunca segura um toque. */
   transition: opacity 0.5s var(--ease-saida), visibility 0.5s;
   /* Logo cerca de 2,5 cm acima do centro: a janela do Face ID do iPhone ocupa a parte de baixo da tela. */
   padding-bottom: 320px;
 }
-.splash img { width: 104px; height: 104px; animation: chegar-logo 0.9s var(--ease-entrada) both; filter: drop-shadow(0 12px 22px rgba(169, 51, 51, 0.22)); }
+.splash img { width: 104px; height: 104px; animation: chegar-logo 1.3s var(--ease-entrada) both; filter: drop-shadow(0 12px 22px rgba(169, 51, 51, 0.22)); }
 .splash-nome {
   font-family: var(--serifa);
   font-size: 1.5rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--texto);
-  animation: chegar-nome 0.9s var(--ease-entrada) both;
+  animation: chegar-nome 1.3s var(--ease-entrada) both;
 }
 .splash.sumindo { opacity: 0; visibility: hidden; }
 @keyframes chegar-logo { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: none; } }
@@ -567,6 +569,36 @@ dl.campos dd { margin: 0; text-align: right; overflow-wrap: anywhere; font-weigh
 .icone-menu.verde { color: var(--verde); background: var(--verde-suave); }
 .icone-menu.ambar { color: var(--ambar); background: var(--ambar-suave); }
 .menu-acoes { display: grid; gap: 4px; margin-top: 22px; }
+.links.coluna { flex-direction: column; align-items: center; gap: 0; }
+.links.coluna > button:not([hidden]) ~ button:not([hidden]) { border-left: 0; }
+.linha-nome { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.linha-nome button { width: auto; padding: 10px 16px; }
+/* Código de convite: grande, fácil de ler e ditar. */
+.codigo-convite {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 1.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-align: center;
+  padding: 16px 8px;
+  border-radius: var(--raio);
+  background: var(--marca-suave);
+  color: var(--destaque);
+  user-select: all;
+  -webkit-user-select: all;
+}
+.cartao.pessoa .nome { font-weight: 600; }
+details.remover-acesso { margin-top: 8px; }
+details.remover-acesso summary { color: var(--vermelho); font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+button.copiar-pix { margin-top: 10px; }
+/* Recebimento aberto pelo aviso de atraso: chama a atenção uma vez. */
+@keyframes chamar { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--marca) 45%, transparent); } 100% { box-shadow: 0 0 0 14px transparent; } }
+form.recebimento.chamando { border-color: var(--marca); animation: chamar 1.2s var(--ease-saida) 2; }
+/* Demonstração no Início: o convite para começar, em destaque. */
+.aviso.demonstracao.destaque { background: var(--heroi); border: 0; color: #ffffff; box-shadow: var(--sombra-marca); padding: 18px; }
+.aviso.demonstracao.destaque .nome { color: #ffffff; font-size: 1.25rem; }
+.aviso.demonstracao.destaque .pequeno { color: rgba(255, 255, 255, 0.92); }
+.aviso.demonstracao.destaque button.primario { background: #ffffff; border-color: #ffffff; color: var(--destaque); box-shadow: none; }
 /* Nuvem e lembretes: título, situação e as ações no próprio cartão. */
 .cartao.nuvem { display: grid; gap: 12px; }
 .cartao.nuvem .nome { font-weight: 600; }
@@ -582,23 +614,53 @@ dl.campos dd { margin: 0; text-align: right; overflow-wrap: anywhere; font-weigh
 .segmentos button.ativo { background: var(--marca); color: var(--marca-texto); box-shadow: var(--sombra-marca); }
 .vazio { color: var(--secundario); text-align: center; padding: 32px 0; font-family: var(--serifa); font-size: 1.05rem; }
 
-/* ---- Gráfico ---- */
-.grafico { width: 100%; height: auto; display: block; }
+/* ---- Gráfico (3D) ---- */
+:root {
+  --barra-entradas-claro: #e9a58d; --barra-entradas: #c96548; --barra-entradas-escuro: #9a4630; --barra-entradas-fundo: #b4553a;
+  --barra-recebidas-claro: #8fcbb5; --barra-recebidas: #3f8b72; --barra-recebidas-escuro: #2a6553; --barra-recebidas-fundo: #347a63;
+  --piso: #ece4da; --piso-borda: #d9cfc3;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema="claro"]) {
+    --barra-entradas-claro: #f3b49f; --barra-entradas: #e07f62; --barra-entradas-escuro: #a9573d; --barra-entradas-fundo: #c96a4e;
+    --barra-recebidas-claro: #a6e0ca; --barra-recebidas: #5fb394; --barra-recebidas-escuro: #357d63; --barra-recebidas-fundo: #4c9a7d;
+    --piso: #262b33; --piso-borda: #343a45;
+  }
+}
+:root[data-tema="escuro"] {
+  --barra-entradas-claro: #f3b49f; --barra-entradas: #e07f62; --barra-entradas-escuro: #a9573d; --barra-entradas-fundo: #c96a4e;
+  --barra-recebidas-claro: #a6e0ca; --barra-recebidas: #5fb394; --barra-recebidas-escuro: #357d63; --barra-recebidas-fundo: #4c9a7d;
+  --piso: #262b33; --piso-borda: #343a45;
+}
+.area-grafico { padding: 14px 10px 10px; background: linear-gradient(180deg, var(--superficie) 0%, var(--superficie-2) 100%); }
+.grafico { width: 100%; height: auto; display: block; overflow: visible; }
 .grafico text { fill: var(--secundario); font-size: 10px; }
 .grafico text.ano { font-size: 8px; }
 .grafico text.escala { font-size: 9px; }
-.grafico .entradas { fill: var(--neutro); }
-.grafico .recebidas { fill: var(--verde); }
-.grafico .eixo { stroke: var(--borda); }
-.grafico .grade { stroke: var(--borda-suave); stroke-dasharray: 2 3; }
+.grafico .grade { stroke: var(--borda); stroke-dasharray: 2 3; }
+.grafico .piso { fill: var(--piso); }
+.grafico .piso-borda { fill: var(--piso-borda); }
+.parada-entradas-alto { stop-color: var(--barra-entradas); }
+.parada-entradas-baixo { stop-color: var(--barra-entradas-fundo); }
+.parada-recebidas-alto { stop-color: var(--barra-recebidas); }
+.parada-recebidas-baixo { stop-color: var(--barra-recebidas-fundo); }
+.barra3d.entradas .lado { fill: var(--barra-entradas-escuro); }
+.barra3d.entradas .topo { fill: var(--barra-entradas-claro); }
+.barra3d.recebidas .lado { fill: var(--barra-recebidas-escuro); }
+.barra3d.recebidas .topo { fill: var(--barra-recebidas-claro); }
+.grafico text.valor-barra { font-size: 8px; font-weight: 700; fill: var(--texto); opacity: 0; transition: opacity 160ms var(--ease-entrada); }
+.grafico .mes.escolhido text.valor-barra { opacity: 1; }
 .grafico .fundo-mes { fill: transparent; }
 .grafico .mes { cursor: pointer; }
 .grafico .mes.escolhido .fundo-mes { fill: var(--marca-suave); }
 .grafico .mes.escolhido text { fill: var(--texto); font-weight: 700; }
+/* As barras sobem do piso, em cascata curta, só ao abrir a tela. */
+@keyframes subir-barra { from { transform: scaleY(0); } to { transform: none; } }
+.grafico.subindo .barra3d { transform-box: fill-box; transform-origin: 50% 100%; animation: subir-barra 520ms var(--ease-entrada) both; }
 .legenda { display: flex; gap: 16px; font-size: 0.85rem; margin-bottom: 8px; }
-.legenda span::before { content: "● "; }
-.legenda .entradas::before { color: var(--neutro); }
-.legenda .recebidas::before { color: var(--verde); }
+.legenda span::before { content: "■ "; }
+.legenda .entradas::before { color: var(--barra-entradas); }
+.legenda .recebidas::before { color: var(--barra-recebidas); }
 
 /* ---- Documentos ---- */
 .documento { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
@@ -860,6 +922,8 @@ details[open] > :not(summary) { animation: abrir-detalhe 240ms var(--ease-padrao
 
 /* Menos movimento pedido pelo sistema: nada se desloca, encolhe nem brilha; só a opacidade continua. */
 @media (prefers-reduced-motion: reduce) {
+  form.recebimento.chamando { animation: none; }
+  .grafico.subindo .barra3d { animation: none; }
   button:active:not(:disabled), a.botao-link:active, label.botao-link:active, a.cartao:active, a.item:active,
   label.escolher-backup:active, .situacoes a:active, .filtros button:active, .grade-agenda .dia:active,
   details.acao summary:active, details.conta summary:active, a.cartao.agenda-resumo:active, a.aviso.item:active,

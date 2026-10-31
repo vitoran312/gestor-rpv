@@ -9,6 +9,7 @@ se faltar, da primeira conta que o token enxerga.
 """
 import json
 import os
+import re
 import subprocess
 import sys
 import urllib.request
@@ -63,7 +64,9 @@ def multipart(metadados, codigo):
 
 def main():
     primeira = '--primeira' in sys.argv
-    conta = os.environ.get('CLOUDFLARE_ACCOUNT_ID') or pedir('GET', '/accounts')[0]['id']
+    conta = os.environ.get('CLOUDFLARE_ACCOUNT_ID', '')
+    if not re.fullmatch(r'[0-9a-f]{32}', conta):  # Vazio ou preenchido por engano: a conta vem do próprio token.
+        conta = pedir('GET', '/accounts')[0]['id']
     base = f'/accounts/{conta}'
     espacos = {n['title']: n['id'] for n in pedir('GET', f'{base}/storage/kv/namespaces?per_page=100')}
     if KV not in espacos:
@@ -77,8 +80,17 @@ def main():
         ligacoes += [{'type': 'secret_text', 'name': 'VAPID_PRIVADA', 'text': json.dumps(vapid['privada'])},
                      {'type': 'plain_text', 'name': 'VAPID_PUBLICA', 'text': vapid['publica']}]
         metadados['keep_bindings'] = []
-    corpo, tipo = multipart(metadados, (PASTA / 'worker.js').read_bytes())
-    pedir('PUT', f'{base}/workers/scripts/{NOME}', corpo, tipo)
+    # Limite de tentativas da Cloudflare (o Worker também conta sozinho, se a conta não oferecer este).
+    limitador = {'type': 'ratelimit', 'name': 'TENTATIVAS', 'namespace_id': '1001', 'simple': {'limit': 30, 'period': 60}}
+    codigo = (PASTA / 'worker.js').read_bytes()
+    try:
+        corpo, tipo = multipart({**metadados, 'bindings': ligacoes + [limitador]}, codigo)
+        pedir('PUT', f'{base}/workers/scripts/{NOME}', corpo, tipo)
+        print('Com o limitador de tentativas da Cloudflare.')
+    except SystemExit as erro:
+        print(f'Sem o limitador da Cloudflare ({erro}); fica a contagem do próprio Worker.')
+        corpo, tipo = multipart(metadados, codigo)
+        pedir('PUT', f'{base}/workers/scripts/{NOME}', corpo, tipo)
     pedir('POST', f'{base}/workers/scripts/{NOME}/subdomain', {'enabled': True, 'previews_enabled': False})
     pedir('PUT', f'{base}/workers/scripts/{NOME}/schedules', [{'cron': CRON}])
     sub = pedir('GET', f'{base}/workers/subdomain')['subdomain']

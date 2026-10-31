@@ -36,45 +36,56 @@
     <img class="logo-abertura" src="icones/logo.png" alt="">
     <h1>GESTOR RPV</h1>
     <p class="slogan">Seus dados sempre seguros e com você.</p>
+    <!-- Desbloqueio: os dados deste celular, com Face ID ou senha. -->
     <div id="fonte" class="cartao" hidden>
       <div id="fonte-titulo" class="discreto pequeno"></div>
       <div id="fonte-detalhe" class="nome"></div>
     </div>
     <button id="abrir-faceid" class="primario" type="button" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"/><path d="M9 9.5v1M15 9.5v1M12 9.5V13h-1M9.5 15.5c1.4 1 3.6 1 5 0"/></svg>Abrir com Face ID</button>
-    <!-- Quem não usa o programa no computador: cria a própria senha e começa com os dados vazios. -->
-    <button id="comecar" class="primario" type="button" hidden>Começar sem computador</button>
-    <!-- Celular novo (ou app reinstalado): os dados voltam do backup na nuvem, com a mesma senha. -->
-    <button id="recuperar-nuvem" class="link" type="button" hidden>Recuperar meus dados da nuvem</button>
+    <form id="formulario" class="cartao formulario" autocomplete="off" hidden>
+      <label for="senha">Senha</label>
+      <input id="senha" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false">
+      <button id="abrir" class="primario" type="submit">Abrir</button>
+    </form>
+    <div class="links">
+      <button id="usar-senha" class="link" type="button" hidden>Usar a senha</button>
+    </div>
+    <!-- Primeira vez neste celular: o nome e a senha que a pessoa escolher. -->
+    <form id="form-novo" class="cartao formulario" autocomplete="off" hidden>
+      <p class="discreto pequeno">A senha tranca os seus dados neste celular e na nuvem. Anote em lugar seguro: sem ela não
+        há como abrir os dados.</p>
+      <label for="nome-novo">Nome</label>
+      <input id="nome-novo" autocomplete="given-name" autocapitalize="words" maxlength="40">
+      <label for="senha-nova">Senha (pelo menos 6 caracteres)</label>
+      <input id="senha-nova" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false">
+      <label for="senha-repetida">Repita a senha</label>
+      <input id="senha-repetida" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false">
+      <button id="criar" class="primario" type="submit">Começar</button>
+    </form>
+    <!-- Recebeu um convite: os mesmos dados de quem convidou, com o nome e a senha desta pessoa. -->
+    <form id="form-convite" class="cartao formulario" autocomplete="off" hidden>
+      <p class="discreto pequeno">Digite o código que recebeu. Você vê e altera os mesmos dados de quem convidou, com o seu
+        nome e a sua senha.</p>
+      <label for="codigo-convite">Código do convite</label>
+      <input id="codigo-convite" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" placeholder="K7P2Q-9XMRT">
+      <label for="nome-convite">Nome</label>
+      <input id="nome-convite" autocomplete="given-name" autocapitalize="words" maxlength="40">
+      <label for="senha-convite">Senha (pelo menos 6 caracteres)</label>
+      <input id="senha-convite" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false">
+      <label for="senha-convite-repetida">Repita a senha</label>
+      <input id="senha-convite-repetida" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false">
+      <button id="entrar-convite" class="primario" type="submit">Entrar</button>
+    </form>
+    <!-- Celular novo (ou app reinstalado): os dados voltam da nuvem, com a mesma senha. -->
     <form id="form-nuvem" class="cartao formulario" autocomplete="off" hidden>
-      <p class="discreto pequeno">Digite a senha dos seus dados. O app procura na nuvem o último backup feito com ela e
-        guarda neste celular.</p>
+      <p class="discreto pequeno">Digite a sua senha. O app traz da nuvem os seus dados e guarda neste celular.</p>
       <label for="senha-nuvem">Senha</label>
       <input id="senha-nuvem" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false">
       <button id="baixar-nuvem" class="primario" type="submit">Recuperar</button>
     </form>
-    <form id="formulario" class="cartao formulario" autocomplete="off">
-      <div id="grupo-arquivo" class="formulario">
-        <label id="rotulo-arquivo" for="arquivo">Backup (.rpvbackup)</label>
-        <input id="arquivo" type="file">
-      </div>
-      <div id="grupo-senha" class="formulario">
-        <label for="senha">Senha dos backups</label>
-        <input id="senha" type="password" autocomplete="off" autocapitalize="off" spellcheck="false">
-        <button id="abrir" class="primario" type="submit">Abrir com a senha</button>
-      </div>
-    </form>
-    <form id="form-novo" class="cartao formulario" autocomplete="off" hidden>
-      <p class="discreto pequeno">Crie a senha que vai proteger seus dados neste celular. Anote em lugar seguro: sem
-        ela não há como abrir os dados nem as cópias de segurança.</p>
-      <label for="senha-nova">Nova senha (pelo menos 6 caracteres)</label>
-      <input id="senha-nova" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false">
-      <label for="senha-repetida">Repita a senha</label>
-      <input id="senha-repetida" type="password" autocomplete="new-password" autocapitalize="off" spellcheck="false">
-      <button id="criar" class="primario" type="submit">Criar e começar</button>
-    </form>
-    <div class="links">
-      <button id="usar-senha" class="link" type="button" hidden>Usar a senha</button>
-      <button id="trocar-backup" class="link" type="button" hidden>Trocar por um backup mais novo</button>
+    <div id="outras-entradas" class="links coluna" hidden>
+      <button id="recebi-convite" class="link" type="button">Recebi um código de convite</button>
+      <button id="recuperar-nuvem" class="link" type="button">Já tenho dados: recuperar da nuvem</button>
     </div>
     <div id="andamento" class="andamento" hidden>
       <p id="andamento-texto" aria-live="polite"></p>
@@ -82,8 +93,6 @@
     </div>
     <p id="erro" class="erro" role="alert" hidden></p>
     <button id="ver-demonstracao" class="link" type="button" hidden>Ver a demonstração (dados fictícios)</button>
-    <p id="explicacao" class="discreto pequeno">O backup fica guardado neste aparelho como saiu do computador,
-      trancado pela senha; nada é enviado para a internet.</p>
     <p id="instalar" class="aviso pequeno" hidden>Para usar como app: no Safari, toque em <strong>Compartilhar</strong>
       e depois em <strong>Adicionar à Tela de Início</strong>. Abra sempre pelo ícone: o app guarda os dados lá.</p>
     <p id="versao-app" class="discreto pequeno"></p>

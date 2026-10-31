@@ -34,7 +34,10 @@ export function kvNaMemoria() {
   };
 }
 
-export function servir(env = { DADOS: kvNaMemoria() }, porta = 0) {
+// Nos testes, um aparelho faz muitos pedidos seguidos do mesmo endereço: sem limite de tentativas.
+const semLimite = { limit: async () => ({ success: true }) };
+
+export function servir(env = { DADOS: kvNaMemoria(), TENTATIVAS: semLimite }, porta = 0) {
   const servidor = http.createServer(async (pedido, resposta) => {
     const partes = [];
     for await (const parte of pedido) {

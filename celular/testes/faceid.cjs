@@ -11,6 +11,7 @@ const { chromium } = require('playwright');
   try {
     const contexto = await navegador.newContext();
     const pagina = await contexto.newPage();
+    await pagina.route(/workers\.dev/, (rota) => rota.abort());  // Sem a nuvem de verdade (ver test_nuvem).
     const erros = [];
     pagina.on('pageerror', (erro) => erros.push(String(erro)));
     const cdp = await contexto.newCDPSession(pagina);
@@ -27,19 +28,20 @@ const { chromium } = require('playwright');
       erro: document.getElementById('erro').hidden ? '' : document.getElementById('erro').textContent,
     }));
 
-    // 1. Primeira vez: escolhe o arquivo e digita a senha; o app oferece o Face ID.
-    // Sem nada guardado, a demonstração abre sozinha; "Começar com meus dados" leva à abertura de sempre.
+    // 1. Primeira vez: os dados chegam (aqui, um backup aberto com a senha) e o app oferece o Face ID.
+    // Sem nada guardado, a demonstração abre sozinha; "Começar a usar com meus dados" leva à abertura.
     const sairDaDemonstracao = async () => {
-      await pagina.waitForSelector('text=Começar com meus dados', { timeout: 30000 });
-      await pagina.click('text=Começar com meus dados');
+      await pagina.waitForSelector('.aviso.demonstracao button', { timeout: 30000 });
+      await pagina.click('.aviso.demonstracao button');
       await pagina.waitForSelector('#abertura:not([hidden])');
     };
+    const abrirArquivo = (url) => pagina.evaluate(async ({ url, senha }) => {
+      await abrirArquivoGestor(new Uint8Array(await (await fetch(url)).arrayBuffer()), senha);
+    }, { url, senha });
     await pagina.goto(endereco + '/index.html');
     await sairDaDemonstracao();
     r.inicial = await estado();
-    await pagina.setInputFiles('#arquivo', primeiro);
-    await pagina.fill('#senha', senha);
-    await pagina.click('#abrir');
+    await abrirArquivo(primeiro);
     await aberto();
     await pagina.waitForSelector('text=Ativar Face ID');
     await pagina.click('text=Ativar Face ID');
@@ -79,27 +81,20 @@ const { chromium } = require('playwright');
     await pagina.evaluate(() => { location.hash = '#backup'; });
     r.tempo_com_faceid = await pagina.evaluate(() => document.getElementById('tela').innerText);
 
-    // 4. Backup novo, aberto pelo mesmo Face ID: passa a ser o guardado e a chave nova fica no Face ID.
-    await pagina.evaluate(() => { location.hash = '#mais'; });
-    await pagina.evaluate(() => trancarGestor());
-    await pagina.waitForSelector('#abertura:not([hidden])');
-    await pagina.setInputFiles('#arquivo', segundo);
-    await pagina.waitForFunction(() => document.getElementById('fonte-titulo').textContent.includes('escolhido'));
-    await pagina.click('#abrir-faceid');
+    // 4. Outros dados (com outra chave) neste celular: o Face ID, que guardava a chave antiga, pede a senha uma vez.
+    await abrirArquivo(segundo);
     await aberto();
     r.segundo_nomes = await pagina.evaluate(() => { location.hash = '#operacoes'; return new Promise((ok) => setTimeout(() => ok(document.getElementById('tela').innerText), 200)); });
-    await pagina.reload();
+    await pagina.evaluate(() => trancarGestor());
+    await pagina.waitForSelector('#abrir-faceid:not([hidden])');
+    await pagina.click('#abrir-faceid');
+    await pagina.waitForSelector('#erro:not([hidden])');
+    r.faceid_chave_antiga = await estado();
+    await pagina.click('#usar-senha');
+    await pagina.fill('#senha', senha);
+    await pagina.click('#abrir');
     await aberto();
     r.segundo_guardado = await pagina.evaluate(() => { location.hash = '#operacoes'; return new Promise((ok) => setTimeout(() => ok(document.getElementById('tela').innerText), 200)); });
-
-    // 4b. Em Mais, "Abrir um backup mais novo": escolhe o arquivo e o Face ID abre direto, sem passar pela abertura.
-    await pagina.evaluate(() => { location.hash = '#mais'; });
-    await pagina.waitForSelector('[name="escolher_backup"]', { state: 'attached' });
-    r.mais_escolher = await pagina.evaluate(() => document.querySelector('label.escolher-backup').innerText);
-    await pagina.setInputFiles('[name="escolher_backup"]', primeiro);
-    await pagina.waitForFunction(() => !document.getElementById('aplicativo').hidden && location.hash === '#inicio'
-      && !document.getElementById('tela').innerText.includes('Abrir um backup mais novo'), null, { timeout: 60000 });
-    r.pelo_mais = await pagina.evaluate(() => { location.hash = '#operacoes'; return new Promise((ok) => setTimeout(() => ok(document.getElementById('tela').innerText), 200)); });
 
     // 5. Senha errada no backup guardado (sem Face ID) mostra o erro e não abre.
     await pagina.evaluate(() => { location.hash = '#mais'; });
@@ -116,8 +111,8 @@ const { chromium } = require('playwright');
     await pagina.click('#abrir');
     await aberto();
     await pagina.evaluate(() => { location.hash = '#mais'; });
-    pagina.once('dialog', (d) => d.accept());
-    await pagina.click('text=Apagar o backup guardado');
+    pagina.on('dialog', (d) => d.accept().catch(() => {}));
+    await pagina.click('text=Apagar os dados deste celular');
     await pagina.waitForSelector('#abertura:not([hidden])');
     await pagina.reload();
     await sairDaDemonstracao();
