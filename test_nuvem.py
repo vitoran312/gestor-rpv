@@ -29,7 +29,7 @@ class TestWorker(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         saida = subprocess.run([NODE, str(RAIZ / 'nuvem' / 'teste_worker.mjs')], capture_output=True, text=True,
-                               check=True, timeout=120)
+                               encoding='utf-8', check=True, timeout=120)
         cls.r = json.loads(saida.stdout)
 
     def test_backup_em_partes_volta_igual(self):
@@ -156,7 +156,8 @@ class TestClienteDoPrograma(unittest.TestCase):
     """nuvem.py contra o Worker de verdade, servido no próprio computador."""
 
     def setUp(self):
-        self.processo = subprocess.Popen([NODE, str(RAIZ / 'nuvem' / 'local.mjs')], stdout=subprocess.PIPE, text=True)
+        self.processo = subprocess.Popen([NODE, str(RAIZ / 'nuvem' / 'local.mjs')], stdout=subprocess.PIPE, text=True,
+                                         encoding='utf-8')
         porta = self.processo.stdout.readline().strip()
         self.addCleanup(self.processo.stdout.close)
         self.addCleanup(self.processo.wait)

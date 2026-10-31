@@ -79,7 +79,7 @@ def pdf_de_teste(textos, enchimento=0):
 def rodar_node(script, endereco, entrada):
     """Roda um roteiro do navegador; se ele falhar, o erro do Node aparece na falha do teste."""
     resultado = subprocess.run(['node', str(RAIZ / 'celular' / 'testes' / script), endereco, json.dumps(entrada)],
-                               capture_output=True, text=True, timeout=300)
+                               capture_output=True, text=True, encoding='utf-8', timeout=300)
     if resultado.returncode:
         raise AssertionError(f'{script} falhou no {NAVEGADOR}:\n{resultado.stderr[-4000:]}')
     return resultado.stdout
