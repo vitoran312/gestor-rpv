@@ -1,6 +1,20 @@
 {
   "versoes": [
     {
+      "versao": "0.62.0",
+      "resumo": "2 novidades",
+      "itens": [
+        {
+          "tipo": "novidade",
+          "texto": "Celular: a cópia de segurança agora é só a da nuvem; saiu a opção de salvar um arquivo à mão."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: o Início lembra de ligar o backup na nuvem e avisa se um envio não chegou."
+        }
+      ]
+    },
+    {
       "versao": "0.61.0",
       "resumo": "6 novidades",
       "itens": [
@@ -81,16 +95,6 @@
         {
           "tipo": "novidade",
           "texto": "Celular: editar, desativar, reativar e remover contas de recebimento, para quem usa só o celular."
-        }
-      ]
-    },
-    {
-      "versao": "0.57.0",
-      "resumo": "1 novidade",
-      "itens": [
-        {
-          "tipo": "novidade",
-          "texto": "Celular: \"Excluir permanentemente\" na lixeira, para quem usa só o celular; a operação sai de vez, com os documentos."
         }
       ]
     }

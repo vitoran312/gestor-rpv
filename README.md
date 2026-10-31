@@ -1,4 +1,4 @@
-# Gestor de RPV — 0.61.0
+# Gestor de RPV — 0.62.0
 
 Aplicativo pessoal para Windows, em Python com Tkinter e SQLite. Cada computador
 mantém seus próprios dados, sem servidor ou sincronização. Não exige pacotes extras.
@@ -544,8 +544,8 @@ entradas antes de chegarem ao computador e são importadas antes das entradas, q
 programa (`python gerar_modelo_celular.py`; `test_celular` confere o esquema). Os dados ficam guardados como um
 `.rpvbackup` comum (manifesto com `"origem": "celular"`), trancado pela senha: abrem com Face ID ou senha como
 qualquer backup, e cada conta, entrada ou recebimento gravado no app (com as mesmas transformações de
-`Banco.salvar_conta`, `Banco.salvar` e `registrar_recebimento`) reempacota o arquivo. "Fazer cópia de segurança"
-salva esse arquivo no iCloud ou no Google Drive; o programa no computador consegue importá-lo. "Convidar
+`Banco.salvar_conta`, `Banco.salvar` e `registrar_recebimento`) reempacota o arquivo. A cópia de segurança é o backup
+automático na nuvem (Mais → Backup automático na nuvem), que o programa no computador também lê. "Convidar
 alguém" (Mais) mostra o link e o QR code do app.
 
 `celular/leitor.js` abre o backup e `celular/dados.js` repete as regras de `dados.py` e `grafico.py`

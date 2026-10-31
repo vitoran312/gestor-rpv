@@ -82,6 +82,8 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
     await a.pagina.click('text=Ligar backup na nuvem');
     await a.pagina.waitForSelector('text=último envio em', { timeout: 60000 });
     r.mais_ligado = await a.texto();
+    await a.ir('#inicio');
+    r.inicio_ligado = await a.texto();
     await esperar(() => metas().length === 1);
     const chaveMeta = metas()[0];
     r.id = chaveMeta.slice('meta:'.length);

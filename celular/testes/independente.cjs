@@ -170,8 +170,6 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
     r.operacoes_depois = await texto();
     await ir(`#operacao/${segundaId}`);
     r.documentos_depois = await documentos();
-    await ir('#copia');
-    r.copia = await texto();
     await ir('#convite');
     r.convite = await texto();
     r.guardado = await pagina.evaluate(async () => {

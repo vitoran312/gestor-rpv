@@ -7,7 +7,7 @@
 (() => {
   // Igual a versao.py (test_celular confere): mostrada na abertura e em Mais, para saber se o aparelho já
   // carregou a última versão publicada.
-  const VERSAO_APP = '0.61.0';
+  const VERSAO_APP = '0.62.0';
   const D = GestorDados;
   const $ = (id) => document.getElementById(id);
   const SITUACOES = { pendente: 'Pendente', atrasada: 'Atrasada', recebida: 'Recebida' };
@@ -57,7 +57,6 @@
     info: ['M12 3.5a8.5 8.5 0 1 1 0 17 8.5 8.5 0 0 1 0-17z', 'M12 11v5.5', 'M12 7.8v.01'],
     megafone: ['M4 10v4h3l7 4V6l-7 4z', 'M17.5 9.5a3.5 3.5 0 0 1 0 5'],
     convidar: ['M9 4.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7z', 'M3 19.5c.8-3.2 3.3-5 6-5s5.2 1.8 6 5', 'M18.5 8v6M15.5 11h6'],
-    escudo: ['M12 3.5l7 2.5v5.5c0 4.3-3 7.6-7 9-4-1.4-7-4.7-7-9V6z', 'M9 12l2 2 4-4'],
     enviar: ['M12 15V4.5M8 8.5l4-4 4 4', 'M5 14.5v5h14v-5'],
     rosto: ['M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16',
       'M9 9.5v1M15 9.5v1M12 9.5V13h-1M9.5 15.5c1.4 1 3.6 1 5 0'],
@@ -647,9 +646,13 @@
     return [
       oferta,
       info.naoGuardado && el('p', { class: 'aviso', texto: 'Não foi possível guardar o backup neste aparelho (falta de espaço?). Na próxima vez, escolha o arquivo de novo.' }),
-      info.independente && localStorageLer('copia_pendente') === '1' && el('a', { class: 'aviso item', href: '#copia' },
-        el('div', { class: 'nome', texto: 'Faça uma cópia de segurança' }),
-        el('div', { class: 'discreto pequeno', texto: 'Há mudanças só neste celular. Toque para salvar uma cópia trancada no iCloud ou no Google Drive.' })),
+      // A cópia de segurança é a da nuvem: sem ela ligada, ou com o último envio falho, o Início avisa.
+      info.independente && !(nuvem && nuvem.backup) && el('a', { class: 'aviso item', href: '#mais' },
+        el('div', { class: 'nome', texto: 'Ligue o backup automático na nuvem' }),
+        el('div', { class: 'discreto pequeno', texto: 'Seus dados estão só neste celular. Em Mais, ligue o backup: a cada gravação, uma cópia trancada com a sua senha vai para a nuvem.' })),
+      info.independente && nuvem && nuvem.backup && estadoNuvem().erro && el('a', { class: 'aviso item', href: '#mais' },
+        el('div', { class: 'nome', texto: 'O último backup não chegou à nuvem' }),
+        el('div', { class: 'discreto pequeno', texto: 'O app tenta de novo na próxima gravação ou abertura. Toque para ver ou enviar agora.' })),
       dados.demonstracao && !info.demonstracao && el('p', { class: 'aviso', texto: 'Este backup tem dados de demonstração, com nomes e valores fictícios.' }),
       info.independente && !dados.operacoes.length && el('div', { class: 'aviso' },
         el('div', { class: 'nome', texto: 'Por onde começar' }),
@@ -896,7 +899,6 @@
     Guarda.persistir();
     Object.assign(info, { manifesto, extrair, todos });
     dados = D.carregar(bancoLocal);
-    localStorageGravar('copia_pendente', '1');
     agendarEnvioNuvem();
     sincronizarLembretes();
   }
@@ -960,6 +962,11 @@
       } finally {
         enviandoNuvem = null;
         redesenharMais();
+        if (dados && location.hash === '#inicio') {
+          const rolagem = window.scrollY;
+          desenhar();
+          window.scrollTo(0, rolagem);
+        }
       }
     })();
     return enviandoNuvem;
@@ -968,6 +975,9 @@
   // Depois de abrir os dados: o que ficou sem enviar (sem internet na hora) vai agora; os lembretes são conferidos.
   async function aposAbrirDados() {
     await carregarNuvem();
+    if (location.hash === '#inicio') {
+      desenhar();
+    }
     if (nuvem && nuvem.backup && info.independente && estadoNuvem().criado_em !== info.manifesto.criado_em) {
       agendarEnvioNuvem(0);
     }
@@ -1228,35 +1238,6 @@
     bancoLocal.run('UPDATE rpvs SET recebimento=? WHERE id=? AND lixeira_em IS NULL', [data, registro.id]);
     await salvarLocal();
     avisar('Recebimento registrado.');
-  }
-
-  // Cópia de segurança: o mesmo arquivo trancado, salvo onde a pessoa quiser (Arquivos, iCloud, Google Drive).
-  function telaCopia() {
-    const hoje = D.hojeIso().replaceAll('-', '');
-    const arquivo = new File([new Uint8Array(fonte.bytes)], `GestorRPV-celular-${hoje}.rpvbackup`, { type: 'application/octet-stream' });
-    const podeCompartilhar = navigator.canShare && navigator.canShare({ files: [arquivo] });
-    const resultado = el('p', { class: 'discreto pequeno' });
-    const ultima = localStorageLer('ultima_copia');
-    return [
-      el('p', { texto: 'Seus dados estão só neste celular. Se ele for perdido, trocado ou o app for apagado, eles se vão junto — a cópia de segurança é o que permite recuperar.' }),
-      el('ol', { class: 'passos' },
-        el('li', { texto: 'Toque em "Salvar cópia de segurança".' }),
-        el('li', { texto: 'Escolha "Salvar em Arquivos" e uma pasta do iCloud Drive ou do Google Drive.' }),
-        el('li', { texto: 'Para recuperar num celular novo: instale o app, escolha o arquivo da cópia na primeira tela e digite a senha.' })),
-      podeCompartilhar
-        ? el('button', { type: 'button', class: 'primario', texto: 'Salvar cópia de segurança', onclick: () => {
-          navigator.share({ files: [arquivo] }).then(() => {
-            localStorageGravar('copia_pendente', '0');
-            localStorageGravar('ultima_copia', new Date().toISOString());
-            resultado.textContent = 'Cópia salva. Faça de novo sempre que cadastrar algo importante.';
-          }).catch(() => {});
-        } })
-        : el('a', { class: 'botao-link primario', href: URL.createObjectURL(arquivo), download: arquivo.name,
-          texto: 'Baixar cópia de segurança', onclick: () => localStorageGravar('copia_pendente', '0') }),
-      resultado,
-      el('p', { class: 'discreto pequeno', texto: ultima ? `Última cópia: ${D.dataHora(ultima)}.` : 'Nenhuma cópia feita ainda.' }),
-      el('p', { class: 'discreto pequeno', texto: 'A cópia é trancada com a sua senha: sem ela, ninguém consegue abrir.' }),
-    ];
   }
 
   // Cifra e guarda no aparelho uma entrada, conta ou mudança feita aqui, e abre a tela de envio ao computador.
@@ -2457,7 +2438,6 @@
       grupo('Aparência', escolherTema()),
       !info.demonstracao && info.chave && grupo('Nuvem e lembretes', cartaoNuvem(), cartaoLembretes()),
       grupo('Dados e segurança',
-        info.independente && opcao('#copia', 'Fazer cópia de segurança', 'Salvar seus dados (trancados) no iCloud ou no Google Drive', 'escudo', 'verde'),
         escolherBackup(),
         senhaRecente && !faceIdAtivo && el('div', { class: 'cartao' },
           el('div', { texto: 'Ativar o Face ID' }), el('div', { class: 'discreto pequeno', texto: 'Abrir o app com o rosto, sem digitar a senha' }),
@@ -2571,7 +2551,6 @@
     editar: { titulo: 'Editar entrada', aba: 'operacoes', montar: telaEditar, voltar: true },
     agenda: { titulo: 'Agenda', aba: 'inicio', montar: telaAgenda, voltar: true },
     resumo: { titulo: 'Resumo em imagem', aba: 'operacoes', montar: telaResumo, voltar: true },
-    copia: { titulo: 'Cópia de segurança', aba: 'mais', montar: telaCopia, voltar: true },
     convite: { titulo: 'Convidar alguém', aba: 'mais', montar: telaConvite, voltar: true },
     'nova-conta': { titulo: 'Nova conta', aba: 'contas', montar: telaNovaConta, voltar: true },
     principal: { titulo: 'Celular principal', aba: 'mais', montar: telaPrincipal, voltar: true },

@@ -1,5 +1,11 @@
 # Histórico de versões
 
+## 0.62.0
+
+- Celular: "Fazer cópia de segurança" (salvar o arquivo no aparelho) e a tela #copia saíram; a cópia de segurança
+  é o backup automático na nuvem. O aviso do Início passa a pedir para ligar a nuvem (quando desligada) ou a
+  dizer que o último envio não chegou (com erro), em vez de pedir a cópia manual.
+
 ## 0.61.0
 
 Celular como principal, com backup na nuvem (Cloudflare Workers, plano gratuito) e lembretes:

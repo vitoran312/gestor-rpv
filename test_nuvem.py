@@ -294,6 +294,7 @@ class TestNuvemPeloCelular(unittest.TestCase):
         self.assertNotIn('Trancar agora', self.r['mais_desligado'])
         self.assertIn('Senha incorreta', self.r['senha_errada'])
         self.assertIn('Ligado · último envio em', self.r['mais_ligado'])
+        self.assertNotIn('Ligue o backup automático na nuvem', self.r['inicio_ligado'])
         self.assertTrue(self.r['reenviado'])
         self.assertTrue(self.r['guardado_igual'])  # A nuvem tem exatamente o arquivo guardado no celular.
 

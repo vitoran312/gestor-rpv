@@ -628,12 +628,12 @@ class TestQuemUsaSoOCelular(unittest.TestCase):
         self.assertIn("João D'Ávila Santos", self.r['detalhe'])
         self.assertIn('futuro', self.r['erro_recebimento'])
         self.assertIn('Recebida', self.r['detalhe_recebido'])
-        self.assertIn('Faça uma cópia de segurança', self.r['inicio_com_dados'])
-        self.assertIn('Fazer cópia de segurança', self.r['mais'])
+        self.assertIn('Ligue o backup automático na nuvem', self.r['inicio_com_dados'])
+        self.assertNotIn('Fazer cópia de segurança', self.r['mais'])  # A cópia é a da nuvem.
+        self.assertIn('Backup automático na nuvem', self.r['mais'])
         self.assertEqual(self.r['abertura'], {'fonte': 'Seus dados, guardados neste celular', 'comecar': False,
                                               'trocar': 'Restaurar uma cópia de segurança'})
         self.assertIn("João D'Ávila Santos", self.r['operacoes_depois'])  # Continua depois de trancar e abrir.
-        self.assertIn('cópia de segurança', self.r['copia'])
         self.assertIn('Começar sem computador', self.r['convite'])
         self.assertTrue(self.r['guardado']['independente'])
 

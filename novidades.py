@@ -10,6 +10,10 @@ from pathlib import Path
 MOSTRAR = 5  # Quantas versões aparecem no "Sobre".
 
 NOVIDADES = [
+    ('0.62.0', [
+        ('novidade', 'Celular: a cópia de segurança agora é só a da nuvem; saiu a opção de salvar um arquivo à mão.'),
+        ('novidade', 'Celular: o Início lembra de ligar o backup na nuvem e avisa se um envio não chegou.'),
+    ]),
     ('0.61.0', [
         ('novidade', 'Celular: "Tornar este celular o principal"; entradas e alterações valem na hora, sem o computador.'),
         ('novidade', 'Celular: backup automático na nuvem a cada gravação, trancado com a sua senha.'),
