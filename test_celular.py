@@ -49,7 +49,7 @@ MENSAGENS = [
     'Titular: Ana Paula Ribeiro CPF 111.111.111-11\nComissão: R$ 300,00\nData da compra: 20/10/2026\nTotal R$ 12000',
     "JOAO PEDRO D'AVILA\nRPV 20.000,00 aquisição 14.000,00",
 ]
-TELAS = ['#inicio', '#operacoes', '#contas', '#mais', '#grafico', '#lixeira', '#backup', '#novidades', '#agenda']
+TELAS = ['#inicio', '#operacoes', '#contas', '#mais', '#grafico', '#lixeira', '#backup', '#novidades', '#agenda', '#ajustes']
 
 
 def pdf_de_teste(textos, enchimento=0):
@@ -280,6 +280,11 @@ class TestAppDoCelular(unittest.TestCase):
         self.assertNotIn('Na Lixeira', telas['#operacoes'])
         self.assertIn('Gráfico mensal', telas['#mais'])
         self.assertIn('trancados com a senha', telas['#backup'])
+        self.assertNotIn('Situação das operações', telas['#inicio'])  # A agenda já mostra o que está atrasado.
+        self.assertIn('Nova entrada', telas['#inicio'])
+        self.assertIn('Sobre os dados · versão', telas['#mais'])
+        self.assertIn('Tema', telas['#ajustes'])
+        self.assertNotIn('Automático', telas['#mais'])  # A escolha do tema fica em Ajustes.
         import novidades
         versao, itens = novidades.NOVIDADES[0]
         self.assertIn(f'Versão {versao}', telas['#novidades'])
@@ -587,7 +592,9 @@ class TestQuemUsaSoOCelular(unittest.TestCase):
         self.assertNotIn('Ligue o backup', self.r['inicio_com_dados'])
         self.assertIn('sincroniza ao voltar a internet', self.r['inicio_com_dados'])
         self.assertNotIn('Fazer cópia de segurança', self.r['mais'])  # A cópia é a da nuvem.
-        self.assertIn('Backup na nuvem', self.r['mais'])
+        self.assertIn('Backup na nuvem', self.r['ajustes'])  # Em Mais → Ajustes, junto do tema e do nome.
+        self.assertIn('Ajustes', self.r['mais'])
+        self.assertNotIn('Backup na nuvem', self.r['mais'])
         self.assertNotIn('computador', self.r['mais'])
         self.assertEqual(self.r['abertura'], {'fonte': 'Seus dados, guardados neste celular', 'novo': False, 'outras': False})
         self.assertIn("João D'Ávila Santos", self.r['operacoes_depois'])  # Continua depois de trancar e abrir.

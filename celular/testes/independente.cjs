@@ -160,6 +160,8 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
     // 4. Trancar e abrir de novo com a senha: os dados continuam.
     await ir('#mais');
     r.mais = await texto();
+    await ir('#ajustes');
+    r.ajustes = await texto();
     await pagina.evaluate(() => trancarGestor());
     await pagina.waitForFunction(() => document.getElementById('fonte-titulo').textContent.length > 0
       && !document.getElementById('abertura').hidden);

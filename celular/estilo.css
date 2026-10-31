@@ -407,7 +407,7 @@ body[data-tela="inicio"] .topo { min-height: calc(max(14px, env(safe-area-inset-
   align-items: center;
   gap: 12px;
   min-width: 0;
-  padding: 14px;
+  padding: 16px;
   border-radius: var(--raio);
   background: var(--superficie);
   border: 1px solid var(--borda-suave);
@@ -436,9 +436,34 @@ body[data-tela="inicio"] .topo { min-height: calc(max(14px, env(safe-area-inset-
 .indicador.verde .valor { color: var(--texto); }
 .indicador.verde .icone-indicador { border-radius: 50%; color: var(--verde-suave); background: var(--verde); }
 
-.situacoes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.situacoes a { text-decoration: none; color: inherit; text-align: center; padding: 14px 8px; }
-.situacoes .numero { font-family: var(--serifa); font-size: 1.7rem; font-weight: 700; }
+/* Atalhos do Início: Nova entrada em destaque, na largura toda; Em aberto e Gráfico lado a lado. */
+.atalhos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
+.atalho {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 64px;
+  padding: 16px 14px;
+  border-radius: var(--raio);
+  background: var(--superficie);
+  border: 1px solid var(--borda-suave);
+  box-shadow: var(--sombra);
+  color: inherit;
+  text-decoration: none;
+}
+.atalho .textos { display: grid; min-width: 0; }
+.atalho .nome { font-weight: 700; font-size: 1.05rem; }
+.atalho .pequeno { color: var(--secundario); }
+.icone-atalho { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px; flex: none; color: var(--marca); background: var(--marca-suave); }
+.icone-atalho svg { width: 22px; height: 22px; }
+.atalho.ambar .icone-atalho { color: var(--ambar); background: var(--ambar-suave); }
+.atalho.principal { grid-column: 1 / -1; min-height: 72px; background: var(--marca); border-color: var(--marca); color: var(--marca-texto); box-shadow: var(--sombra-marca); }
+.atalho.principal .nome { font-size: 1.2rem; }
+.atalho.principal .pequeno { color: inherit; opacity: 0.85; }
+.atalho.principal .icone-atalho { border-radius: 50%; color: inherit; background: rgba(255, 255, 255, 0.18); }
+
+.sobre-dados { display: block; margin: 18px 0 4px; text-align: center; font-size: 0.75rem; color: var(--secundario); text-decoration: none; }
 
 /* ---- Avisos ---- */
 .aviso {
@@ -767,11 +792,11 @@ a.cartao.agenda-resumo { background: none; border: 0; box-shadow: none; padding:
 .agenda-resumo .nome { font-family: var(--serifa); font-weight: 700; font-size: 1.2rem; }
 .agenda-resumo .mostrar { color: var(--destaque); font-weight: 600; }
 .blocos-agenda { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center; }
-.bloco-agenda { padding: 10px 2px; border-radius: var(--raio-pequeno); background: var(--superficie); border: 1px solid var(--borda-suave); }
+.bloco-agenda { padding: 16px 2px; border-radius: var(--raio-pequeno); background: var(--superficie); border: 1px solid var(--borda-suave); }
 .bloco-agenda.atrasadas { background: var(--vermelho-suave); border-color: transparent; }
 .bloco-agenda.hoje { background: var(--ambar-suave); border-color: transparent; }
 .bloco-agenda.amanha { background: var(--azul-suave); border-color: transparent; }
-.bloco-agenda .numero { font-family: var(--serifa); font-size: 1.5rem; font-weight: 700; }
+.bloco-agenda .numero { font-family: var(--serifa); font-size: 1.9rem; font-weight: 700; }
 .bloco-agenda.hoje .numero.marca { color: var(--ambar); }
 .bloco-agenda.amanha .numero.marca { color: var(--azul); }
 .numero.marca { color: var(--destaque); }
@@ -804,10 +829,8 @@ a.cartao.agenda-resumo { background: none; border: 0; box-shadow: none; padding:
 .grade-agenda .dia.escolhido .marca-dia { color: var(--marca-texto); }
 
 /* ---- Modo discreto: o olho num círculo, no canto do topo ---- */
+.acoes-topo { grid-column: 2; grid-row: 1 / span 2; align-self: end; display: flex; gap: 8px; }
 .botao-discreto {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-  align-self: end;
   display: grid;
   place-items: center;
   width: 44px;
@@ -823,6 +846,9 @@ a.cartao.agenda-resumo { background: none; border: 0; box-shadow: none; padding:
 .botao-discreto .olho-fechado, .botao-discreto.ligado .olho-aberto { display: none; }
 .botao-discreto.ligado .olho-fechado { display: block; }
 .botao-discreto.ligado { color: var(--marca-texto); background: var(--marca); border-color: var(--marca); }
+.botao-tema .sol, .botao-tema.escuro .lua { display: none; }
+.botao-tema.escuro .sol { display: block; }
+body:not([data-tela="inicio"]) .botao-tema { display: none; }
 
 /* ---- Colar e preencher e resumo em imagem ---- */
 details.colar { margin-bottom: 12px; }
@@ -867,14 +893,14 @@ label.escolher-backup { position: relative; overflow: hidden; margin-top: 0; cur
 /* ---- Microinterações ---- */
 /* Toque: o elemento encolhe para 0,98 enquanto o dedo está nele (120 ms) e volta em 160 ms. Só transform e cor,
    que não refazem o layout; transição (não keyframes), para retomar do ponto atual se tocar de novo. */
-button, a.botao-link, label.botao-link, a.cartao, a.item, label.escolher-backup, .situacoes a, .filtros button,
+button, a.botao-link, label.botao-link, a.cartao, a.item, label.escolher-backup, .atalho, .filtros button,
 .grade-agenda .dia, details.acao summary, details.conta summary, .abas a, .opcao-menu {
   transition: transform 160ms var(--ease-entrada), background-color 160ms var(--ease-entrada),
     color 160ms var(--ease-entrada), box-shadow 160ms var(--ease-entrada);
   -webkit-tap-highlight-color: transparent;
 }
 button:active:not(:disabled), a.botao-link:active, label.botao-link:active, a.cartao:active, a.item:active,
-label.escolher-backup:active, .situacoes a:active, .filtros button:active, .grade-agenda .dia:active,
+label.escolher-backup:active, .atalho:active, .filtros button:active, .grade-agenda .dia:active,
 details.acao summary:active, details.conta summary:active, .abas a:active, .opcao-menu:active {
   transform: scale(0.98);
   transition-duration: 120ms;
@@ -892,7 +918,7 @@ a.cartao.agenda-resumo:active, a.aviso.item:active { transform: scale(0.99); }
 .tela.entrando { animation: chegar-tela var(--movimento-normal) var(--ease-entrada); }
 .tela.empurrando { animation: empurrar-tela var(--movimento-lento) var(--ease-entrada); }
 .tela.voltando { animation: voltar-tela var(--movimento-normal) var(--ease-entrada); }
-.tela.entrando > .panorama, .tela.entrando > .indicadores > *, .tela.entrando > .agenda-resumo, .tela.entrando > .situacoes {
+.tela.entrando > .panorama, .tela.entrando > .indicadores > *, .tela.entrando > .agenda-resumo, .tela.entrando > .atalhos {
   animation: chegar-tela var(--movimento-lento) var(--ease-entrada) both;
 }
 .tela.entrando > .indicadores > :nth-child(1) { animation-delay: 35ms; }
@@ -900,7 +926,7 @@ a.cartao.agenda-resumo:active, a.aviso.item:active { transform: scale(0.99); }
 .tela.entrando > .indicadores > :nth-child(3) { animation-delay: 105ms; }
 .tela.entrando > .indicadores > :nth-child(4) { animation-delay: 140ms; }
 .tela.entrando > .agenda-resumo { animation-delay: 170ms; }
-.tela.entrando > .situacoes { animation-delay: 200ms; }
+.tela.entrando > .atalhos { animation-delay: 200ms; }
 
 /* Troca de filtro: só a lista se transforma (crossfade), sem a tela piscar. */
 @keyframes trocar { from { opacity: 0; } to { opacity: 1; } }
@@ -925,7 +951,7 @@ details[open] > :not(summary) { animation: abrir-detalhe 240ms var(--ease-padrao
   form.recebimento.chamando { animation: none; }
   .grafico.subindo .barra3d { animation: none; }
   button:active:not(:disabled), a.botao-link:active, label.botao-link:active, a.cartao:active, a.item:active,
-  label.escolher-backup:active, .situacoes a:active, .filtros button:active, .grade-agenda .dia:active,
+  label.escolher-backup:active, .atalho:active, .filtros button:active, .grade-agenda .dia:active,
   details.acao summary:active, details.conta summary:active, a.cartao.agenda-resumo:active, a.aviso.item:active,
   .abas a:active, .opcao-menu:active {
     transform: none;

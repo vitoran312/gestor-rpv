@@ -7,7 +7,7 @@
 (() => {
   // Igual a versao.py (test_celular confere): mostrada na abertura e em Mais, para saber se o aparelho já
   // carregou a última versão publicada.
-  const VERSAO_APP = '0.63.0';
+  const VERSAO_APP = '0.64.0';
   const D = GestorDados;
   const $ = (id) => document.getElementById(id);
   const SITUACOES = { pendente: 'Pendente', atrasada: 'Atrasada', recebida: 'Recebida' };
@@ -63,6 +63,8 @@
     cadeado: ['M6 10.5h12v10H6z', 'M8.5 10.5v-3a3.5 3.5 0 0 1 7 0v3'],
     celular: ['M8 3.5h8v17H8z', 'M11 17.5h2'],
     seta: ['M9 5.5l6.5 6.5L9 18.5'],
+    ajustes: ['M4 7h10M18 7h2M4 17h4M12 17h8', 'M16 4.5v5M10 14.5v5'],
+    mais: ['M12 5.5v13M5.5 12h13'],
   };
 
   function icone(nome, classe = 'icone') {
@@ -652,11 +654,10 @@
     const indicador = (rotulo, valor, classe, simbolo) => el('div', { class: 'indicador ' + (classe || '') },
       el('span', { class: 'icone-indicador' }, icone(simbolo)),
       el('div', { class: 'textos' }, el('div', { class: 'rotulo', texto: rotulo }), el('div', { class: 'valor', texto: valor })));
-    const situacao = (chave, rotulo, classe) => el('a', { class: 'cartao', href: '#operacoes', onclick: () => {
-      estado.filtro = chave;
-      estado.busca = '';
-    } }, el('div', { class: 'numero ' + (classe || ''), texto: String(totais[chave]) }),
-    el('div', { class: 'discreto pequeno', texto: rotulo }));
+    // Atalhos grandes, no lugar da antiga "Situação das operações" (a agenda já mostra o que está atrasado).
+    const atalho = (href, rotulo, detalhe, simbolo, classe, aoTocar) => el('a', { class: 'atalho ' + (classe || ''), href,
+      onclick: aoTocar }, el('span', { class: 'icone-atalho' }, icone(simbolo)),
+    el('span', { class: 'textos' }, el('span', { class: 'nome', texto: rotulo }), el('span', { class: 'pequeno', texto: detalhe })));
     const oferta = senhaRecente && senhaRecente.oferecer && el('div', { class: 'aviso' },
       el('div', { texto: 'Abrir com Face ID nas próximas vezes, sem digitar a senha?' }),
       el('div', { class: 'botoes' },
@@ -671,10 +672,10 @@
       info.naoGuardado && el('p', { class: 'aviso', texto: 'Não foi possível guardar o backup neste aparelho (falta de espaço?). Na próxima vez, escolha o arquivo de novo.' }),
       // A nuvem é a cópia de segurança: só aparece aviso se ela ainda não foi ligada (dados antigos abertos pelo
       // Face ID) ou no raro caso de este celular e outro terem mudado os dados ao mesmo tempo.
-      !info.demonstracao && nuvemCarregada && !(nuvem && nuvem.backup) && el('a', { class: 'aviso item', href: '#mais' },
+      !info.demonstracao && nuvemCarregada && !(nuvem && nuvem.backup) && el('a', { class: 'aviso item', href: '#ajustes' },
         el('div', { class: 'nome', texto: 'Ligue o backup na nuvem' }),
-        el('div', { class: 'discreto pequeno', texto: 'Em Mais, confirme a sua senha uma vez: os dados passam a ir para a nuvem a cada gravação.' })),
-      !info.demonstracao && estadoNuvem().conflito_dados && el('a', { class: 'aviso item', href: '#mais' },
+        el('div', { class: 'discreto pequeno', texto: 'Em Mais → Ajustes, confirme a sua senha uma vez: os dados passam a ir para a nuvem a cada gravação.' })),
+      !info.demonstracao && estadoNuvem().conflito_dados && el('a', { class: 'aviso item', href: '#ajustes' },
         el('div', { class: 'nome', texto: 'Dados mudados em dois aparelhos ao mesmo tempo' }),
         el('div', { class: 'discreto pequeno', texto: 'Toque para escolher quais ficam.' })),
       dados.demonstracao && !info.demonstracao && el('p', { class: 'aviso', texto: 'Este backup tem dados de demonstração, com nomes e valores fictícios.' }),
@@ -694,11 +695,13 @@
         indicador('Capital investido em aberto', reais(ind.aberto), '', 'moedas'),
         indicador('Lucro realizado', reais(ind.realizado), 'verde', 'dinheiro')),
       dados.operacoes.length > 0 && cartaoAgenda(),
-      el('h2', { texto: 'Situação das operações' }),
-      el('div', { class: 'situacoes' },
-        situacao('pendente', 'Pendentes'),
-        situacao('atrasada', 'Atrasadas', totais.atrasada ? 'vermelho' : ''),
-        situacao('recebida', 'Recebidas', 'verde')),
+      el('div', { class: 'atalhos' },
+        atalho('#nova', 'Nova entrada', 'Cadastrar uma operação', 'mais', 'principal'),
+        atalho('#operacoes', 'Pendentes', D.quantidade(totais.pendente, 'operação', 'operações'), 'documento', '', () => {
+          estado.filtro = 'pendente';
+          estado.busca = '';
+        }),
+        atalho('#grafico', 'Gráfico', 'Últimos 12 meses', 'barras', 'ambar')),
     ];
   }
 
@@ -964,13 +967,13 @@
     window.scrollTo(0, rolagem);
   }
 
-  // Depois de um envio, só o texto pequeno muda (o Início e o cartão da nuvem em Mais); a tela não é redesenhada.
+  // Depois de um envio, só o texto pequeno muda (o Início e o cartão da nuvem em Ajustes); a tela não é redesenhada.
   function atualizarTextoSincronia() {
     if (!info || info.demonstracao) {
       return;
     }
     document.querySelectorAll('.panorama-fonte').forEach((p) => { p.textContent = textoSincronia(); });
-    if (location.hash === '#mais' && !$('tela').querySelector('form input:focus')) {
+    if (location.hash === '#ajustes' && !$('tela').querySelector('form input:focus')) {
       redesenharSemPular();
     }
   }
@@ -2564,11 +2567,10 @@
       grupo('Aplicativo e compartilhamento',
         !info.demonstracao && opcao('#compartilhar', 'Compartilhar com outra pessoa', 'Ela entra com o nome e a senha dela e vê os mesmos dados', 'convidar', 'verde'),
         opcao('#novidades', 'Novidades', 'O que mudou nas últimas versões', 'megafone'),
-        opcao('#convite', 'Indicar o app', 'Mandar o app para outra pessoa usar com os dados dela', 'convidar', 'azul'),
-        opcao('#backup', 'Sobre os dados', `Gravação, versão do app ${VERSAO_APP}`, 'info', 'azul')),
-      grupo('Aparência', escolherTema(), escolherNome()),
-      !info.demonstracao && grupo('Nuvem e lembretes', cartaoNuvem(), cartaoLembretes()),
-      grupo('Segurança',
+        opcao('#convite', 'Indicar o app', 'Mandar o app para outra pessoa usar com os dados dela', 'convidar', 'azul')),
+      grupo('Ajustes e segurança',
+        opcao('#ajustes', 'Ajustes', info.demonstracao ? 'Tema e nome' : 'Tema, nome, backup na nuvem, lembretes e calendário',
+          'ajustes', 'ambar'),
         senhaRecente && !faceIdAtivo && el('div', { class: 'cartao' },
           el('div', { texto: 'Ativar o Face ID' }), el('div', { class: 'discreto pequeno', texto: 'Abrir o app com o rosto, sem digitar a senha' }),
           el('div', { class: 'botoes' }, el('button', { type: 'button', class: 'primario', texto: 'Ativar',
@@ -2586,6 +2588,16 @@
       el('div', { class: 'menu-acoes' },
         info.demonstracao && el('button', { type: 'button', class: 'primario', texto: 'Começar a usar com meus dados', onclick: sairDaDemonstracao }),
         !info.demonstracao && el('button', { type: 'button', class: 'secundario', texto: 'Apagar os dados deste celular', onclick: esquecerBackup })),
+      el('a', { class: 'sobre-dados', href: '#backup', texto: `Sobre os dados · versão ${VERSAO_APP}` }),
+    ];
+  }
+
+  // Ajustes: tema, nome e, com dados de verdade, o backup na nuvem e os lembretes com o calendário.
+  function telaAjustes() {
+    const grupo = (titulo, ...itens) => [el('h3', { class: 'grupo-menu', texto: titulo }), el('div', { class: 'menu' }, itens)];
+    return [
+      grupo('Aparência', escolherTema(), escolherNome()),
+      !info.demonstracao && grupo('Nuvem e lembretes', cartaoNuvem(), cartaoLembretes()),
     ];
   }
 
@@ -2671,6 +2683,7 @@
     lixeira: { titulo: 'Lixeira', aba: 'mais', montar: telaLixeira, voltar: true },
     grafico: { titulo: 'Gráfico mensal', aba: 'mais', montar: telaGrafico, voltar: true },
     backup: { titulo: 'Sobre os dados', aba: 'mais', montar: telaBackup, voltar: true },
+    ajustes: { titulo: 'Ajustes', aba: 'mais', montar: telaAjustes, voltar: true },
     novidades: { titulo: 'Novidades', aba: 'mais', montar: telaNovidades, voltar: true },
     nova: { titulo: 'Nova entrada', aba: 'operacoes', montar: telaNovaEntrada, voltar: true },
     editar: { titulo: 'Editar entrada', aba: 'operacoes', montar: telaEditar, voltar: true },
@@ -2843,6 +2856,7 @@
         texto: rotulo, onclick: () => {
           localStorageGravar('tema', chave);
           aplicarTema(chave);
+          mostrarBotaoTema();
           const rolagem = window.scrollY;
           desenhar();
           window.scrollTo(0, rolagem);
@@ -2850,6 +2864,28 @@
   }
 
   aplicarTema(localStorageLer('tema'));
+
+  // O sol e a lua no topo do Início: um toque troca entre o claro e o escuro (deixa de seguir o iPhone).
+  const temaDoIphone = window.matchMedia('(prefers-color-scheme: dark)');
+  const temaEscuro = () => (document.documentElement.dataset.tema || (temaDoIphone.matches ? 'escuro' : 'claro')) === 'escuro';
+
+  function mostrarBotaoTema() {
+    const escuro = temaEscuro();
+    $('tema').classList.toggle('escuro', escuro);
+    $('tema').setAttribute('aria-label', escuro ? 'Mudar para o tema claro' : 'Mudar para o tema escuro');
+  }
+
+  mostrarBotaoTema();
+  temaDoIphone.addEventListener('change', mostrarBotaoTema);
+  $('tema').addEventListener('click', () => {
+    const tema = temaEscuro() ? 'claro' : 'escuro';
+    localStorageGravar('tema', tema);
+    aplicarTema(tema);
+    mostrarBotaoTema();
+    const rolagem = window.scrollY;
+    desenhar();
+    window.scrollTo(0, rolagem);
+  });
 
   discreto = localStorageLer('discreto') === '1';
   mostrarDiscreto();

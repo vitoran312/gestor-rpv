@@ -10,6 +10,12 @@ from pathlib import Path
 MOSTRAR = 5  # Quantas versões aparecem no "Sobre".
 
 NOVIDADES = [
+    ('0.64.0', [
+        ('novidade', 'Celular: Início mais limpo, com atalhos grandes (Nova entrada, Pendentes, Gráfico) no lugar da '
+                     '"Situação das operações".'),
+        ('novidade', 'Celular: sol e lua no topo do Início para trocar entre o tema claro e o escuro num toque.'),
+        ('novidade', 'Celular: tema, nome, nuvem e lembretes juntos em Mais → Ajustes; "Sobre os dados" em letra pequena.'),
+    ]),
     ('0.63.0', [
         ('novidade', 'Celular: compartilhe os dados com outra pessoa por um código de convite; cada um com seu nome e senha.'),
         ('novidade', 'Celular: o que um muda aparece no celular do outro, sem perder nada se os dois gravarem juntos.'),

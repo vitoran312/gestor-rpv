@@ -1,6 +1,24 @@
 {
   "versoes": [
     {
+      "versao": "0.64.0",
+      "resumo": "3 novidades",
+      "itens": [
+        {
+          "tipo": "novidade",
+          "texto": "Celular: Início mais limpo, com atalhos grandes (Nova entrada, Pendentes, Gráfico) no lugar da \"Situação das operações\"."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: sol e lua no topo do Início para trocar entre o tema claro e o escuro num toque."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: tema, nome, nuvem e lembretes juntos em Mais → Ajustes; \"Sobre os dados\" em letra pequena."
+        }
+      ]
+    },
+    {
       "versao": "0.63.0",
       "resumo": "6 novidades",
       "itens": [
@@ -93,28 +111,6 @@
         {
           "tipo": "correcao",
           "texto": "Celular: contraste reforçado no tema claro (terracota, vermelho e setas)."
-        }
-      ]
-    },
-    {
-      "versao": "0.59.0",
-      "resumo": "4 novidades",
-      "itens": [
-        {
-          "tipo": "novidade",
-          "texto": "Celular: novo visual em creme, terracota e azul-marinho, com ícones, cartões mais claros e tema escuro combinando."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Celular: Início com \"Seu panorama\" e o lucro previsto em destaque; operações com as iniciais e a faixa da situação."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Celular: Mais organizado em grupos; abas com a aba escolhida em terracota."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Celular: transições suaves entre telas e um aviso rápido depois de gravar algo no celular."
         }
       ]
     }

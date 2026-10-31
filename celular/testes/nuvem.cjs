@@ -105,6 +105,8 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
     await esperar(() => versao(r.cofre) !== antesDaEntrada);
     await a.ir('#mais');
     r.mais_vitor = await a.texto();
+    await a.ir('#ajustes');
+    r.ajustes_vitor = await a.texto();
 
     // 2. O convite: um código de 10 letras e números, para uma pessoa só.
     await a.ir('#compartilhar');

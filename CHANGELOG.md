@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## 0.64.0
+
+Celular, organização das telas:
+- Início: sai "Situação das operações" (a agenda das previsões já mostra atrasadas, hoje, amanhã e a semana, agora
+  com blocos maiores); no lugar, atalhos grandes: Nova entrada (na largura toda), Pendentes e Gráfico.
+- Topo do Início: botão de sol e lua ao lado do olho; um toque troca entre claro e escuro.
+- Mais: Tema, Nome, Backup na nuvem e Lembretes e calendário vão para a tela nova Ajustes (#ajustes); "Sobre os
+  dados" vira uma linha em letra pequena no fim de Mais, com a versão.
+
 ## 0.63.0
 
 App só de celular, dados divididos entre pessoas e sincronização:

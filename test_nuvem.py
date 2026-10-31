@@ -327,7 +327,7 @@ class TestNuvemPeloCelular(unittest.TestCase):
         self.assertNotEqual(self.r['cofre'], self.r['membro_vitor'])
         self.assertIn('Olá, Vitor!', self.r['inicio_vitor'])
         self.assertIn('Sincronizado às', self.r['inicio_vitor'])
-        self.assertIn('Backup na nuvem', self.r['mais_vitor'])
+        self.assertIn('Backup na nuvem', self.r['ajustes_vitor'])
         self.assertIn('Compartilhar com outra pessoa', self.r['mais_vitor'])
         self.assertNotIn('computador', self.r['mais_vitor'])
 
