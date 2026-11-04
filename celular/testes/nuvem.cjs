@@ -203,6 +203,14 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
     await a.novaEntrada('vitor ao mesmo tempo');
     await esperar(() => versao(r.cofre) !== antesDele);
     await a.pagina.waitForTimeout(1500);
+    // A tela continua na entrada que ele acabou de fazer (e não numa da Ana que ganhou o mesmo número).
+    const enderecoDela = await a.pagina.evaluate(() => location.hash);
+    await a.ir('#inicio');
+    await a.ir(enderecoDela);
+    r.tela_depois_de_juntar = await a.texto();
+    await a.pagina.click('text=Editar dados da entrada');
+    await a.pagina.waitForFunction(() => location.hash.startsWith('#editar/'));
+    r.editar_depois_de_juntar = await a.pagina.inputValue('[name="nome"]');
     r.vitor_depois_de_juntar = await a.operacoes();
     await b.voltarAoApp();
     await b.pagina.waitForTimeout(2000);

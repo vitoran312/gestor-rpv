@@ -1,5 +1,14 @@
 # Histórico de versões
 
+## 0.64.3
+
+- Sincronização: ao refazer as gravações deste celular por cima da versão do outro (409 "desatualizado"), a linha
+  nova ganhava outro número (o último + 1), e a tela aberta nela (#operacao, #editar) passava a mostrar a operação
+  do outro celular que ficou com o número antigo. Agora as linhas novas guardam o número escolhido na primeira vez
+  (`inserir` + `rodarGravacao`), com um salto sorteado depois do maior número; se ainda assim coincidir, a tela
+  acompanha o número novo. Documentos de entrada também passam por `inserir`.
+- Operação recebida: botão "Desfazer recebimento" (como `Banco.registrar_recebimento` com data vazia).
+
 ## 0.64.2
 
 - Abertura: no passo de criar dados (Nome + Senha), um aviso em destaque "Alguém da casa já usa o app?" com o botão

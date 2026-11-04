@@ -971,3 +971,4 @@ details[open] > :not(summary) { animation: abrir-detalhe 240ms var(--ease-padrao
 /* Abertura: o convite em destaque antes de criar dados novos (quem divide os dados não deve começar do zero). */
 .aviso.convite-primeiro { display: grid; gap: 4px; margin-bottom: 4px; }
 .aviso.convite-primeiro button { margin-top: 8px; }
+button.desfazer-recebimento { width: 100%; margin: 4px 0 12px; }

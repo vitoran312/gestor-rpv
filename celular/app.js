@@ -7,7 +7,7 @@
 (() => {
   // Igual a versao.py (test_celular confere): mostrada na abertura e em Mais, para saber se o aparelho já
   // carregou a última versão publicada.
-  const VERSAO_APP = '0.64.2';
+  const VERSAO_APP = '0.64.3';
   const D = GestorDados;
   const $ = (id) => document.getElementById(id);
   const SITUACOES = { pendente: 'Pendente', atrasada: 'Atrasada', recebida: 'Recebida' };
@@ -942,9 +942,10 @@
   function gravar(operacao, mensagem) {
     return emOrdem(async () => {
       await puxarDaNuvem();
-      const r = operacao() || {};
+      const item = { operacao, geracao, ids: [] };
+      const r = rodarGravacao(item);
       await salvarLocal(r.novos, r.removidos);
-      filaNuvem.push({ operacao, geracao });
+      filaNuvem.push(item);
       if (mensagem) {
         avisar(typeof mensagem === 'function' ? mensagem(r.valor) : mensagem);
       }
@@ -1113,18 +1114,25 @@
     await trocarPelosDaNuvem(meta);
     let novos = {};
     let removidos = [];
+    const trocados = [];
     filaNuvem = [];
     for (const item of pendentes) {
       try {
-        const r = item.operacao() || {};
+        const r = rodarGravacao(item, trocados);
         novos = { ...novos, ...(r.novos || {}) };
         removidos = [...removidos, ...(r.removidos || [])];
-        filaNuvem.push({ operacao: item.operacao, geracao: geracao + 1 });
+        filaNuvem.push({ ...item, geracao: geracao + 1 });
       } catch (erro) {
         // A operação não cabe mais (o outro aparelho excluiu a mesma entrada, por exemplo): fica de fora.
       }
     }
     await salvarLocal(novos, removidos);
+    // No caso raro de o número da entrada ter mudado, a tela aberta nela acompanha.
+    const operacaoTrocada = trocados.find((t) => t.tabela === 'rpvs'
+      && new RegExp(`^#(operacao|editar|resumo)/${t.antes}$`).test(location.hash));
+    if (operacaoTrocada) {
+      location.replace(location.hash.replace(/\d+$/, String(operacaoTrocada.depois)));
+    }
     gravarEstadoNuvem({ ...estadoNuvem(), criado_em: null });
     return 'refeito';
   }
@@ -1296,11 +1304,37 @@
     await guardarNuvem({ ...nuvem, lembretes: false });
   }
 
+  // Linha nova com um número que não muda quando a gravação é refeita por cima dos dados do outro celular: o
+  // número escolhido na primeira vez fica guardado na gravação (memoriaIds) e é reaproveitado ao refazer. Com um
+  // salto sorteado depois do maior número, dois celulares gravando ao mesmo tempo quase nunca escolhem o mesmo; se
+  // escolherem, a gravação refeita ganha outro, e a tela que mostrava o antigo passa para o novo.
+  let memoriaIds = null;
+
   function inserir(tabela, linha) {
-    const campos = Object.keys(linha);
+    const lembrado = memoriaIds && memoriaIds.lista[memoriaIds.pos];
+    const livre = lembrado && !bancoLocal.exec(`SELECT 1 FROM ${tabela} WHERE id=?`, [lembrado]).length;
+    const maior = bancoLocal.exec(`SELECT COALESCE(MAX(id), 0) FROM ${tabela}`)[0].values[0][0];
+    const id = livre ? lembrado : maior + 1 + Math.floor(Math.random() * 1000);
+    const campos = ['id', ...Object.keys(linha)];
     bancoLocal.run(`INSERT INTO ${tabela} (${campos.join(',')}) VALUES (${campos.map(() => '?').join(',')})`,
-      campos.map((k) => linha[k]));
-    return bancoLocal.exec('SELECT last_insert_rowid()')[0].values[0][0];
+      [id, ...Object.keys(linha).map((k) => linha[k])]);
+    if (memoriaIds) {
+      if (lembrado && lembrado !== id) {
+        memoriaIds.trocados.push({ tabela, antes: lembrado, depois: id });
+      }
+      memoriaIds.lista[memoriaIds.pos++] = id;
+    }
+    return id;
+  }
+
+  // Roda uma gravação (a primeira vez ou refeita) lembrando os números das linhas novas.
+  function rodarGravacao(item, trocados = []) {
+    memoriaIds = { lista: item.ids, pos: 0, trocados };
+    try {
+      return item.operacao() || {};
+    } finally {
+      memoriaIds = null;
+    }
   }
 
   // Como Banco.salvar: nome com iniciais maiúsculas, observação com a primeira maiúscula e a cópia dos dados da
@@ -1374,7 +1408,7 @@
     const novos = {};
     for (const d of documentos) {
       const caminho = `${rpvId}/${crypto.randomUUID().replaceAll('-', '')}.${d.extensao}`;
-      bancoLocal.run("INSERT INTO documentos (rpv_id,nome,caminho,tipo) VALUES (?,?,?,'entrada')", [rpvId, d.nome, caminho]);
+      inserir('documentos', { rpv_id: rpvId, nome: d.nome, caminho, tipo: 'entrada' });
       novos[caminho] = d.bytes;
     }
     return novos;
@@ -1494,6 +1528,13 @@
     return gravar(() => {
       bancoLocal.run('UPDATE rpvs SET recebimento=? WHERE id=? AND lixeira_em IS NULL', [data, registro.id]);
     }, 'Recebimento registrado.');
+  }
+
+  // Como Banco.registrar_recebimento com data vazia: a operação volta a ficar pendente (os comprovantes ficam).
+  function desfazerRecebimentoLocal(registro) {
+    return gravar(() => {
+      bancoLocal.run('UPDATE rpvs SET recebimento=NULL WHERE id=? AND lixeira_em IS NULL', [registro.id]);
+    }, 'Recebimento desfeito.');
   }
 
   function campoFormulario(rotulo, controle, ajuda) {
@@ -1799,6 +1840,15 @@
       ])),
       !r.lixeira_em && el('a', { class: 'botao-link secundario', href: `#resumo/${r.id}`, texto: 'Compartilhar resumo em imagem' }),
       !info.demonstracao && !r.recebimento && !r.lixeira_em && formularioRecebimento(r),
+      !info.demonstracao && r.recebimento && !r.lixeira_em && el('button', { type: 'button', class: 'secundario desfazer-recebimento',
+        texto: 'Desfazer recebimento', onclick: async (evento) => {
+          if (!confirm(`Desfazer o recebimento de ${D.dataBr(r.recebimento)}? A operação volta a ficar pendente.`)) {
+            return;
+          }
+          evento.target.disabled = true;
+          await desfazerRecebimentoLocal(r).catch(() => { evento.target.disabled = false; });
+          desenhar();
+        } }),
       el('h2', { texto: 'Conta de destino' }),
       contaRecolhida(r.conta, conta),
       r.observacoes && [el('h2', { texto: 'Observações' }), cartao(el('div', { class: 'observacoes', texto: r.observacoes }))],

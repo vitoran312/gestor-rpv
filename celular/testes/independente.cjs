@@ -97,6 +97,14 @@ const NAVEGADOR = process.env.GESTOR_RPV_NAVEGADOR || 'chromium';
     await pagina.click('text=Registrar recebimento');
     await pagina.waitForFunction(() => !document.querySelector('form.recebimento'));
     r.detalhe_recebido = await texto();
+    // Desfazer o recebimento (volta a pendente) e registrar de novo.
+    pagina.once('dialog', (d) => d.accept());
+    await pagina.click('button.desfazer-recebimento');
+    await pagina.waitForSelector('form.recebimento');
+    r.detalhe_desfeito = await texto();
+    await pagina.fill('[name="recebimento"]', hoje);
+    await pagina.click('text=Registrar recebimento');
+    await pagina.waitForFunction(() => !document.querySelector('form.recebimento'));
 
     // 3b. Segunda entrada, já com um PDF e uma foto; depois editada, com nova previsão, mais uma foto, excluída
     // e restaurada da lixeira.

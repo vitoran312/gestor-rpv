@@ -1,6 +1,20 @@
 {
   "versoes": [
     {
+      "versao": "0.64.3",
+      "resumo": "1 novidade · 1 correção",
+      "itens": [
+        {
+          "tipo": "correcao",
+          "texto": "Celular: entrada nova feita com o outro celular gravando ao mesmo tempo abria e editava outra operação."
+        },
+        {
+          "tipo": "novidade",
+          "texto": "Celular: \"Desfazer recebimento\" na operação recebida; ela volta a ficar pendente."
+        }
+      ]
+    },
+    {
       "versao": "0.64.2",
       "resumo": "2 novidades · 1 correção",
       "itens": [
@@ -77,20 +91,6 @@
         {
           "tipo": "novidade",
           "texto": "Celular: só o app do celular; as opções do computador saíram, e a nuvem fica sempre ligada."
-        }
-      ]
-    },
-    {
-      "versao": "0.62.0",
-      "resumo": "2 novidades",
-      "itens": [
-        {
-          "tipo": "novidade",
-          "texto": "Celular: a cópia de segurança agora é só a da nuvem; saiu a opção de salvar um arquivo à mão."
-        },
-        {
-          "tipo": "novidade",
-          "texto": "Celular: o Início lembra de ligar o backup na nuvem e avisa se um envio não chegou."
         }
       ]
     }

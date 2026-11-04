@@ -10,6 +10,10 @@ from pathlib import Path
 MOSTRAR = 5  # Quantas versões aparecem no "Sobre".
 
 NOVIDADES = [
+    ('0.64.3', [
+        ('correcao', 'Celular: entrada nova feita com o outro celular gravando ao mesmo tempo abria e editava outra operação.'),
+        ('novidade', 'Celular: "Desfazer recebimento" na operação recebida; ela volta a ficar pendente.'),
+    ]),
     ('0.64.2', [
         ('novidade', 'Celular: quem já criou dados próprios entra nos dados da casa em Mais → Compartilhar → "Recebeu um código?".'),
         ('novidade', 'Celular: na primeira vez, "Tenho um código de convite" aparece em destaque, antes de criar dados novos.'),

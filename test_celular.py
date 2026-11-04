@@ -588,6 +588,8 @@ class TestQuemUsaSoOCelular(unittest.TestCase):
         self.assertIn("João D'Ávila Santos", self.r['detalhe'])
         self.assertIn('futuro', self.r['erro_recebimento'])
         self.assertIn('Recebida', self.r['detalhe_recebido'])
+        self.assertIn('Desfazer recebimento', self.r['detalhe_recebido'])
+        self.assertIn('Não recebido', self.r['detalhe_desfeito'])
         # Sem internet (a nuvem é bloqueada neste teste): nenhum aviso chamativo, só o texto pequeno.
         self.assertNotIn('Ligue o backup', self.r['inicio_com_dados'])
         self.assertIn('sincroniza ao voltar a internet', self.r['inicio_com_dados'])
@@ -651,9 +653,14 @@ class TestQuemUsaSoOCelular(unittest.TestCase):
         rpv = referencia.salvar(dict(self.ENTRADA, custo=500000, previsto=800000, comissao=None, conta_id=conta_id,
                                      conta=''))
         referencia.registrar_recebimento(rpv, self.hoje)
+        # Os números das linhas não entram: no celular, cada linha nova pula um trecho sorteado (para dois celulares
+        # gravando juntos não escolherem o mesmo).
         def linha(banco, tabela):
             with banco.conectar() as con:
-                return {k: v for k, v in dict(con.execute(f'SELECT * FROM {tabela}').fetchone()).items() if k != 'id'}
+                valores = dict(con.execute(f'SELECT * FROM {tabela} ORDER BY id').fetchone())
+            if valores.get('conta_snapshot'):
+                valores['conta_snapshot'] = {k: v for k, v in json.loads(valores['conta_snapshot']).items() if k != 'id'}
+            return {k: v for k, v in valores.items() if k not in ('id', 'conta_id')}
 
         self.assertEqual(linha(do_celular, 'contas'), linha(referencia, 'contas'))
         self.assertEqual(linha(do_celular, 'rpvs'), linha(referencia, 'rpvs'))

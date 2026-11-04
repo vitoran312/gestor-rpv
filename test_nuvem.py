@@ -368,6 +368,9 @@ class TestNuvemPeloCelular(unittest.TestCase):
         self.assertIn('Entrada Da Ana', self.r['operacoes_lilian'])
         self.assertIn('Lilian', self.r['membros_com_lilian'])
         self.assertTrue(self.r['cofre_da_lilian_apagado'])
+        self.assertIn('Vitor Ao Mesmo Tempo', self.r['tela_depois_de_juntar'])
+        self.assertNotIn('Ana Ao Mesmo Tempo', self.r['tela_depois_de_juntar'])
+        self.assertEqual(self.r['editar_depois_de_juntar'], 'Vitor Ao Mesmo Tempo')
         self.assertTrue(self.r['antigos_sem_cadastro'])  # O caso do Face ID antigo: sem cadastro da pessoa na nuvem.
         self.assertIn('confirme a sua senha', self.r['compartilhar_antigos'])
         self.assertEqual(self.r['antigos_migrados'], {'cadastro_continua': True, 'cofre_novo': True})
